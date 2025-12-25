@@ -1,0 +1,392 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:nxnapp/l10n/app_localizations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../theme.dart';
+import '../widgets/brand_logo.dart';
+import '../providers/locale_provider.dart';
+import 'package:nxnapp/providers/user_provider.dart';
+import 'home_shell.dart';
+import 'login.dart';
+import 'onboarding/profile_setup_page.dart';
+
+class RegistrationPage extends StatefulWidget {
+  const RegistrationPage({super.key});
+
+  @override
+  State<RegistrationPage> createState() => _RegistrationPageState();
+}
+
+class _RegistrationPageState extends State<RegistrationPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _pass = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _obscure = true;
+  bool _agree = false;
+  bool _isLoading = false;
+
+  void _skipToHome() {
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.guestMessage)), // "Continuing as guest..."
+    );
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeShell()),
+          (route) => false,
+    );
+  }
+
+  Future<void> _continueWithUaePass() async {
+    setState(() => _isLoading = true);
+    // Simulate network delay for demo
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    // Navigate to Profile Setup with PRE-FILLED demo data
+    // This satisfies "Fix the data" request
+    final demoData = {
+      'businessName': 'Al Falak Logistics',
+      'contactNumber': '+971 50 123 4567',
+      'licenseNumber': 'CN-1234567',
+    };
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileSetupPage(uaePassData: demoData),
+      ),
+    );
+  }
+
+  Future<void> _submitEmailSignUp() async {
+    final l10n = AppLocalizations.of(context)!;
+    if (!_agree) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.agreeTermsError),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+    if (_formKey.currentState?.validate() ?? false) {
+      try {
+        final response = await Supabase.instance.client.auth.signUp(
+          email: _email.text.trim(),
+          password: _pass.text.trim(),
+          data: {'full_name': _name.text.trim()},
+          emailRedirectTo: 'io.supabase.nxnapp://login-callback',
+        );
+
+        if (!mounted) return;
+
+        if (response.user != null) {
+          if (response.session == null) {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Text('Verify your email'),
+                  content: Text('A verification link has been sent to ${_email.text}.\nHowever, you can also use "Skip for now" to continue with the demo.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                         Navigator.pop(context);
+                         // Optional: could go to login, or stay here.
+                         Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (_) => const LoginPage()),
+                         );
+                      }, 
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n.accountCreated)),
+            );
+
+            // SYNC NAME TO PROFILE immediately
+            Provider.of<UserProvider>(context, listen: false).setUser(
+              businessName: _name.text.trim(), // Use name from form
+              contactNumber: '', 
+              licenseNumber: '',
+              email: _email.text.trim(),
+            );
+
+            Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const HomeShell()),
+                (route) => false,
+            );
+          }
+        }
+      } on AuthException catch (e) {
+        if (!mounted) return;
+         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.registrationFailed), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _pass.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: const BackButton(color: AppColors.bluePrimary),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.language, color: AppColors.bluePrimary),
+            onPressed: () {
+              Provider.of<LocaleProvider>(context, listen: false).toggleLocale();
+            },
+          ),
+          TextButton(
+            onPressed: _skipToHome,
+            child: Text(
+              l10n.skipForNow,
+              style: const TextStyle(
+                color: AppColors.bluePrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            const BrandLogo(height: 70), // Slightly smaller to fit
+            const SizedBox(height: 32),
+
+            // ===== UAE PASS Quick Option =====
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F9FF), // Very clear light blue
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.15)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.quickRegistration,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _continueWithUaePass,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green[700], // UAE Pass Color
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: _isLoading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                        : const Icon(Icons.fingerprint),
+                    label: Text(
+                      l10n.uaePassContinue,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // ===== Divider =====
+            Row(
+              children: [
+                const Expanded(child: Divider(color: AppColors.border)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Text(l10n.orDivider, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                ),
+                const Expanded(child: Divider(color: AppColors.border)),
+              ],
+            ),
+
+            const SizedBox(height: 30),
+
+            // ===== Email Form =====
+            Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                   Text(
+                    l10n.registerWithEmail,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  TextFormField(
+                    controller: _name,
+                    decoration: InputDecoration(
+                        labelText: l10n.fullName,
+                        prefixIcon: const Icon(Icons.person_outline),
+                    ),
+                    validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? l10n.requiredField : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _email,
+                    decoration: InputDecoration(
+                        labelText: l10n.emailLabel,
+                        prefixIcon: const Icon(Icons.email_outlined),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return l10n.requiredField;
+                      final ok = RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim());
+                      if (!ok) return l10n.invalidEmail;
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _pass,
+                    obscureText: _obscure,
+                    decoration: InputDecoration(
+                      labelText: l10n.passwordLabel,
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                        ),
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                      ),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return l10n.requiredField;
+                      if (v.length < 6) return l10n.minSixChars;
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirm,
+                    obscureText: _obscure,
+                    decoration: InputDecoration(
+                        labelText: l10n.confirmPassword,
+                        prefixIcon: const Icon(Icons.lock_outline),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return l10n.requiredField;
+                      if (v != _pass.text) return l10n.passwordMismatch;
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Terms agreement
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _agree,
+                          activeColor: AppColors.bluePrimary,
+                          onChanged: (v) => setState(() => _agree = v ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.agreeTerms,
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Register button
+                  ElevatedButton(
+                    onPressed: _submitEmailSignUp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.bluePrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: Text(
+                      l10n.createAccount,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                        Text("Already have an account?", style: TextStyle(color: Colors.grey[600])),
+                        TextButton(
+                            onPressed: () {
+                            Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const LoginPage()),
+                            );
+                            },
+                        child: Text(l10n.loginButton, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
