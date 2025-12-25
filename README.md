@@ -1,12 +1,10 @@
-# nxnapp
+# NXN App
 
-A new Flutter project.
+A Flutter project for the NXN App.
 
 ## Getting Started
 
 This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
 
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
@@ -14,3 +12,43 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+---
+
+# NXN App Backend Server
+
+This is the Node.js backend for the NXN App, handling payment processing via Fintx and authentication via Supabase.
+
+## Setup
+
+1.  **Install Dependencies**
+    Since the environment prevented automatic installation, please run:
+    ```bash
+    cd server
+    npm install
+    ```
+
+2.  **Environment Variables**
+    Open `server/.env` and fill in your actual credentials:
+    -   `SUPABASE_URL` & `SUPABASE_KEY`: From your Supabase project settings.
+    -   `FINTX_API_URL`, `FINTX_API_KEY`, `FINTX_MERCHANT_ID`: From your Fintx dashboard.
+
+3.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
+
+## API Endpoints
+
+-   `GET /api/status`: Check server health.
+-   `POST /api/payment/initiate`: Create a payment link. Requires Bearer Token.
+-   `POST /api/payment/webhook`: Handle Fintx callbacks.
+
+## Project Structure
+
+-   `src/app.js`: Entry point.
+-   `src/config`: Configuration files.
+-   `src/services`: Business logic (Payment integration).
+-   `src/controllers`: Request handlers.
+-   `src/routes`: API route definitions.
+-   `src/middlewares`: Auth middleware.
