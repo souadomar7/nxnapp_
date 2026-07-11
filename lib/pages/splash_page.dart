@@ -20,11 +20,10 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _redirect() async {
-    // Wait a bit for splash effect
+
     await Future.delayed(const Duration(seconds: 2));
 
     try {
-      // Explicitly sign out to ensure clean state as per user request
       await Supabase.instance.client.auth.signOut();
     } catch (_) {
       // Ignore errors if already signed out or network issues during splash

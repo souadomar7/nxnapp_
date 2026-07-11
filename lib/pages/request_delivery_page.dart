@@ -5,9 +5,12 @@ import 'payment_page.dart';
 import '../models/invoice.dart';
 import '../services/marketplace_service.dart'; // Import service
 
+import '../theme.dart';
+import '../widgets/brand_logo.dart';
+
 // Match other premium pages
 class RequestDeliveryColors {
-  static const primary = Color(0xFF0057FF); // Vibrant Blue
+  static const primary = AppColors.bluePrimary; // Match App Theme
   static const background = Color(0xFFF3F6FB); // Light Grey-Blue
   static const textDark = Color(0xFF1A1F36); // Dark user text
   static const cardBorder = Color(0xFFE0E6F2);
@@ -39,8 +42,8 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
   String? _country; // International country
   String? _internationalCity; // City in selected country
 
-  // Domestic: 7 Emirates
-  final List<String> _uaeEmirates = const [
+  // Domestic: 7 Emirates (Keys)
+  final List<String> _uaeEmiratesKeys = const [
     'Abu Dhabi',
     'Dubai',
     'Sharjah',
@@ -52,6 +55,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
 
   // International countries and cities
   final Map<String, List<String>> _citiesByCountry = const {
+    // Keeping countries in English for now as requested keys in batch 3 were limited
     'Qatar': ['Doha', 'Al Rayyan', 'Al Wakrah'],
     'Saudi Arabia': ['Riyadh', 'Jeddah', 'Dammam', 'Khobar'],
     'Bahrain': ['Manama', 'Riffa'],
@@ -61,17 +65,36 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
     'USA': ['New York', 'Los Angeles', 'Chicago', 'Houston'],
   };
 
-  // Delivery Options Configuration
-  final Map<String, List<Map<String, String>>> _deliveryOptions = {
-    'NXN': [
-      {'label': 'Standard', 'duration': '2-3 Days', 'price': 'AED 25'},
-      {'label': 'Express', 'duration': 'Same Day', 'price': 'AED 45'},
-      {'label': 'Economy', 'duration': '5-7 Days', 'price': 'AED 15'},
-    ],
-    'EMX': [
-      {'label': 'Premium', 'duration': 'Same Day', 'price': 'AED 60'},
-    ],
-  };
+  // Delivery Options Configuration Helper
+  Map<String, List<Map<String, String>>> _getDeliveryOptions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return {
+      'NXN': [
+        {'id': 'Standard', 'label': l10n.standard, 'duration': l10n.days2to3, 'price': 'AED 25'},
+        {'id': 'Express', 'label': l10n.express, 'duration': l10n.sameDay, 'price': 'AED 45'},
+        {'id': 'Economy', 'label': l10n.economy, 'duration': l10n.days5to7, 'price': 'AED 15'},
+      ],
+      'EMX': [
+        {'id': 'Premium', 'label': l10n.premium, 'duration': l10n.sameDay, 'price': 'AED 60'},
+      ],
+    };
+  }
+
+  String _getEmirateName(BuildContext context, String key) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (key) {
+      case 'Dubai': return l10n.dubai;
+      case 'Abu Dhabi': return l10n.abuDhabi;
+      case 'Sharjah': return l10n.sharjah;
+      case 'Al Ain': return l10n.alAin; // Though Al Ain is city, usually mapped to Abu Dhabi or self.
+      // For others, return key or add more keys.
+      // Reusing keys from Batch 2.
+      // Missing keys for Ajman, etc. Returning key if not found or adding keys now?
+      // I'll return key for now or add "ajman" etc to arb if needed.
+      // Given scope, I'll rely on provided keys or fallback.
+      default: return key; 
+    }
+  }
 
   @override
   void dispose() {
@@ -188,21 +211,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "NXN",
-                            style: TextStyle(
-                              color: RequestDeliveryColors.primary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
+                        child: const BrandLogo(height: 40),
                       ),
                       const Spacer(),
                       Row(
@@ -288,7 +297,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
                                  setState(() {
                                    _shippingCompany = val;
                                    // Reset/Default delivery type to first option of new company
-                                   _deliveryType = _deliveryOptions[val]!.first['label']!;
+                                   _deliveryType = _getDeliveryOptions(context)[val]!.first['id']!;
                                  });
                                },
                                validator: (val) => val == null ? AppLocalizations.of(context)!.selectShippingCompanyError : null,
@@ -300,22 +309,22 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
                              
                              if (_shippingCompany == null)
                                Text(
-                                 "Please select a shipping company first.",
+                                 AppLocalizations.of(context)!.selectShippingCompanyFirst,
                                  style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic),
                                )
                              else 
                                Row(
-                                 children: _deliveryOptions[_shippingCompany]!.map((opt) {
+                                 children: _getDeliveryOptions(context)[_shippingCompany]!.map((opt) {
+                                   final id = opt['id']!;
                                    final label = opt['label']!;
                                    return Expanded(
                                      child: Padding(
                                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
                                        child: _DeliveryTypeCard(
                                          label: label, 
-                                         duration: opt['duration']!, 
-                                         price: opt['price']!, 
-                                         isSelected: _deliveryType == label,
-                                         onTap: () => setState(() => _deliveryType = label),
+                                         // duration and price removed
+                                         isSelected: _deliveryType == id,
+                                         onTap: () => setState(() => _deliveryType = id),
                                        ),
                                      ),
                                    );
@@ -376,7 +385,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
                                  decoration: _fieldDecoration(),
                                  dropdownColor: Colors.white,
                                  initialValue: _localCity,
-                                 items: _uaeEmirates.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                                 items: _uaeEmiratesKeys.map((e) => DropdownMenuItem(value: e, child: Text(_getEmirateName(context, e)))).toList(),
                                  onChanged: (val) => setState(() => _localCity = val),
                                  validator: (val) => val == null ? AppLocalizations.of(context)!.selectCityError : null,
                                ),
@@ -586,15 +595,11 @@ class _Label extends StatelessWidget {
 
 class _DeliveryTypeCard extends StatelessWidget {
   final String label;
-  final String duration;
-  final String price;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _DeliveryTypeCard({
     required this.label, 
-    required this.duration, 
-    required this.price, 
     required this.isSelected,
     required this.onTap,
   });
@@ -605,8 +610,7 @@ class _DeliveryTypeCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        // width: 100, // REMOVED FIXED WIDTH
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8), // Increased vertical padding
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8), 
         decoration: BoxDecoration(
           color: isSelected ? RequestDeliveryColors.primary : const Color(0xFFFAFBFE),
           borderRadius: BorderRadius.circular(14),
@@ -618,22 +622,16 @@ class _DeliveryTypeCard extends StatelessWidget {
               ? [BoxShadow(color: RequestDeliveryColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] 
               : [],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // Center content
-          children: [
-            Text(label, style: TextStyle(color: isSelected ? Colors.white : RequestDeliveryColors.textDark, fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            Text(duration, style: TextStyle(color: isSelected ? Colors.white70 : Colors.grey, fontSize: 11)), // Slightly larger
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // Larger price tag
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.2) : Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(price, style: TextStyle(color: isSelected ? Colors.white : RequestDeliveryColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+        child: Center( // Center content
+          child: Text(
+            label, 
+            style: TextStyle(
+              color: isSelected ? Colors.white : RequestDeliveryColors.textDark, 
+              fontWeight: FontWeight.bold, 
+              fontSize: 14 // Slightly increased from 13
             ),
-          ],
+            textAlign: TextAlign.center,
+          ),
         ),
       ),
     );

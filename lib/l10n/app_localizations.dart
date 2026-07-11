@@ -977,7 +977,7 @@ abstract class AppLocalizations {
   /// No description provided for @vatLabel.
   ///
   /// In en, this message translates to:
-  /// **'VAT (5%)'**
+  /// **'VAT 5%'**
   String get vatLabel;
 
   /// No description provided for @totalLabel.
@@ -1285,6 +1285,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown Product'**
   String get unknownProduct;
+
+  /// Subtitle for inventory page with item count
+  ///
+  /// In en, this message translates to:
+  /// **'Managing {count} items across all branches'**
+  String inventorySubtitle(int count);
 
   /// No description provided for @productCatalogTitle.
   ///
@@ -1793,13 +1799,13 @@ abstract class AppLocalizations {
   /// No description provided for @restockCreated.
   ///
   /// In en, this message translates to:
-  /// **'Restock created'**
+  /// **'Restock request created'**
   String get restockCreated;
 
   /// No description provided for @restockFailed.
   ///
   /// In en, this message translates to:
-  /// **'Restock failed'**
+  /// **'Failed to create restock request'**
   String get restockFailed;
 
   /// No description provided for @openingReports.
@@ -2227,6 +2233,636 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recent Activity'**
   String get recentActivity;
+
+  /// No description provided for @alAinBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'Al Ain Branch'**
+  String get alAinBranch;
+
+  /// No description provided for @activeShelves.
+  ///
+  /// In en, this message translates to:
+  /// **'Active • {count} Shelves'**
+  String activeShelves(Object count);
+
+  /// No description provided for @showQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Show QR'**
+  String get showQr;
+
+  /// No description provided for @failedToLoadHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load history'**
+  String get failedToLoadHistory;
+
+  /// No description provided for @noRecentActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent activity'**
+  String get noRecentActivity;
+
+  /// No description provided for @managingTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Managing'**
+  String get managingTag;
+
+  /// No description provided for @minutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}m ago'**
+  String minutesAgo(Object count);
+
+  /// No description provided for @hoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}h ago'**
+  String hoursAgo(Object count);
+
+  /// No description provided for @yesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get yesterday;
+
+  /// No description provided for @daysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} days ago'**
+  String daysAgo(Object count);
+
+  /// No description provided for @guestUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest User'**
+  String get guestUser;
+
+  /// No description provided for @accountSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get accountSection;
+
+  /// No description provided for @mySubscriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'My Subscriptions'**
+  String get mySubscriptions;
+
+  /// No description provided for @walletInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet & Invoices'**
+  String get walletInvoices;
+
+  /// No description provided for @preferencesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get preferencesSection;
+
+  /// No description provided for @businessSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Business'**
+  String get businessSection;
+
+  /// No description provided for @allFeatures.
+  ///
+  /// In en, this message translates to:
+  /// **'All Features / Demo'**
+  String get allFeatures;
+
+  /// No description provided for @exploreScreens.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore all screens'**
+  String get exploreScreens;
+
+  /// No description provided for @version.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String version(Object version);
+
+  /// No description provided for @dubai.
+  ///
+  /// In en, this message translates to:
+  /// **'Dubai'**
+  String get dubai;
+
+  /// No description provided for @abuDhabi.
+  ///
+  /// In en, this message translates to:
+  /// **'Abu Dhabi'**
+  String get abuDhabi;
+
+  /// No description provided for @sharjah.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharjah'**
+  String get sharjah;
+
+  /// No description provided for @alAin.
+  ///
+  /// In en, this message translates to:
+  /// **'Al Ain'**
+  String get alAin;
+
+  /// No description provided for @welcomeUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome {name}!'**
+  String welcomeUser(Object name);
+
+  /// No description provided for @step2CustomizeSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Step 2 - Customize Space'**
+  String get step2CustomizeSpace;
+
+  /// No description provided for @locationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: No location data available.'**
+  String get locationError;
+
+  /// No description provided for @shelvesLabelSimple.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelves'**
+  String get shelvesLabelSimple;
+
+  /// No description provided for @monthsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Months'**
+  String get monthsLabel;
+
+  /// No description provided for @addWorkersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Workers? (+50 AED/ea)'**
+  String get addWorkersLabel;
+
+  /// No description provided for @grandTotalSimple.
+  ///
+  /// In en, this message translates to:
+  /// **'Grand Total'**
+  String get grandTotalSimple;
+
+  /// No description provided for @bookNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Now'**
+  String get bookNow;
+
+  /// No description provided for @verifiedSeller.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Seller'**
+  String get verifiedSeller;
+
+  /// No description provided for @trendPlusMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} this month'**
+  String trendPlusMonth(Object count);
+
+  /// No description provided for @trendStocked.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% Stocked'**
+  String trendStocked(Object percent);
+
+  /// No description provided for @actionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Action Required'**
+  String get actionRequired;
+
+  /// No description provided for @selectShippingCompanyFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a shipping company first.'**
+  String get selectShippingCompanyFirst;
+
+  /// No description provided for @cashOnPostOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on Post Office'**
+  String get cashOnPostOffice;
+
+  /// No description provided for @payAtPostOfficeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay at your nearest post office'**
+  String get payAtPostOfficeSubtitle;
+
+  /// No description provided for @cardError.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong while processing the card.'**
+  String get cardError;
+
+  /// No description provided for @openingApplePay.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Apple Pay…'**
+  String get openingApplePay;
+
+  /// No description provided for @applePaySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Pay successful.'**
+  String get applePaySuccess;
+
+  /// No description provided for @applePayError.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Pay failed. Please try again.'**
+  String get applePayError;
+
+  /// No description provided for @orderPlacedPostOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Order placed! Please pay at the post office.'**
+  String get orderPlacedPostOffice;
+
+  /// No description provided for @viewButton.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get viewButton;
+
+  /// No description provided for @invoicesFoundCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} invoices found'**
+  String invoicesFoundCount(Object count);
+
+  /// No description provided for @standard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get standard;
+
+  /// No description provided for @express.
+  ///
+  /// In en, this message translates to:
+  /// **'Express'**
+  String get express;
+
+  /// No description provided for @economy.
+  ///
+  /// In en, this message translates to:
+  /// **'Economy'**
+  String get economy;
+
+  /// No description provided for @premium.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get premium;
+
+  /// No description provided for @sameDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Same Day'**
+  String get sameDay;
+
+  /// No description provided for @days2to3.
+  ///
+  /// In en, this message translates to:
+  /// **'2-3 Days'**
+  String get days2to3;
+
+  /// No description provided for @days5to7.
+  ///
+  /// In en, this message translates to:
+  /// **'5-7 Days'**
+  String get days5to7;
+
+  /// No description provided for @addProductFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first product to start selling'**
+  String get addProductFirst;
+
+  /// No description provided for @activeStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get activeStatus;
+
+  /// No description provided for @stockLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock: {count}'**
+  String stockLabel(Object count);
+
+  /// No description provided for @searchInventoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search items, SKU, or shelf...'**
+  String get searchInventoryHint;
+
+  /// No description provided for @statusFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: '**
+  String get statusFilter;
+
+  /// No description provided for @branchFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch: '**
+  String get branchFilter;
+
+  /// No description provided for @all.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get all;
+
+  /// No description provided for @goodStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get goodStatus;
+
+  /// No description provided for @damagedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Damaged'**
+  String get damagedStatus;
+
+  /// No description provided for @lowStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Low Stock'**
+  String get lowStock;
+
+  /// No description provided for @error.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String error(Object error);
+
+  /// No description provided for @scheduleFirstToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Please schedule the drop-off time first.'**
+  String get scheduleFirstToast;
+
+  /// No description provided for @selectBayToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a bay first.'**
+  String get selectBayToast;
+
+  /// No description provided for @prepareWarehouseFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare warehouse first.'**
+  String get prepareWarehouseFirst;
+
+  /// No description provided for @updatedStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated. Storage # {no}'**
+  String updatedStorage(Object no);
+
+  /// No description provided for @statusReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Received & Stored'**
+  String get statusReceived;
+
+  /// No description provided for @progressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get progressTitle;
+
+  /// No description provided for @scheduleFirstText.
+  ///
+  /// In en, this message translates to:
+  /// **'Please schedule drop-off first.'**
+  String get scheduleFirstText;
+
+  /// No description provided for @allDoneButton.
+  ///
+  /// In en, this message translates to:
+  /// **'All Done'**
+  String get allDoneButton;
+
+  /// No description provided for @undoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undoAction;
+
+  /// No description provided for @gatePassSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Gate Pass Saved'**
+  String get gatePassSaved;
+
+  /// No description provided for @saveToGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Gallery'**
+  String get saveToGallery;
+
+  /// No description provided for @warehouseLocationName.
+  ///
+  /// In en, this message translates to:
+  /// **'NXN Hub - Al Quoz'**
+  String get warehouseLocationName;
+
+  /// No description provided for @unitsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Units'**
+  String get unitsLabel;
+
+  /// No description provided for @unitsHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Number of units / rooms / racks'**
+  String get unitsHelper;
+
+  /// No description provided for @platformFeeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform fee (5%)'**
+  String get platformFeeLabel;
+
+  /// No description provided for @itemNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item Name'**
+  String get itemNameLabel;
+
+  /// No description provided for @enterItemNameError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter item name'**
+  String get enterItemNameError;
+
+  /// No description provided for @quantityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get quantityLabel;
+
+  /// No description provided for @enterQuantityError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter quantity'**
+  String get enterQuantityError;
+
+  /// No description provided for @mustBeNumberError.
+  ///
+  /// In en, this message translates to:
+  /// **'Must be a number'**
+  String get mustBeNumberError;
+
+  /// No description provided for @notesOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes (Optional)'**
+  String get notesOptionalLabel;
+
+  /// No description provided for @additionalDetailsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Any additional details...'**
+  String get additionalDetailsHint;
+
+  /// No description provided for @amenitiesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amenities'**
+  String get amenitiesLabel;
+
+  /// No description provided for @priceAed.
+  ///
+  /// In en, this message translates to:
+  /// **'AED {price}'**
+  String priceAed(Object price);
+
+  /// No description provided for @completeProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Your Profile'**
+  String get completeProfileTitle;
+
+  /// No description provided for @uaePassVerifiedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity Verified via UAE PASS. Data has been auto-populated.'**
+  String get uaePassVerifiedMessage;
+
+  /// No description provided for @businessDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Details'**
+  String get businessDetailsTitle;
+
+  /// No description provided for @businessNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Name'**
+  String get businessNameLabel;
+
+  /// No description provided for @mobileNumberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile Number'**
+  String get mobileNumberLabel;
+
+  /// No description provided for @tradeLicenseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Trade License Number'**
+  String get tradeLicenseLabel;
+
+  /// No description provided for @requiredDocumentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Required Documents'**
+  String get requiredDocumentsTitle;
+
+  /// No description provided for @uploadedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get uploadedLabel;
+
+  /// No description provided for @changeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get changeButton;
+
+  /// No description provided for @tapToUploadDoc.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to upload Trade License / ID'**
+  String get tapToUploadDoc;
+
+  /// No description provided for @docUploadRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Document upload is required.'**
+  String get docUploadRequiredError;
+
+  /// No description provided for @saveAndContinueButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save & Continue'**
+  String get saveAndContinueButton;
+
+  /// No description provided for @loginWithUaePass.
+  ///
+  /// In en, this message translates to:
+  /// **'Login with UAE PASS'**
+  String get loginWithUaePass;
+
+  /// No description provided for @termsReviewRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Please review and accept our terms to proceed.'**
+  String get termsReviewRequest;
+
+  /// No description provided for @verifyEmailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email'**
+  String get verifyEmailTitle;
+
+  /// No description provided for @verifyEmailMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'A verification link has been sent to {email}.\nHowever, you can also use \"Skip for now\" to continue with the demo.'**
+  String verifyEmailMessage(Object email);
+
+  /// No description provided for @okButton.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get okButton;
+
+  /// No description provided for @alreadyHaveAccountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account?'**
+  String get alreadyHaveAccountLabel;
 }
 
 class _AppLocalizationsDelegate

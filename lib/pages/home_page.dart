@@ -4,14 +4,16 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme.dart';
-// Models & Data
 
+// Models & Data
 import '../widgets/brand_logo.dart';
 import 'booking_page.dart';
-import 'payment_page.dart'; 
+import 'payment_page.dart';
+import 'marketplace/public_marketplace_page.dart';
 import 'request_delivery_page.dart';
-import 'receive_goods_stage.dart'; // Warehouse Preparation
+import 'receive_goods_stage.dart';
 import 'operations/gate_pass_page.dart';
+import 'copilot_page.dart';
 
 import '../services/marketplace_service.dart';
 import '../models/history_models.dart';
@@ -24,13 +26,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Using rigid stats for demo purposes
-  // final int _pendingDeliveries = 1; // Unused
-  // final double _inventoryUsage = 0.65; // Unused
-
-  // Real History
   final MarketplaceService _marketService = MarketplaceService();
   late Future<List<DashboardActivity>> _activityFuture;
+
   Map<String, dynamic> _stats = {
     'shelves': 0,
     'items': 0,
@@ -43,148 +41,162 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadData();
-    // Listen for real-time updates (local or remote trigger)
-    MarketplaceService.updateNotifier.addListener(_loadData);
+    MarketplaceService.updateNotifier.addListener(_refreshData);
   }
 
   @override
   void dispose() {
-    MarketplaceService.updateNotifier.removeListener(_loadData);
+    MarketplaceService.updateNotifier.removeListener(_refreshData);
     super.dispose();
   }
 
-  void _loadData() {
+  // Wrapper for listener
+  void _refreshData() => _loadData();
+
+  Future<void> _loadData() async {
     setState(() {
       _activityFuture = _marketService.getRecentActivity();
-      _marketService.getDashboardStats().then((s) { 
-        if (mounted) setState(() => _stats = s); 
-      });
     });
+    // Fetch stats separately so they don't block the UI
+    final stats = await _marketService.getDashboardStats();
+    if (mounted) setState(() => _stats = stats);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA), // Light grey background
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeader(l10n),
-            _buildStatsOverview(l10n),
-            const SizedBox(height: 24),
-            _buildAlertsSection(l10n),
-            const SizedBox(height: 24),
-            _buildWarehousePrep(context, l10n),
-            const SizedBox(height: 24),
-            _buildQuickActions(context, l10n),
-            const SizedBox(height: 24),
-            _buildActiveRentals(l10n),
-            const SizedBox(height: 24),
-            _buildRecentActivity(l10n),
-            const SizedBox(height: 40),
-          ],
+      backgroundColor: const Color(0xFFF5F7FA),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'home_fab',
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CopilotPage()),
+          );
+        },
+        backgroundColor: AppColors.bluePrimary,
+        child: const Icon(Icons.smart_toy_rounded, size: 28, color: Colors.white),
+      ),
+      // Wrapped in RefreshIndicator for standard "Pull to Refresh" behavior
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.bluePrimary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildHeader(l10n),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0), // Increased margin
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStatsOverview(l10n),
+                    // Reduced spacing due to Transform.translate on Stats
+                    const SizedBox(height: 0), 
+                    _buildAlertsSection(l10n),
+                    const SizedBox(height: 16),
+                    _buildWarehousePrep(context, l10n),
+                    const SizedBox(height: 16),
+                    _buildQuickActions(context, l10n),
+                    const SizedBox(height: 16),
+                    _buildActiveRentals(l10n),
+                    const SizedBox(height: 16),
+                    _buildRecentActivitySection(l10n),
+                    const SizedBox(height: 40), // Bottom padding for scrolling
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // 1. Header Section with Gradient and Greeting
+  // 1. Header: Increased breathing room and font size
   Widget _buildHeader(AppLocalizations l10n) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 50), // Increased bottom pad to push stats down
       decoration: const BoxDecoration(
         color: AppColors.bluePrimary,
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          )
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo & Profile Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const BrandLogo(height: 40, isLight: true), // White logo variant if available, else standard
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                  onPressed: () {
-                    // TODO: Open notifications
-                  },
+              const BrandLogo(height: 36, isLight: true),
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
+                onPressed: () {},
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          // Greeting & Welcome
+          const SizedBox(height: 20),
           Consumer<UserProvider>(
             builder: (context, user, _) {
-              return Text(
-                l10n.helloUser(user.displayName),
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.helloUser(user.displayName),
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Here's what's happening today.", // Optional subtitle for context
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
               );
             },
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.welcomeBannerText,
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.9),
-              height: 1.4,
-            ),
           ),
         ],
       ),
     );
   }
 
-  // 2. Stats Overview Cards
+  // 2. Stats: Floating effect
   Widget _buildStatsOverview(AppLocalizations l10n) {
-
-    
     return Transform.translate(
-      offset: const Offset(0, -20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          children: [
-            _buildStatCard(
-              title: l10n.totalShelves,
-              value: '${_stats['shelves']}',
-              icon: Icons.shelves,
-              color: AppColors.bluePrimary,
-            ),
-            const SizedBox(width: 12),
-            _buildStatCard(
-              title: l10n.stockValue,
-              value: 'AED ${( (_stats['totalValue'] as num) / 1000).toStringAsFixed(1)}k',
-              icon: Icons.monetization_on_rounded,
-              color: Colors.green,
-            ),
-          ],
-        ),
+      offset: const Offset(0, -30),
+      child: Row(
+        children: [
+          _buildStatCard(
+            title: l10n.totalShelves,
+            value: '${_stats['shelves']}',
+            icon: Icons.shelves,
+            color: AppColors.bluePrimary,
+          ),
+          const SizedBox(width: 16),
+          _buildStatCard(
+            title: l10n.stockValue,
+            value: 'AED ${( (_stats['totalValue'] as num) / 1000).toStringAsFixed(1)}k',
+            icon: Icons.monetization_on_rounded,
+            color: Colors.green,
+          ),
+        ],
       ),
     );
   }
@@ -198,37 +210,41 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF1A1F3D).withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                // Optional trend arrow
+                // Icon(Icons.arrow_upward_rounded, color: Colors.green, size: 16),
+              ],
             ),
             const SizedBox(height: 12),
             Text(
               value,
               style: const TextStyle(
                 fontSize: 22,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 4),
             Text(
               title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -241,47 +257,52 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 2.5 Alerts Section
+  // 3. Alerts: Cleaner look
   Widget _buildAlertsSection(AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.shade300),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
-                  SizedBox(height: 4),
-                  Text(l10n.lowStockCount(3), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.brown)),
-                ],
-              ),
-            ),
+    if (_stats['pendingOrders'] == 0) return const SizedBox.shrink(); // Hide if empty
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildAlertChip(
+            label: l10n.lowStockCount(3),
+            icon: Icons.warning_amber_rounded,
+            color: Colors.amber,
+            bgColor: Colors.amber.shade50,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.red.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.shade300),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline_rounded, color: Colors.red, size: 24),
-                  SizedBox(height: 4),
-                  Text(l10n.outOfStockCount(1), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                ],
-              ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildAlertChip(
+            label: l10n.outOfStockCount(1),
+            icon: Icons.error_outline_rounded,
+            color: Colors.red,
+            bgColor: Colors.red.shade50,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAlertChip({required String label, required IconData icon, required Color color, required Color bgColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontWeight: FontWeight.w700, color: color.withValues(alpha: 0.8), fontSize: 12),
             ),
           ),
         ],
@@ -289,70 +310,186 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 2.6 Warehouse Preparation
+  // 4. Hero Action: Warehouse Prep
   Widget _buildWarehousePrep(BuildContext context, AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: InkWell(
-        onTap: () {
-           Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ReceiveGoodsStagePageEN()),
-          );
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0057FF), Color(0xFF0038A8)], // Blue gradient
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ReceiveGoodsStagePageEN()),
+        );
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2E63FF), Color(0xFF0038A8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E63FF).withValues(alpha: 0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
-            borderRadius: BorderRadius.circular(16),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.fact_check_rounded, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.warehousePrep,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Manage incoming goods", // Helper text
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 5. Quick Actions: Larger touch targets and clearer icons
+  Widget _buildQuickActions(BuildContext context, AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.quickActionsTitle,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 125, // Safely increased height to avoid text overflow
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none, // Allow shadows to paint outside
+            children: [
+              _buildActionCard(
+                title: l10n.gatePassTitle,
+                icon: Icons.qr_code_2_rounded,
+                color: const Color(0xFF2D3436),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GatePassPage())),
+              ),
+              const SizedBox(width: 16),
+              _buildActionCard(
+                title: l10n.bookSpace,
+                icon: Icons.store_mall_directory_rounded,
+                color: AppColors.bluePrimary,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BookingPage())),
+              ),
+              const SizedBox(width: 16),
+              _buildActionCard(
+                title: l10n.requestDeliveryAction,
+                icon: Icons.local_shipping_rounded,
+                color: Colors.purple,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RequestDeliveryPage())),
+              ),
+              const SizedBox(width: 16),
+              _buildActionCard(
+                title: l10n.myInventoryAction,
+                icon: Icons.inventory_2_rounded,
+                color: Colors.orange,
+                onTap: () => Navigator.pushNamed(context, '/stage6'),
+              ),
+              const SizedBox(width: 16),
+              _buildActionCard(
+                title: 'Marketplace',
+                icon: Icons.storefront,
+                color: Colors.green,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PublicMarketplacePage())),
+              ),
+              const SizedBox(width: 16),
+              _buildActionCard(
+                title: l10n.navPayments,
+                icon: Icons.receipt_long_rounded,
+                color: Colors.teal,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentsPage())),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      elevation: 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 90,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade100),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0057FF).withValues(alpha: 0.3),
+                color: Colors.grey.shade200,
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.fact_check_rounded, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.warehousePrep,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.scheduleDropoffShort,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ],
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  height: 1.2,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
             ],
           ),
         ),
@@ -360,306 +497,146 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 3. Active Rentals List
+  // 6. Active Rental: Informational
   Widget _buildActiveRentals(AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Row(
         children: [
-          Text(
-            l10n.activeRentals,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              color: Colors.green.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
             ),
-            child: Row(
+            child: const Icon(Icons.warehouse_rounded, color: Colors.green, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.warehouse_rounded, color: Colors.green, size: 24),
+                Text(
+                  l10n.alAinBranch,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Al Ain Branch',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Active • 5 Shelves',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-                const Chip(
-                  label: Text('Managing', style: TextStyle(color: Colors.white, fontSize: 10)),
-                  backgroundColor: AppColors.bluePrimary,
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
+                Text(
+                  l10n.activeShelves(5),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // 3. Quick Actions Grid
-  Widget _buildQuickActions(BuildContext context, AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.quickActionsTitle,
-            style: const TextStyle(
-              fontSize: 20, // Larger Header
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.bluePrimary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
             ),
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const crossAxisCount = 2; // Fixed 2 columns
-              final width = (constraints.maxWidth - (16 * (crossAxisCount - 1))) / crossAxisCount; 
-              // Using Wrap to simulate Grid but with auto-sizing
-              return Wrap(
-                spacing: 16, // More spacing
-                runSpacing: 16,
-                children: [
-                  _buildActionCard(
-                    width: width,
-                    title: l10n.gatePassTitle,
-                    subtitle: 'Show QR',
-                    icon: Icons.qr_code_2,
-                    color: const Color(0xFF2D3436),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GatePassPage())),
-                  ),
-                  _buildActionCard(
-                    width: width,
-                    title: l10n.bookSpace,
-                    subtitle: l10n.findNewShelves,
-                    icon: Icons.add_business_rounded,
-                    color: AppColors.bluePrimary,
-                    onTap: () {
-                      // final shell = context.findAncestorStateOfType<HomeShellState>();
-                      // if (shell != null) {
-                      //   shell.switchToTab(1); // Removed tab
-                      // }
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => BookingPage()));
-                    },
-                  ),
-                  _buildActionCard(
-                    width: width,
-                    title: l10n.requestDeliveryAction,
-                    subtitle: l10n.shipToCustomers,
-                    icon: Icons.send_rounded,
-                    color: Colors.purple,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const RequestDeliveryPage()));
-                    },
-                  ),
-                  _buildActionCard(
-                    width: width,
-                    title: l10n.myInventoryAction,
-                    subtitle: l10n.manageStock,
-                    icon: Icons.inventory,
-                    color: Colors.orange,
-                    onTap: () {
-                      Navigator.pushNamed(context, '/stage6');
-                    },
-                  ),
-                  _buildActionCard(
-                    width: width,
-                    title: l10n.navPayments,
-                    subtitle: l10n.viewInvoices,
-                    icon: Icons.receipt_long,
-                    color: Colors.teal,
-                    onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentsPage()));
-                    },
-                  ),
-                ],
-              );
-            },
+            child: Text(
+                l10n.managingTag,
+                style: const TextStyle(color: AppColors.bluePrimary, fontSize: 11, fontWeight: FontWeight.bold)
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionCard({
-    required double width,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        width: width,
-        padding: const EdgeInsets.all(20), // More internal padding
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade100),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.shade200,
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  // 7. Recent Activity: Full list with error handling
+  Widget _buildRecentActivitySection(AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-             Container(
-              padding: const EdgeInsets.all(12), // Larger Icon BG
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: color, size: 28), // Larger Icon
-            ),
-            const SizedBox(height: 20),
             Text(
-              title,
+              l10n.recentActivity,
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
-            ),
+            TextButton(
+              onPressed: () {}, // Navigate to full history page
+              child: const Text("View All"),
+            )
           ],
         ),
-      ),
-    );
-  }
-
-  // 4. Recent Activity Feed
-  Widget _buildRecentActivity(AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                l10n.recentActivity,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.bluePrimary),
-                onPressed: _loadData,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          FutureBuilder<List<DashboardActivity>>(
-            future: _activityFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return const Text('Failed to load history');
-              }
-              final activities = snapshot.data ?? [];
-              if (activities.isEmpty) {
-                 return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.history_toggle_off_rounded, size: 48, color: Colors.grey.shade300),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No recent activity',
-                        style: TextStyle(color: Colors.grey.shade500),
-                      ),
-                    ],
-                  ),
-                 );
-              }
-
-              return Column(
-                children: activities.map((activity) {
-                  return _buildActivityItem(
-                    title: activity.title,
-                    subtitle: activity.subtitle,
-                    time: _formatDate(activity.date),
-                    icon: activity.icon,
-                    color: activity.color,
-                  );
-                }).toList(),
+        const SizedBox(height: 8),
+        FutureBuilder<List<DashboardActivity>>(
+          future: _activityFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               );
-            },
-          ),
-        ],
-      ),
+            }
+            if (snapshot.hasError) {
+              return Container(
+                padding: const EdgeInsets.all(20),
+                width: double.infinity,
+                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
+                child: Text(l10n.failedToLoadHistory, textAlign: TextAlign.center, style: TextStyle(color: Colors.red)),
+              );
+            }
+            final activities = snapshot.data ?? [];
+            if (activities.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  children: [
+                    Icon(Icons.history_toggle_off, size: 40, color: Colors.grey.shade300),
+                    const SizedBox(height: 10),
+                    Text(l10n.noRecentActivity, style: TextStyle(color: Colors.grey.shade500)),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.separated(
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(), // Let parent scroll
+              shrinkWrap: true,
+              itemCount: activities.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final activity = activities[index];
+                return _buildActivityItem(
+                  title: activity.title,
+                  subtitle: activity.subtitle,
+                  time: _formatDate(activity.date, l10n),
+                  icon: activity.icon,
+                  color: activity.color,
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime date, AppLocalizations l10n) {
     final now = DateTime.now();
     final diff = now.difference(date);
     if (diff.inDays == 0) {
-      if (diff.inHours == 0) return '${diff.inMinutes}m ago';
-      return '${diff.inHours}h ago';
+      if (diff.inHours == 0) return l10n.minutesAgo(diff.inMinutes);
+      return l10n.hoursAgo(diff.inHours);
     }
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return DateFormat('MMM d').format(date);
+    if (diff.inDays == 1) return l10n.yesterday;
+    if (diff.inDays < 7) return l10n.daysAgo(diff.inDays);
+    return DateFormat('MMM d', l10n.localeName).format(date);
   }
 
   Widget _buildActivityItem({
@@ -670,12 +647,17 @@ class _HomePageState extends State<HomePage> {
     required Color color,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade100,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -685,7 +667,7 @@ class _HomePageState extends State<HomePage> {
               color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -703,6 +685,8 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -714,7 +698,8 @@ class _HomePageState extends State<HomePage> {
           Text(
             time,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
               color: Colors.grey,
             ),
           ),

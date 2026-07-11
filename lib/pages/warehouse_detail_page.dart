@@ -133,11 +133,11 @@ class WarehouseDetailPage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _PriceCard(price: w.pricePerShelf.toStringAsFixed(0), label: AppLocalizations.of(context)!.pricePerShelf('')),
+                    _PriceCard(price: w.pricePerShelf.toStringAsFixed(0), label: AppLocalizations.of(context)!.perShelfSuffix), // Just suffix
 
                     const SizedBox(height: 24),
                     Text(
-                      "Amenities",
+                      AppLocalizations.of(context)!.amenitiesLabel,
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1F36)),
                     ),
                     const SizedBox(height: 12),
@@ -245,7 +245,7 @@ class _PriceCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'AED $price',
+                AppLocalizations.of(context)!.priceAed(price),
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
               ),
               Text(

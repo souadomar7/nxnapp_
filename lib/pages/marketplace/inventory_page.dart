@@ -4,6 +4,7 @@ import '../../services/marketplace_service.dart';
 import '../../models/marketplace_models.dart';
 import '../../l10n/app_localizations.dart';
 import 'item_detail_page.dart';
+import '../../widgets/brand_logo.dart';
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
@@ -57,102 +58,161 @@ class _InventoryPageState extends State<InventoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.myInventoryTitle),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search items, SKU, or shelf...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-              ),
-              onChanged: (val) => setState(() => _searchQuery = val),
-            ),
-          ),
-        ),
-      ),
-      backgroundColor: Colors.grey[50], 
+      backgroundColor: const Color(0xFFF3F6FB), // Light Grey-Blue background
       body: FutureBuilder<List<SmeInventory>>(
         future: _inventoryFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-             return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (snapshot.data == null || snapshot.data!.isEmpty) {
-             return Center(child: Text(AppLocalizations.of(context)!.noInventory));
-          }
-
-          final allItems = snapshot.data!;
+          // Data handling
+          final isLoading = snapshot.connectionState == ConnectionState.waiting;
+          final hasError = snapshot.hasError;
+          final allItems = snapshot.data ?? [];
           final items = _filterList(allItems);
 
-          return Column(
-            children: [
-              // Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    const Text('Status: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                    _buildFilterChip('All', _filterStatus, (v) => _filterStatus = v),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Good', _filterStatus, (v) => _filterStatus = v),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Damaged', _filterStatus, (v) => _filterStatus = v),
-                    const SizedBox(width: 16),
-                    const Text('Branch: ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                    _buildFilterChip('All', _filterBranch, (v) => _filterBranch = v),
-                    // _buildFilterChip('Abu Dhabi', _filterBranch, (v) => _filterBranch = v), // Unlock when data ready
-                  ],
+          return CustomScrollView(
+            slivers: [
+              // 1. Premium Header
+              SliverAppBar(
+                expandedHeight: 180,
+                pinned: true,
+                backgroundColor: AppColors.bluePrimary,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: const BrandLogo(height: 32),
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  AppLocalizations.of(context)!.myInventoryTitle,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            AppLocalizations.of(context)!.inventorySubtitle(items.length),
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(60),
+                  child: Container(
+                    height: 60,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: AppLocalizations.of(context)!.searchInventoryHint,
+                        prefixIcon: const Icon(Icons.search, color: AppColors.bluePrimary),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.bluePrimary, width: 2)),
+                      ),
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                    ),
+                  ),
                 ),
               ),
 
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return Card(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: AppColors.border),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          // Navigate to Detail
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailPage(item: item)));
-                        },
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(12),
-                          leading: Container(
-                            width: 50, height: 50,
-                            decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                            child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                          ),
-                          title: Text(item.productName ?? AppLocalizations.of(context)!.unknownProduct, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                               Text('${AppLocalizations.of(context)!.qtyLabel(item.quantity)}  •  ${AppLocalizations.of(context)!.shelfLabel(item.shelfId ?? "Pending")}'),
-                               // Text(AppLocalizations.of(context)!.statusLabel(item.status), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                            ],
-                          ),
-                          trailing: _buildStockIndicator(item.quantity, item.status == 'damaged'),
+              // 2. Filters & Content
+              SliverToBoxAdapter(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF3F6FB),
+                  ),
+                  child: Column(
+                    children: [
+                       // Filters
+                       SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          children: [
+                            _buildFilterSection(
+                              AppLocalizations.of(context)!.statusFilter,
+                              ['All', 'Good', 'Damaged'],
+                              _filterStatus,
+                              (v) => _filterStatus = v,
+                              context
+                            ),
+                            const SizedBox(width: 20),
+                            Container(width: 1, height: 24, color: Colors.grey[300]),
+                            const SizedBox(width: 20),
+                            _buildFilterSection(
+                                AppLocalizations.of(context)!.branchFilter,
+                                ['All'], // Mock branches
+                                _filterBranch,
+                                (v) => _filterBranch = v,
+                                context
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
+                      
+                      if (isLoading)
+                        const Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator())
+                      else if (hasError)
+                         Padding(padding: const EdgeInsets.all(40), child: Text(AppLocalizations.of(context)!.error(snapshot.error.toString())))
+                      else if (items.isEmpty)
+                         Padding(
+                           padding: const EdgeInsets.all(40),
+                           child: Column(
+                             children: [
+                               Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
+                               const SizedBox(height: 16),
+                               Text(AppLocalizations.of(context)!.noInventory, style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                             ],
+                           ),
+                         )
+                      else
+                        ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          physics: const NeverScrollableScrollPhysics(),
+                          shrinkWrap: true,
+                          itemCount: items.length,
+                          itemBuilder: (context, index) {
+                            final item = items[index];
+                            return _buildInventoryCard(context, item);
+                          },
+                        ),
+                        
+                       const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -162,29 +222,134 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Widget _buildFilterChip(String label, String currentVal, Function(String) onSelect) {
-    final isSelected = currentVal == label;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        if (selected) setState(() => onSelect(label));
-      },
-      selectedColor: AppColors.bluePrimary.withValues(alpha: 0.2),
-      labelStyle: TextStyle(color: isSelected ? AppColors.bluePrimary : Colors.black),
-      backgroundColor: Colors.white,
+  Widget _buildFilterSection(String title, List<String> options, String current, Function(String) onSelect, BuildContext context) {
+    return Row(
+      children: [
+        Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700], fontSize: 13)),
+        const SizedBox(width: 8),
+        ...options.map((opt) {
+          final isSelected = current == opt;
+          String label = opt;
+          if (opt == 'All') {
+            label = AppLocalizations.of(context)!.all;
+          } else if (opt == 'Good') {
+            label = AppLocalizations.of(context)!.goodStatus;
+          } else if (opt == 'Damaged') {
+            label = AppLocalizations.of(context)!.damagedStatus;
+          }
+          
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => onSelect(opt)),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.bluePrimary : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isSelected ? AppColors.bluePrimary : Colors.grey[300]!),
+                  boxShadow: isSelected ? [BoxShadow(color: AppColors.bluePrimary.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 2))] : [],
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.grey[700],
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildInventoryCard(BuildContext context, SmeInventory item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0E6F2)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => ItemDetailPage(item: item)));
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Icon / Image Placeholder
+                Container(
+                  width: 56, height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.bluePrimary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.inventory_2_outlined, color: AppColors.bluePrimary, size: 28),
+                ),
+                const SizedBox(width: 16),
+                
+                // Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.productName ?? AppLocalizations.of(context)!.unknownProduct,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F2937)),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.shelves, size: 14, color: Colors.grey[500]),
+                          const SizedBox(width: 4),
+                          Text(
+                            AppLocalizations.of(context)!.shelfLabel(item.shelfId ?? "Pending"), 
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13)
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(Icons.layers_outlined, size: 14, color: Colors.grey[500]),
+                          const SizedBox(width: 4),
+                          Text(
+                            AppLocalizations.of(context)!.qtyLabel(item.quantity),
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Status Badge
+                _buildStockIndicator(item.quantity, item.status == 'damaged'),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildStockIndicator(int quantity, bool isDamaged) {
     if (isDamaged) {
-       return _statusBadge(Colors.red, 'Damaged');
+       return _statusBadge(Colors.red, AppLocalizations.of(context)!.damagedStatus);
     }
     
     if (quantity == 0) {
       return _statusBadge(Colors.red, AppLocalizations.of(context)!.itemOutOfStock);
     } else if (quantity < 10) {
-      return _statusBadge(Colors.orange, 'Low Stock');
+      return _statusBadge(Colors.orange, AppLocalizations.of(context)!.lowStock);
     } else {
       return _statusBadge(Colors.green, AppLocalizations.of(context)!.itemInStock);
     }
@@ -192,12 +357,13 @@ class _InventoryPageState extends State<InventoryPage> {
 
   Widget _statusBadge(Color color, String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
     );
   }
 }

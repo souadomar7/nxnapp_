@@ -114,9 +114,9 @@ class GatePassPage extends StatelessWidget {
                           style: const TextStyle(fontSize: 14, color: Colors.grey),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          "NXN Hub - Al Quoz",
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        Text(
+                          l10n.warehouseLocationName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                         ),
                       ],
                     ),
@@ -135,10 +135,10 @@ class GatePassPage extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gate Pass Saved')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.gatePassSaved)));
                 },
                 icon: const Icon(Icons.download_rounded, size: 28),
-                label: const Text('Save to Gallery', style: TextStyle(fontSize: 18)),
+                label: Text(l10n.saveToGallery, style: const TextStyle(fontSize: 18)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.bluePrimary,
                   foregroundColor: Colors.white,

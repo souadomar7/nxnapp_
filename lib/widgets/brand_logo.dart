@@ -9,7 +9,10 @@ class BrandLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(8), 
         boxShadow: isLight ? [] : [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -22,7 +25,6 @@ class BrandLogo extends StatelessWidget {
         'assets/images/nxn_logo.jpg',
         height: height,
         fit: BoxFit.contain,
-        // color: isLight ? Colors.white : null, // Commented out to prevent white-box effect on JPG
       ),
     );
   }

@@ -36,6 +36,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
       ),
       backgroundColor: Colors.grey[50], // Light background
       floatingActionButton: FloatingActionButton(
+        heroTag: 'catalog_fab',
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -54,7 +55,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-             return Center(child: Text('Error: ${snapshot.error}'));
+             return Center(child: Text(AppLocalizations.of(context)!.error(snapshot.error.toString())));
           } else if (snapshot.data == null || snapshot.data!.isEmpty) {
              return Center(
                child: Column(
@@ -67,9 +68,9 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                      style: TextStyle(fontSize: 18, color: Colors.grey[600], fontWeight: FontWeight.bold),
                    ),
                    const SizedBox(height: 8),
-                   const Text(
-                     "Add your first product to start selling",
-                     style: TextStyle(color: Colors.grey),
+                   Text(
+                     AppLocalizations.of(context)!.addProductFirst,
+                     style: const TextStyle(color: Colors.grey),
                    ),
                  ],
                ),
@@ -139,10 +140,12 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                                         color: Colors.green.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: const Text('Active', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+                                      child: Text(AppLocalizations.of(context)!.activeStatus, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
                                     ),
                                     const SizedBox(width: 12),
-                                    Text('Stock: 120', style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500)),
+                                    Expanded(
+                                      child: Text(AppLocalizations.of(context)!.stockLabel(120), style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                                    ),
                                   ],
                                 ),
                               ],

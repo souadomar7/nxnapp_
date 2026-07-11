@@ -79,34 +79,34 @@ class _RestockPageState extends State<RestockPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLabel('Item Name'),
+              _buildLabel(AppLocalizations.of(context)!.itemNameLabel),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _itemNameCtrl,
                 decoration: _fieldDecoration(hint: 'e.g. Widget A'),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Please enter item name' : null,
+                validator: (v) => v == null || v.trim().isEmpty ? AppLocalizations.of(context)!.enterItemNameError : null,
               ),
               const SizedBox(height: 20),
 
-              _buildLabel('Quantity'),
+              _buildLabel(AppLocalizations.of(context)!.quantityLabel),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _quantityCtrl,
                 decoration: _fieldDecoration(hint: 'e.g. 50'),
                 keyboardType: TextInputType.number,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Please enter quantity';
-                  if (int.tryParse(v) == null) return 'Must be a number';
+                  if (v == null || v.trim().isEmpty) return AppLocalizations.of(context)!.enterQuantityError;
+                  if (int.tryParse(v) == null) return AppLocalizations.of(context)!.mustBeNumberError;
                   return null;
                 },
               ),
               const SizedBox(height: 20),
 
-              _buildLabel('Notes (Optional)'),
+              _buildLabel(AppLocalizations.of(context)!.notesOptionalLabel),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _notesCtrl,
-                decoration: _fieldDecoration(hint: 'Any additional details...'),
+                decoration: _fieldDecoration(hint: AppLocalizations.of(context)!.additionalDetailsHint),
                 maxLines: 3,
               ),
               const SizedBox(height: 40),

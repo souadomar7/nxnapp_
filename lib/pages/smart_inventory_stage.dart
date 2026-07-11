@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:nxnapp/pages/restock_page.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart'; // Standard imports
 
 import '../data/inventory_controller.dart';
+import '../widgets/brand_logo.dart';
 import '../data/receive_result.dart';
 import '../l10n/app_localizations.dart';
+import '../theme.dart';
 
 // Match BookingPage/ReceivePage colors
 class InventoryColors {
-  static const primary = Color(0xFF0057FF); // Vibrant Blue
+  static const primary = AppColors.bluePrimary; // Match App Theme
   static const background = Color(0xFFF3F6FB); // Light Grey-Blue
   static const textDark = Color(0xFF1A1F36); // Dark user text
   static const cardBorder = Color(0xFFE0E6F2);
@@ -73,21 +76,7 @@ class _SmartInventoryStageENState extends State<SmartInventoryStageEN> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "NXN",
-                            style: TextStyle(
-                              color: InventoryColors.primary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
+                        child: const BrandLogo(height: 32),
                       ),
                       const Spacer(),
                       Row(
@@ -485,6 +474,7 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
+
 class _SimpleBars extends StatelessWidget {
   final List<double> values;
   final List<String> labels;
@@ -493,44 +483,79 @@ class _SimpleBars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxV = (values.isEmpty) ? 0.0 : values.reduce((a, b) => a > b ? a : b);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            for (int i = 0; i < values.length; i++)
-              Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    width: 30,
-                    height: maxV == 0 ? 4 : (values[i] / maxV) * (constraints.maxHeight - 30),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [InventoryColors.primary, InventoryColors.primary.withValues(alpha: 0.6)],
-                      ),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
+    if (values.isEmpty) return const SizedBox();
+    
+    final maxVal = values.reduce((a, b) => a > b ? a : b);
+    final topY = maxVal == 0 ? 10.0 : maxVal * 1.2;
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: topY,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+             // Removed deprecated params
+            tooltipPadding: const EdgeInsets.all(8),
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+               return BarTooltipItem(
+                 '${labels[group.x.toInt()]}\n',
+                 const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                 children: [
+                   TextSpan(
+                     text: rod.toY.toStringAsFixed(0),
+                     style: const TextStyle(color: Colors.yellowAccent),
+                   ),
+                 ],
+               );
+            },
+          ),
+        ),
+        titlesData: FlTitlesData(
+          show: true,
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index < 0 || index >= labels.length) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    labels[index],
+                    style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: 40,
-                    child: Text(
-                      labels[i],
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  )
-                ],
+                );
+              },
+            ),
+          ),
+          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        gridData: const FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        barGroups: List.generate(values.length, (i) {
+          return BarChartGroupData(
+            x: i,
+            barRods: [
+              BarChartRodData(
+                toY: values[i],
+                color: InventoryColors.primary,
+                width: 16, // Thicker bars
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                backDrawRodData: BackgroundBarChartRodData(
+                  show: true,
+                  toY: topY,
+                  color: const Color(0xFFF3F6FB),
+                ),
               ),
-          ],
-        );
-      }
+            ],
+          );
+        }),
+      ),
     );
   }
 }

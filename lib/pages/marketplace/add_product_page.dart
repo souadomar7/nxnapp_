@@ -148,7 +148,13 @@ class _AddProductPageState extends State<AddProductPage> {
                    return null;
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              const Text(
+                'Note: If your shop is Verified, this product will be immediately visible on the Public Marketplace.',
+                style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(

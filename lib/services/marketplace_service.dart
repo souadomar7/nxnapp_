@@ -1,8 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/marketplace_models.dart';
 import '../models/history_models.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart'; // Added for Color
+import 'package:flutter/material.dart'; // Provides Color, debugPrint, ValueNotifier, etc.
 
 import '../models/invoice.dart'; // Import Invoice model
 import 'dart:convert'; // For jsonEncode/Decode
@@ -383,45 +382,7 @@ class MarketplaceService {
 
   // --- Outbound Orders (Delivery) ---
 
-  Future<void> createDeliveryRequest(String name, String address, String method) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) {
-      // Guest Mode Activity
-      _localActivity.add(DashboardActivity(
-        id: 'L-DEL-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Delivery Requested',
-        subtitle: 'To $name • ${method.toUpperCase()}',
-        date: DateTime.now(),
-        type: ActivityType.delivery,
-      ));
-      _saveLocal(); // Persist
-      updateNotifier.value++; // Notify UI
-      return;
-    }
 
-    try {
-      await _supabase.from('sme_orders').insert({
-        'seller_id': user.id,
-        'customer_name': name,
-        'customer_address': address,
-        'delivery_method': method,
-        'status': 'pending',
-        'total_amount': 0.0, // Placeholder
-      });
-    } catch (e) {
-      debugPrint('Error creating delivery (fallback): $e');
-      // Fallback
-      _localActivity.add(DashboardActivity(
-        id: 'L-DEL-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Delivery Requested',
-        subtitle: 'To $name • ${method.toUpperCase()}',
-        date: DateTime.now(),
-        type: ActivityType.delivery,
-      ));
-      _saveLocal(); // Persist
-    }
-    updateNotifier.value++; // Notify UI
-  }
 
   // --- Subscriptions ---
 
@@ -702,5 +663,194 @@ class MarketplaceService {
       debugPrint('Error creating delivery: $e');
       return false;
     }
+  }
+
+  // --- Marketplace Shops ---
+  
+  static MarketplaceShop? _localShop;
+
+  Future<MarketplaceShop?> getMyShop() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return _localShop;
+
+    try {
+      final response = await _supabase
+          .from('marketplace_shops')
+          .select()
+          .eq('seller_id', user.id)
+          .maybeSingle();
+      
+      if (response != null) {
+        return MarketplaceShop.fromJson(response);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting shop (DB table might not exist): $e');
+      return _localShop; // Fallback for demo
+    }
+  }
+
+  Future<bool> createShop(String shopName, String licenseName) async {
+    final user = _supabase.auth.currentUser;
+    final newShop = MarketplaceShop(
+        id: 'SHOP-${DateTime.now().millisecondsSinceEpoch}',
+        sellerId: user?.id ?? 'GUEST',
+        shopName: shopName,
+        licenseName: licenseName,
+        isVerified: false, // Default false until admin approves
+        createdAt: DateTime.now(),
+    );
+
+    if (user == null) {
+      if (_localShop != null) return false; // Prevent duplicate
+      _localShop = newShop;
+      updateNotifier.value++;
+      return true;
+    }
+
+    try {
+      // First check if one already exists
+      final existing = await _supabase.from('marketplace_shops').select().eq('seller_id', user.id).maybeSingle();
+      if (existing != null) return false;
+
+      await _supabase.from('marketplace_shops').insert(newShop.toJson());
+      updateNotifier.value++;
+      return true;
+    } catch (e) {
+      debugPrint('Error creating shop (fallback to local): $e');
+      if (_localShop != null) return false; // Prevent duplicate fallback
+      _localShop = newShop;
+      updateNotifier.value++;
+      return true; // Still return true for demo UX
+    }
+  }
+
+  Future<void> forceVerifyShop() async {
+    final user = _supabase.auth.currentUser;
+    
+    // Update local mock
+    if (_localShop != null) {
+      _localShop = MarketplaceShop(
+        id: _localShop!.id,
+        sellerId: _localShop!.sellerId,
+        shopName: _localShop!.shopName,
+        licenseName: _localShop!.licenseName,
+        isVerified: true,
+        createdAt: _localShop!.createdAt,
+      );
+    }
+    
+    if (user != null) {
+      try {
+        await _supabase
+            .from('marketplace_shops')
+            .update({'is_verified': true})
+            .eq('seller_id', user.id);
+      } catch (e) {
+        debugPrint('Error force verifying shop in DB: $e');
+      }
+    }
+    
+    updateNotifier.value++;
+  }
+
+  Future<List<SmeProduct>> getPublicMarketplaceProducts() async {
+    try {
+      // In a real database, this is an inner join:
+      // select products.*, shops.shop_name from sme_products products
+      // join marketplace_shops shops on products.seller_id = shops.seller_id
+      // where shops.is_verified = true
+      
+      final response = await _supabase
+          .from('sme_products')
+          .select('*, marketplace_shops!inner(shop_name, is_verified)')
+          .eq('marketplace_shops.is_verified', true)
+          .order('created_at', ascending: false);
+          
+      return (response as List).map((e) {
+        // Flatten the joined data
+        e['shop_name'] = e['marketplace_shops']['shop_name'];
+        e['is_shop_verified'] = e['marketplace_shops']['is_verified'];
+        return SmeProduct.fromJson(e);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching public marketplace products: $e');
+      // Mock data for demo
+      return [
+        SmeProduct(
+            id: 'mock1',
+            sellerId: 's1',
+            name: 'Premium Espresso Beans',
+            description: 'Locally roasted in UAE',
+            price: 45.0,
+            shopName: 'Arabica Coffee Roasters',
+            isShopVerified: true,
+            createdAt: DateTime.now(),
+        ),
+        SmeProduct(
+            id: 'mock2',
+            sellerId: 's2',
+            name: 'Wireless Earbuds',
+            description: 'Noise cancelling, 20h battery',
+            price: 120.0,
+            shopName: 'Tech Haven LLC',
+            isShopVerified: true,
+            createdAt: DateTime.now(),
+        ),
+        SmeProduct(
+            id: 'mock3',
+            sellerId: 's3',
+            name: 'Handcrafted Vase',
+            description: 'Ceramic decor',
+            price: 85.0,
+            shopName: 'Dubai Arts',
+            isShopVerified: true,
+            createdAt: DateTime.now(),
+        ),
+      ];
+    }
+  }
+
+  // --- Admin/Operations APIs ---
+
+  Future<List<Invoice>> getAdminInvoices(InvoiceType type) async {
+    final user = _supabase.auth.currentUser;
+    
+    // Global query for admin panel (no seller_id filter)
+    if (user != null) {
+      try {
+        final response = await _supabase
+            .from('sme_invoices')
+            .select()
+            .eq('type', type.name)
+            .order('created_at', ascending: false);
+            
+        return (response as List).map((e) => Invoice.fromJson(e)).toList();
+      } catch (e) {
+        debugPrint('Error fetching admin invoices: $e');
+      }
+    }
+    
+    // Local / Offline fallback
+    return _localInvoices.where((e) => e.type == type).toList();
+  }
+
+  Future<void> dispatchDeliveryOrder(String invoiceId) async {
+    final user = _supabase.auth.currentUser;
+    
+    // Remove locally
+    _localInvoices.removeWhere((e) => e.id == invoiceId);
+    _saveLocal();
+    
+    if (user != null) {
+      try {
+        // Mark as paid or complete (we delete in this prototype to clear queue)
+        await _supabase.from('sme_invoices').delete().eq('id', invoiceId);
+      } catch (e) {
+        debugPrint('Error deleting dispatch order: $e');
+      }
+    }
+    
+    updateNotifier.value++;
   }
 }

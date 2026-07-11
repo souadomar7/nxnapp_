@@ -475,7 +475,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subtotalLabel => 'Subtotal';
 
   @override
-  String get vatLabel => 'VAT (5%)';
+  String get vatLabel => 'VAT 5%';
 
   @override
   String get totalLabel => 'Total';
@@ -638,6 +638,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unknownProduct => 'Unknown Product';
+
+  @override
+  String inventorySubtitle(int count) {
+    return 'Managing $count items across all branches';
+  }
 
   @override
   String get productCatalogTitle => 'Product Catalog';
@@ -914,10 +919,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewReportsBtn => 'View Reports';
 
   @override
-  String get restockCreated => 'Restock created';
+  String get restockCreated => 'Restock request created';
 
   @override
-  String get restockFailed => 'Restock failed';
+  String get restockFailed => 'Failed to create restock request';
 
   @override
   String get openingReports => 'Opening reports…';
@@ -1140,4 +1145,351 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recentActivity => 'Recent Activity';
+
+  @override
+  String get alAinBranch => 'Al Ain Branch';
+
+  @override
+  String activeShelves(Object count) {
+    return 'Active • $count Shelves';
+  }
+
+  @override
+  String get showQr => 'Show QR';
+
+  @override
+  String get failedToLoadHistory => 'Failed to load history';
+
+  @override
+  String get noRecentActivity => 'No recent activity';
+
+  @override
+  String get managingTag => 'Managing';
+
+  @override
+  String minutesAgo(Object count) {
+    return '${count}m ago';
+  }
+
+  @override
+  String hoursAgo(Object count) {
+    return '${count}h ago';
+  }
+
+  @override
+  String get yesterday => 'Yesterday';
+
+  @override
+  String daysAgo(Object count) {
+    return '$count days ago';
+  }
+
+  @override
+  String get guestUser => 'Guest User';
+
+  @override
+  String get accountSection => 'Account';
+
+  @override
+  String get mySubscriptions => 'My Subscriptions';
+
+  @override
+  String get walletInvoices => 'Wallet & Invoices';
+
+  @override
+  String get preferencesSection => 'Preferences';
+
+  @override
+  String get businessSection => 'Business';
+
+  @override
+  String get allFeatures => 'All Features / Demo';
+
+  @override
+  String get exploreScreens => 'Explore all screens';
+
+  @override
+  String version(Object version) {
+    return 'Version $version';
+  }
+
+  @override
+  String get dubai => 'Dubai';
+
+  @override
+  String get abuDhabi => 'Abu Dhabi';
+
+  @override
+  String get sharjah => 'Sharjah';
+
+  @override
+  String get alAin => 'Al Ain';
+
+  @override
+  String welcomeUser(Object name) {
+    return 'Welcome $name!';
+  }
+
+  @override
+  String get step2CustomizeSpace => 'Step 2 - Customize Space';
+
+  @override
+  String get locationError => 'Error: No location data available.';
+
+  @override
+  String get shelvesLabelSimple => 'Shelves';
+
+  @override
+  String get monthsLabel => 'Months';
+
+  @override
+  String get addWorkersLabel => 'Add Workers? (+50 AED/ea)';
+
+  @override
+  String get grandTotalSimple => 'Grand Total';
+
+  @override
+  String get bookNow => 'Book Now';
+
+  @override
+  String get verifiedSeller => 'Verified Seller';
+
+  @override
+  String trendPlusMonth(Object count) {
+    return '+$count this month';
+  }
+
+  @override
+  String trendStocked(Object percent) {
+    return '$percent% Stocked';
+  }
+
+  @override
+  String get actionRequired => 'Action Required';
+
+  @override
+  String get selectShippingCompanyFirst =>
+      'Please select a shipping company first.';
+
+  @override
+  String get cashOnPostOffice => 'Cash on Post Office';
+
+  @override
+  String get payAtPostOfficeSubtitle => 'Pay at your nearest post office';
+
+  @override
+  String get cardError => 'Something went wrong while processing the card.';
+
+  @override
+  String get openingApplePay => 'Opening Apple Pay…';
+
+  @override
+  String get applePaySuccess => 'Apple Pay successful.';
+
+  @override
+  String get applePayError => 'Apple Pay failed. Please try again.';
+
+  @override
+  String get orderPlacedPostOffice =>
+      'Order placed! Please pay at the post office.';
+
+  @override
+  String get viewButton => 'View';
+
+  @override
+  String invoicesFoundCount(Object count) {
+    return '$count invoices found';
+  }
+
+  @override
+  String get standard => 'Standard';
+
+  @override
+  String get express => 'Express';
+
+  @override
+  String get economy => 'Economy';
+
+  @override
+  String get premium => 'Premium';
+
+  @override
+  String get sameDay => 'Same Day';
+
+  @override
+  String get days2to3 => '2-3 Days';
+
+  @override
+  String get days5to7 => '5-7 Days';
+
+  @override
+  String get addProductFirst => 'Add your first product to start selling';
+
+  @override
+  String get activeStatus => 'Active';
+
+  @override
+  String stockLabel(Object count) {
+    return 'Stock: $count';
+  }
+
+  @override
+  String get searchInventoryHint => 'Search items, SKU, or shelf...';
+
+  @override
+  String get statusFilter => 'Status: ';
+
+  @override
+  String get branchFilter => 'Branch: ';
+
+  @override
+  String get all => 'All';
+
+  @override
+  String get goodStatus => 'Good';
+
+  @override
+  String get damagedStatus => 'Damaged';
+
+  @override
+  String get lowStock => 'Low Stock';
+
+  @override
+  String error(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get scheduleFirstToast => 'Please schedule the drop-off time first.';
+
+  @override
+  String get selectBayToast => 'Select a bay first.';
+
+  @override
+  String get prepareWarehouseFirst => 'Prepare warehouse first.';
+
+  @override
+  String updatedStorage(Object no) {
+    return 'Updated. Storage # $no';
+  }
+
+  @override
+  String get statusReceived => 'Received & Stored';
+
+  @override
+  String get progressTitle => 'Progress';
+
+  @override
+  String get scheduleFirstText => 'Please schedule drop-off first.';
+
+  @override
+  String get allDoneButton => 'All Done';
+
+  @override
+  String get undoAction => 'Undo';
+
+  @override
+  String get gatePassSaved => 'Gate Pass Saved';
+
+  @override
+  String get saveToGallery => 'Save to Gallery';
+
+  @override
+  String get warehouseLocationName => 'NXN Hub - Al Quoz';
+
+  @override
+  String get unitsLabel => 'Units';
+
+  @override
+  String get unitsHelper => 'Number of units / rooms / racks';
+
+  @override
+  String get platformFeeLabel => 'Platform fee (5%)';
+
+  @override
+  String get itemNameLabel => 'Item Name';
+
+  @override
+  String get enterItemNameError => 'Please enter item name';
+
+  @override
+  String get quantityLabel => 'Quantity';
+
+  @override
+  String get enterQuantityError => 'Please enter quantity';
+
+  @override
+  String get mustBeNumberError => 'Must be a number';
+
+  @override
+  String get notesOptionalLabel => 'Notes (Optional)';
+
+  @override
+  String get additionalDetailsHint => 'Any additional details...';
+
+  @override
+  String get amenitiesLabel => 'Amenities';
+
+  @override
+  String priceAed(Object price) {
+    return 'AED $price';
+  }
+
+  @override
+  String get completeProfileTitle => 'Complete Your Profile';
+
+  @override
+  String get uaePassVerifiedMessage =>
+      'Identity Verified via UAE PASS. Data has been auto-populated.';
+
+  @override
+  String get businessDetailsTitle => 'Business Details';
+
+  @override
+  String get businessNameLabel => 'Business Name';
+
+  @override
+  String get mobileNumberLabel => 'Mobile Number';
+
+  @override
+  String get tradeLicenseLabel => 'Trade License Number';
+
+  @override
+  String get requiredDocumentsTitle => 'Required Documents';
+
+  @override
+  String get uploadedLabel => 'Uploaded';
+
+  @override
+  String get changeButton => 'Change';
+
+  @override
+  String get tapToUploadDoc => 'Tap to upload Trade License / ID';
+
+  @override
+  String get docUploadRequiredError => 'Document upload is required.';
+
+  @override
+  String get saveAndContinueButton => 'Save & Continue';
+
+  @override
+  String get loginWithUaePass => 'Login with UAE PASS';
+
+  @override
+  String get termsReviewRequest =>
+      'Please review and accept our terms to proceed.';
+
+  @override
+  String get verifyEmailTitle => 'Verify your email';
+
+  @override
+  String verifyEmailMessage(Object email) {
+    return 'A verification link has been sent to $email.\nHowever, you can also use \"Skip for now\" to continue with the demo.';
+  }
+
+  @override
+  String get okButton => 'OK';
+
+  @override
+  String get alreadyHaveAccountLabel => 'Already have an account?';
 }

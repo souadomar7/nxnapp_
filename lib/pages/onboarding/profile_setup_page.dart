@@ -5,6 +5,7 @@ import '../../providers/user_provider.dart';
 import '../../theme.dart';
 import '../booking/booking_map_page.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nxnapp/l10n/app_localizations.dart';
 
 class ProfileSetupPage extends StatefulWidget {
   final Map<String, String>? uaePassData;
@@ -102,7 +103,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Complete Your Profile'),
+        title: Text(AppLocalizations.of(context)!.completeProfileTitle),
         backgroundColor: AppColors.bg,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.bluePrimary),
@@ -124,13 +125,13 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                     border: Border.all(color: Colors.green),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(Icons.check_circle, color: Colors.green),
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Identity Verified via UAE PASS. Data has been auto-populated.',
+                          AppLocalizations.of(context)!.uaePassVerifiedMessage,
                           style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -138,46 +139,46 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                   ),
                 ),
 
-              const Text(
-                'Business Details',
+              Text(
+                AppLocalizations.of(context)!.businessDetailsTitle,
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               
               TextFormField(
                 controller: _businessNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Business Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.business),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.businessNameLabel,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.business),
                 ),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                validator: (value) => value == null || value.isEmpty ? AppLocalizations.of(context)!.requiredField : null,
               ),
               const SizedBox(height: 16),
 
               TextFormField(
                 controller: _contactController,
-                decoration: const InputDecoration(
-                  labelText: 'Mobile Number',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.mobileNumberLabel,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.phone),
                 ),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                validator: (value) => value == null || value.isEmpty ? AppLocalizations.of(context)!.requiredField : null,
               ),
               const SizedBox(height: 16),
               
                TextFormField(
                 controller: _licenseController,
-                decoration: const InputDecoration(
-                  labelText: 'Trade License Number',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.badge),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.tradeLicenseLabel,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.badge),
                 ),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                validator: (value) => value == null || value.isEmpty ? AppLocalizations.of(context)!.requiredField : null,
               ),
 
               const SizedBox(height: 24),
-              const Text('Required Documents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(AppLocalizations.of(context)!.requiredDocumentsTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               
               InkWell(
@@ -197,24 +198,24 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                         children: [
                           const Icon(Icons.check_circle, color: Colors.green, size: 32),
                           const SizedBox(height: 8),
-                          Text('Uploaded: ${_documentFile!.name}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                          TextButton(onPressed: _pickDocument, child: const Text('Change'))
+                          Text('${AppLocalizations.of(context)!.uploadedLabel}: ${_documentFile!.name}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                          TextButton(onPressed: _pickDocument, child: Text(AppLocalizations.of(context)!.changeButton))
                         ],
                       )
-                    : const Column(
+                    : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.cloud_upload_outlined, size: 32, color: Colors.grey),
                           SizedBox(height: 8),
-                          Text('Tap to upload Trade License / ID', style: TextStyle(color: Colors.grey)),
+                          Text(AppLocalizations.of(context)!.tapToUploadDoc, style: TextStyle(color: Colors.grey)),
                         ],
                       ),
                 ),
               ),
               if (_showDocError)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 8.0, left: 4),
-                  child: Text('Document upload is required.', style: TextStyle(color: Colors.red, fontSize: 12)),
+                  child: Text(AppLocalizations.of(context)!.docUploadRequiredError, style: TextStyle(color: Colors.red, fontSize: 12)),
                 ),
 
               const SizedBox(height: 32),
@@ -230,7 +231,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 ),
                 child: _isLoading 
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Save & Continue', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  : Text(AppLocalizations.of(context)!.saveAndContinueButton, style: const TextStyle(fontSize: 16, color: Colors.white)),
               ),
             ],
           ),

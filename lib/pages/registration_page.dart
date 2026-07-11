@@ -90,8 +90,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 context: context,
                 barrierDismissible: false,
                 builder: (context) => AlertDialog(
-                  title: const Text('Verify your email'),
-                  content: Text('A verification link has been sent to ${_email.text}.\nHowever, you can also use "Skip for now" to continue with the demo.'),
+                  title: Text(l10n.verifyEmailTitle),
+                  content: Text(l10n.verifyEmailMessage(_email.text)),
                   actions: [
                     TextButton(
                       onPressed: () {
@@ -101,7 +101,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             MaterialPageRoute(builder: (_) => const LoginPage()),
                          );
                       }, 
-                      child: const Text('OK'),
+                      child: Text(l10n.okButton),
                     ),
                   ],
                 ),
@@ -369,7 +369,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                        Text("Already have an account?", style: TextStyle(color: Colors.grey[600])),
+                        Text(l10n.alreadyHaveAccountLabel, style: TextStyle(color: Colors.grey[600])),
                         TextButton(
                             onPressed: () {
                             Navigator.pushReplacement(

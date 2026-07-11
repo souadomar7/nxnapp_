@@ -21,6 +21,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC), // Premium light grey bg
       body: CustomScrollView(
@@ -74,7 +75,7 @@ class ProfilePage extends StatelessWidget {
                                   Consumer<UserProvider>(
                                     builder: (context, user, _) {
                                       return Text(
-                                        user.displayName.isNotEmpty ? user.displayName : 'Guest User',
+                                        user.displayName.isNotEmpty ? user.displayName : l10n.guestUser,
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 22,
@@ -104,11 +105,11 @@ class ProfilePage extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _HeaderStat(label: AppLocalizations.of(context)!.bookingsLabel, value: '3'),
+                            _HeaderStat(label: l10n.bookingsLabel, value: '3'),
                             Container(width: 1, height: 30, color: Colors.white24),
-                            _HeaderStat(label: AppLocalizations.of(context)!.savedLabel, value: '8'),
+                            _HeaderStat(label: l10n.savedLabel, value: '8'),
                             Container(width: 1, height: 30, color: Colors.white24),
-                            _HeaderStat(label: AppLocalizations.of(context)!.rentedShelvesLabel, value: '240'),
+                            _HeaderStat(label: l10n.rentedShelvesLabel, value: '240'),
                           ],
                         ),
                       ],
@@ -125,23 +126,23 @@ class ProfilePage extends StatelessWidget {
               child: Column(
                 children: [
                   // --- Account Section ---
-                  _SectionHeader(title: 'Account'),
+                  _SectionHeader(title: l10n.accountSection),
                   _MenuCard(children: [
                     _ProfileTile(
                       icon: Icons.inventory_2_outlined,
-                      title: 'My Subscriptions',
+                      title: l10n.mySubscriptions,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MySubscriptionsPage())),
                     ),
                     _Divider(),
                     _ProfileTile(
                       icon: Icons.account_balance_wallet_outlined,
-                      title: 'Wallet & Invoices',
+                      title: l10n.walletInvoices,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletPage())),
                     ),
                     _Divider(),
                     _ProfileTile(
                       icon: Icons.verified_user_outlined,
-                      title: AppLocalizations.of(context)!.kycDocsTitle,
+                      title: l10n.kycDocsTitle,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KYCPage())),
                     ),
                   ]),
@@ -149,18 +150,18 @@ class ProfilePage extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // --- Settings Section ---
-                  _SectionHeader(title: 'Preferences'), // Add to l10n later if needed
+                  _SectionHeader(title: l10n.preferencesSection), 
                   _MenuCard(children: [
                     _ProfileTile(
                       icon: Icons.notifications_outlined,
-                      title: AppLocalizations.of(context)!.notificationsTitle,
+                      title: l10n.notificationsTitle,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsPage())),
                     ),
                     _Divider(),
                     Consumer<LocaleProvider>(
                       builder: (context, provider, _) => _ProfileTile(
                         icon: Icons.language,
-                        title: AppLocalizations.of(context)!.languageTitle,
+                        title: l10n.languageTitle,
                         trailingText: provider.locale.languageCode == 'en' ? 'English' : 'العربية',
                         onTap: () => provider.toggleLocale(),
                       ),
@@ -170,19 +171,19 @@ class ProfilePage extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // --- Business Section ---
-                  _SectionHeader(title: 'Business'),
+                  _SectionHeader(title: l10n.businessSection),
                   _MenuCard(children: [
                     _ProfileTile(
                       icon: Icons.store_mall_directory_outlined,
-                      title: AppLocalizations.of(context)!.marketplaceTitle,
-                      subtitle: AppLocalizations.of(context)!.marketplaceSubtitle,
+                      title: l10n.marketplaceTitle,
+                      subtitle: l10n.marketplaceSubtitle,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerHub())),
                     ),
                     _Divider(),
                      _ProfileTile(
                       icon: Icons.layers_outlined,
-                      title: 'All Features / Demo',
-                      subtitle: 'Explore all screens',
+                      title: l10n.allFeatures,
+                      subtitle: l10n.exploreScreens,
                       iconColor: Colors.purple,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DemoMenuPage())),
                     ),
@@ -194,7 +195,7 @@ class ProfilePage extends StatelessWidget {
                   _MenuCard(children: [
                     _ProfileTile(
                       icon: Icons.logout_rounded,
-                      title: AppLocalizations.of(context)!.logoutTitle,
+                      title: l10n.logoutTitle,
                       iconColor: Colors.redAccent,
                       textColor: Colors.redAccent,
                       showTrailing: false,
@@ -217,7 +218,7 @@ class ProfilePage extends StatelessWidget {
                   
                   const SizedBox(height: 40),
                   Text(
-                    'Version 1.0.2',
+                    l10n.version('1.0.2'),
                     style: TextStyle(color: Colors.grey[400], fontSize: 12),
                   ),
                   const SizedBox(height: 20),

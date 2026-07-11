@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 class UserProvider extends ChangeNotifier {
   // Default to Demo Data for "Fix the data" request
-  String? _businessName = 'Al Falak Logistics';
-  String? _contactNumber = '+971 50 123 4567';
-  String? _licenseNumber = 'CN-1234567';
-  String? _email = 'suad.sayed@example.com';
+  // Default to null so guests are identified correctly
+  String? _businessName;
+  String? _contactNumber;
+  String? _licenseNumber;
+  String? _email;
 
   bool get isLoggedIn => _businessName != null;
   String get displayName => _businessName ?? 'Guest';

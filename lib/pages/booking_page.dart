@@ -1,33 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'payment_page.dart'; 
+import 'payment_page.dart';
 import '../models/invoice.dart';
-import '../services/marketplace_service.dart'; // Import service
-// import 'package:flutter_svg/flutter_svg.dart'; // Uncomment if using SVG logo
-// import 'package:flutter_svg/flutter_svg.dart'; // Uncomment if using SVG logo
+import '../services/marketplace_service.dart';
+import '../l10n/app_localizations.dart';
+import '../widgets/brand_logo.dart';
 
-// --- THEME COLORS (Based on Screenshot) ---
-class BookingColors {
-  static const Color primary = Color(0xFF1A47B8); // NXN Blue
+// ==============================================================================
+// 1. THEME & CONSTANTS (Compact)
+// ==============================================================================
+
+class BookingTheme {
+  static const Color primary = Color(0xFF1A47B8);
   static const Color primaryDark = Color(0xFF102A70);
-  static const Color accent = Color(0xFFF4B400); // Gold/Yellow for greeting
+  static const Color accent = Color(0xFFF4B400);
   static const Color background = Color(0xFFF5F6FA);
   static const Color textDark = Color(0xFF2D3436);
   static const Color textGrey = Color(0xFFA4B0BE);
+  static const Color cardShadow = Color(0x0D000000);
+
+  // Reduced font size for tighter UI
+  static TextStyle get titleStyle => const TextStyle(
+      fontSize: 14, fontWeight: FontWeight.bold, color: primary, letterSpacing: 0.5
+  );
 }
 
-// --- DATA MODELS ---
+// ==============================================================================
+// 2. DATA MODELS & LOGIC
+// ==============================================================================
+
 class PrimeWarehouse {
   final String id;
   final String nameEn;
   final String nameAr;
   final IconData icon;
 
-  PrimeWarehouse({
+  const PrimeWarehouse({
     required this.id,
     required this.nameEn,
     required this.nameAr,
     required this.icon,
+  });
+}
+
+class PriceBreakdown {
+  final double subtotal;
+  final double platformFee;
+  final double vat;
+  final double total;
+
+  PriceBreakdown({
+    required this.subtotal,
+    required this.platformFee,
+    required this.vat,
+    required this.total,
   });
 }
 
@@ -40,20 +66,35 @@ class BookingConfig {
 
   BookingConfig({
     this.isSelected = false,
-    this.shelves = 5, // Default start
+    this.shelves = 5,
     this.durationMonths = 1,
     this.addWorkers = false,
     this.workerCount = 1,
   });
 
-  double get totalCost {
-    if (!isSelected) return 0;
-    // Centralized Logic via Service (Simulating API Call)
-    return MarketplaceService().calculateRentalPrice(shelves, durationMonths, addWorkers, workerCount);
+  PriceBreakdown calculateBreakdown() {
+    double baseCost = 100.0 * shelves * durationMonths;
+    if (addWorkers) {
+      baseCost += (workerCount * 500 * durationMonths);
+    }
+    final fee = baseCost * 0.05;
+    final taxable = baseCost + fee;
+    final vat = taxable * 0.05;
+    final total = taxable + vat;
+
+    return PriceBreakdown(
+        subtotal: baseCost,
+        platformFee: fee,
+        vat: vat,
+        total: total
+    );
   }
 }
 
-// --- MAIN PAGE ---
+// ==============================================================================
+// 3. MAIN PAGE
+// ==============================================================================
+
 class BookingPage extends StatefulWidget {
   const BookingPage({super.key});
 
@@ -62,15 +103,19 @@ class BookingPage extends StatefulWidget {
 }
 
 class _BookingPageState extends State<BookingPage> {
-  // The 4 Prime Locations
   final List<PrimeWarehouse> _warehouses = [
-    PrimeWarehouse(id: 'dxb', nameEn: 'Dubai', nameAr: 'دبي', icon: Icons.business),
-    PrimeWarehouse(id: 'auh', nameEn: 'Abu Dhabi', nameAr: 'أبو ظبي', icon: Icons.location_city),
-    PrimeWarehouse(id: 'shj', nameEn: 'Sharjah', nameAr: 'الشارقة', icon: Icons.mosque),
-    PrimeWarehouse(id: 'aln', nameEn: 'Al Ain', nameAr: 'العين', icon: Icons.landscape),
+    const PrimeWarehouse(id: 'dxb', nameEn: 'Dubai', nameAr: 'دبي', icon: Icons.business),
+    const PrimeWarehouse(id: 'auh', nameEn: 'Abu Dhabi', nameAr: 'أبو ظبي', icon: Icons.location_city),
+    const PrimeWarehouse(id: 'shj', nameEn: 'Sharjah', nameAr: 'الشارقة', icon: Icons.mosque),
+    const PrimeWarehouse(id: 'aln', nameEn: 'Al Ain', nameAr: 'العين', icon: Icons.landscape),
   ];
 
   final Map<String, BookingConfig> _configs = {};
+
+  double get _grandTotal => _configs.values.where((c) => c.isSelected)
+      .fold(0, (sum, c) => sum + c.calculateBreakdown().total);
+
+  int get _selectedCount => _configs.values.where((c) => c.isSelected).length;
 
   @override
   void initState() {
@@ -80,94 +125,60 @@ class _BookingPageState extends State<BookingPage> {
     }
   }
 
-  double get _grandTotal => _configs.values.fold(0, (sum, c) => sum + c.totalCost);
-  int get _selectedCount => _configs.values.where((c) => c.isSelected).length;
   @override
   Widget build(BuildContext context) {
-    // Detect Language from context (Assuming generic check for now)
-    final bool isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final l10n = AppLocalizations.of(context)!;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final currencyFormat = NumberFormat.currency(symbol: 'AED ', decimalDigits: 0);
-    final bottomPadding = _selectedCount > 0 ? 100.0 : 20.0;
+    // Reduced bottom padding
+    final bottomPadding = _selectedCount > 0 ? 90.0 : 16.0;
 
     return Scaffold(
-      backgroundColor: BookingColors.background,
+      backgroundColor: BookingTheme.background,
       body: Stack(
         children: [
           CustomScrollView(
             slivers: [
-              // 1. Sliver App Bar (Scrollable Header)
-              SliverAppBar(
-                expandedHeight: 200,
-                pinned: true,
-                backgroundColor: BookingColors.primary,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                              child: const Text(
-                                "NXN",
-                                style: TextStyle(color: BookingColors.primary, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: 2),
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          Row(
-                            children: [
-                              Text(
-                                isAr ? "مرحباً سعاد!" : "Welcome Suad!",
-                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text("👋", style: TextStyle(fontSize: 22)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            isAr ? "اعثر على مخزن للإيجار اليوم" : "Find a warehouse to rent today",
-                            style: const TextStyle(color: Colors.white70, fontSize: 14),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // 2. Content List
+              _BookingHeader(l10n: l10n, isAr: isAr),
               SliverToBoxAdapter(
                 child: Container(
                   decoration: const BoxDecoration(
-                    color: BookingColors.background,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    color: BookingTheme.background,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)), // Slightly sharper
                   ),
-                  transform: Matrix4.translationValues(0, -20, 0), // Overlap effect
-                  padding: EdgeInsets.fromLTRB(20, 30, 20, bottomPadding),
+                  transform: Matrix4.translationValues(0, -10, 0), // Adjusted overlap
+                  padding: EdgeInsets.fromLTRB(16, 20, 16, bottomPadding), // Increased top padding
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _sectionTitle(isAr ? 'الخطوة 1 - اختر الإمارة' : 'Step 1 - Choose Emirate'),
-                      const SizedBox(height: 12),
-                      _buildLocationGrid(isAr),
+                      _SectionTitle(title: l10n.step1Title),
+                      const SizedBox(height: 8),
 
-                      const SizedBox(height: 30),
+                      _WarehouseGrid(
+                        warehouses: _warehouses,
+                        configs: _configs,
+                        isAr: isAr,
+                        onToggle: (id) => setState(() {
+                          _configs[id]!.isSelected = !_configs[id]!.isSelected;
+                        }),
+                      ),
+
+                      const SizedBox(height: 16),
 
                       if (_selectedCount > 0) ...[
-                        _sectionTitle(isAr ? 'الخطوة 2 - تخصيص المساحة' : 'Step 2 - Customize Space'),
-                        const SizedBox(height: 12),
+                        _SectionTitle(title: l10n.step2CustomizeSpace),
+                        const SizedBox(height: 8),
                         ..._warehouses.where((w) => _configs[w.id]!.isSelected).map(
-                              (w) => _buildConfigCard(w, _configs[w.id]!, isAr),
-                            ),
-                      ] else 
-                         _buildEmptyState(isAr),
+                              (w) => _RentalConfigCard(
+                            warehouse: w,
+                            config: _configs[w.id]!,
+                            isAr: isAr,
+                            onUpdate: () => setState(() {}),
+                            onRemove: () => setState(() => _configs[w.id]!.isSelected = false),
+                          ),
+                        ),
+                      ] else
+                        _EmptyState(l10n: l10n),
                     ],
                   ),
                 ),
@@ -175,220 +186,254 @@ class _BookingPageState extends State<BookingPage> {
             ],
           ),
 
-          // 3. Floating Quote Bar
           if (_selectedCount > 0)
             Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildBottomQuoteBar(currencyFormat, isAr),
+              bottom: 0, left: 0, right: 0,
+              child: _BottomQuoteBar(
+                l10n: l10n,
+                grandTotal: _grandTotal,
+                currencyFormat: currencyFormat,
+                onBook: () => _showQuoteDialog(context, currencyFormat, isAr),
+              ),
             ),
         ],
       ),
     );
   }
 
-  // Helper moved inside build or kept, but _buildHeader is gone.
-  // ... other widgets use existing methods ...
-
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: BookingColors.textDark,
+  void _showQuoteDialog(BuildContext context, NumberFormat fmt, bool isAr) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _QuoteDialog(
+        warehouses: _warehouses.where((w) => _configs[w.id]!.isSelected).toList(),
+        configs: _configs,
+        currencyFormat: fmt,
+        isAr: isAr,
+        grandTotal: _grandTotal,
       ),
     );
   }
+}
 
-  Widget _buildLocationGrid(bool isAr) {
-    if (_warehouses.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text("Error: No location data available."),
-      );
-    }
+// ==============================================================================
+// 4. SUB-WIDGETS (UI COMPONENTS - COMPACT)
+// ==============================================================================
+
+class _BookingHeader extends StatelessWidget {
+  final AppLocalizations l10n;
+  final bool isAr;
+
+  const _BookingHeader({required this.l10n, required this.isAr});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: 120, // Further Reduced from 140
+      pinned: true,
+      backgroundColor: BookingTheme.primary,
+      flexibleSpace: FlexibleSpaceBar(
+        background: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Tighter padding
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Center(child: BrandLogo(height: 28, isLight: true)), // Smaller Logo
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(l10n.welcomeUser("Suad"), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), // Smaller font
+                        const SizedBox(width: 8),
+                        const Text("👋", style: TextStyle(fontSize: 20)),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        isAr ? "اعثر على مخزن للإيجار اليوم" : "Find a warehouse to rent today",
+                        style: const TextStyle(color: Colors.white70, fontSize: 12), // Smaller font
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(title, style: BookingTheme.titleStyle);
+  }
+}
+
+class _WarehouseGrid extends StatelessWidget {
+  final List<PrimeWarehouse> warehouses;
+  final Map<String, BookingConfig> configs;
+  final bool isAr;
+  final Function(String) onToggle;
+
+  const _WarehouseGrid({
+    required this.warehouses,
+    required this.configs,
+    required this.isAr,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (warehouses.isEmpty) return const SizedBox();
 
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      childAspectRatio: 2.2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      children: _warehouses.map((w) {
-        // Safety check for config
-        if (!_configs.containsKey(w.id)) {
-          return const SizedBox(); // Should not happen
-        }
-
-        final isSelected = _configs[w.id]!.isSelected;
-        
-        return Material(
-          color: isSelected ? BookingColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          elevation: isSelected ? 4 : 1, // Add slight elevation to unselected too to make it pop
-          shadowColor: Colors.black.withValues(alpha: 0.1),
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _configs[w.id]!.isSelected = !isSelected;
-              });
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected ? BookingColors.primary : Colors.grey.shade400, // Darker grey
-                  width: 1.5,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (isSelected) ...[
-                    const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(
-                    isAr ? w.nameAr : w.nameEn,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : BookingColors.textDark,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+      childAspectRatio: 2.8, // Flatter aspect ratio for compactness
+      crossAxisSpacing: 6, // Reduced spacing
+      mainAxisSpacing: 6,
+      children: warehouses.map((w) {
+        final isSelected = configs[w.id]!.isSelected;
+        return _GridItem(w: w, isSelected: isSelected, isAr: isAr, onTap: () => onToggle(w.id));
       }).toList(),
     );
   }
+}
 
-  Widget _buildConfigCard(PrimeWarehouse w, BookingConfig c, bool isAr) {
+class _GridItem extends StatelessWidget {
+  final PrimeWarehouse w;
+  final bool isSelected;
+  final bool isAr;
+  final VoidCallback onTap;
+
+  const _GridItem({required this.w, required this.isSelected, required this.isAr, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected ? BookingTheme.primary : Colors.white,
+      borderRadius: BorderRadius.circular(10), // Smaller radius
+      elevation: isSelected ? 2 : 1, // Reduced elevation
+      shadowColor: BookingTheme.cardShadow,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? BookingTheme.primary : Colors.grey.shade300,
+              width: 1, // Thinner border
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isSelected) ...[const Icon(Icons.check_circle, color: Colors.white, size: 16), const SizedBox(width: 6)], // Smaller icon
+              Text(
+                isAr ? w.nameAr : w.nameEn,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : BookingTheme.textDark,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13, // Smaller font
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RentalConfigCard extends StatelessWidget {
+  final PrimeWarehouse warehouse;
+  final BookingConfig config;
+  final bool isAr;
+  final VoidCallback onUpdate;
+  final VoidCallback onRemove;
+
+  const _RentalConfigCard({
+    required this.warehouse,
+    required this.config,
+    required this.isAr,
+    required this.onUpdate,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 8), // Reduced margin
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: BookingTheme.cardShadow, blurRadius: 6, offset: Offset(0, 2))],
       ),
       child: Column(
         children: [
-          // Header: Location Name
+          // Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Tighter padding
             decoration: BoxDecoration(
-              color: BookingColors.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              color: BookingTheme.primary.withValues(alpha: 0.05),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               children: [
-                Icon(w.icon, color: BookingColors.primary, size: 20),
-                const SizedBox(width: 10),
+                Icon(warehouse.icon, color: BookingTheme.primary, size: 18),
+                const SizedBox(width: 8),
                 Text(
-                  isAr ? w.nameAr : w.nameEn,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: BookingColors.primaryDark),
+                  isAr ? warehouse.nameAr : warehouse.nameEn,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: BookingTheme.primaryDark),
                 ),
                 const Spacer(),
                 IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                   icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                  onPressed: () => setState(() => c.isSelected = false),
+                  onPressed: onRemove,
                 ),
               ],
             ),
           ),
-          
-          // Controls
+          // Sliders & Toggles
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12), // Reduced padding
             child: Column(
               children: [
-                // Shelves Slider
-                _controlRow(
-                  label: isAr ? 'عدد الرفوف' : 'Shelves',
-                  value: '${c.shelves}',
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 16), // Big Thumb
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 28),
-                      trackHeight: 12, // Thick Track
-                    ),
-                    child: Slider(
-                      value: c.shelves.toDouble(),
-                      min: 1,
-                      max: 50,
-                      activeColor: BookingColors.primary,
-                      inactiveColor: Colors.grey[200],
-                      divisions: 49,
-                      onChanged: (v) => setState(() => c.shelves = v.toInt()),
-                    ),
-                  ),
+                _SliderRow(
+                  label: AppLocalizations.of(context)!.shelvesLabelSimple,
+                  value: '${config.shelves}',
+                  min: 1, max: 50,
+                  current: config.shelves.toDouble(),
+                  activeColor: BookingTheme.primary,
+                  onChanged: (v) { config.shelves = v.toInt(); onUpdate(); },
                 ),
-                const SizedBox(height: 24), // More space
-                
-                // Duration Slider
-                _controlRow(
-                  label: isAr ? 'المدة (أشهر)' : 'Months',
-                  value: '${c.durationMonths}',
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 16), // Big Thumb
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 28),
-                      trackHeight: 12, // Thick Track
-                    ),
-                    child: Slider(
-                      value: c.durationMonths.toDouble(),
-                      min: 1,
-                      max: 12,
-                      activeColor: BookingColors.accent,
-                      inactiveColor: Colors.grey[200],
-                      divisions: 11,
-                      onChanged: (v) => setState(() => c.durationMonths = v.toInt()),
-                    ),
-                  ),
+                const SizedBox(height: 8), // Reduced gap
+                _SliderRow(
+                  label: AppLocalizations.of(context)!.monthsLabel,
+                  value: '${config.durationMonths}',
+                  min: 1, max: 12,
+                  current: config.durationMonths.toDouble(),
+                  activeColor: BookingTheme.accent,
+                  onChanged: (v) { config.durationMonths = v.toInt(); onUpdate(); },
                 ),
-                
-                const Divider(height: 40),
-                
-                // Workers Toggle
-                Row(
-                  children: [
-                    Icon(Icons.people_outline, size: 28, color: Colors.grey[600]), // Bigger Icon
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        isAr ? 'إضافة عمال؟ (+50 درهم/عامل)' : 'Add Workers? (+50 AED/ea)',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Transform.scale(
-                      scale: 1.2, // Bigger Switch
-                      child: Switch(
-                        value: c.addWorkers,
-                        activeTrackColor: BookingColors.primary,
-                        onChanged: (v) => setState(() => c.addWorkers = v),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                if (c.addWorkers)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _roundBtn(Icons.remove, () => setState(() => c.workerCount > 1 ? c.workerCount-- : null)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('${c.workerCount}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                      _roundBtn(Icons.add, () => setState(() => c.workerCount < 10 ? c.workerCount++ : null)),
-                    ],
-                  ),
+                const Divider(height: 16), // Thinner divider
+                _WorkersControl(config: config, onUpdate: onUpdate),
               ],
             ),
           ),
@@ -396,132 +441,310 @@ class _BookingPageState extends State<BookingPage> {
       ),
     );
   }
+}
 
-  Widget _controlRow({required String label, required String value, required Widget child}) {
+class _SliderRow extends StatelessWidget {
+  final String label, value;
+  final double min, max, current;
+  final Color activeColor;
+  final ValueChanged<double> onChanged;
+
+  const _SliderRow({required this.label, required this.value, required this.min, required this.max, required this.current, required this.activeColor, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w600)),
-            Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
+            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           ],
         ),
-        SizedBox(height: 30, child: child), // Compact Slider
+        SizedBox(
+          height: 24, // Reduced slider container height
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10), // Smaller thumb
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+              trackHeight: 6, // Thinner track
+            ),
+            child: Slider(value: current, min: min, max: max, divisions: (max-min).toInt(), activeColor: activeColor, inactiveColor: Colors.grey[200], onChanged: onChanged),
+          ),
+        ),
       ],
     );
   }
+}
 
-  Widget _roundBtn(IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300)),
-        child: Icon(icon, size: 16),
+class _WorkersControl extends StatelessWidget {
+  final BookingConfig config;
+  final VoidCallback onUpdate;
+
+  const _WorkersControl({required this.config, required this.onUpdate});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Tighter
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.people_outline, size: 20, color: BookingTheme.primary), // Smaller icon
+              const SizedBox(width: 10),
+              Expanded(child: Text(AppLocalizations.of(context)!.addWorkersLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
+              Transform.scale(
+                scale: 0.7, // Smaller Switch
+                child: Switch(
+                  value: config.addWorkers,
+                  activeTrackColor: BookingTheme.primary,
+                  onChanged: (v) { config.addWorkers = v; onUpdate(); },
+                ),
+              ),
+            ],
+          ),
+          if (config.addWorkers) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("Workers:", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade300)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _RoundBtn(icon: Icons.remove, onTap: () { if(config.workerCount > 1) { config.workerCount--; onUpdate(); } }),
+                      SizedBox(width: 24, child: Text('${config.workerCount}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      _RoundBtn(icon: Icons.add, onTap: () { if(config.workerCount < 10) { config.workerCount++; onUpdate(); } }),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
+}
 
-  Widget _buildEmptyState(bool isAr) {
+class _RoundBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RoundBtn({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(2), // Smaller btn padding
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300)),
+        child: Icon(icon, size: 14),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final AppLocalizations l10n;
+  const _EmptyState({required this.l10n});
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.only(top: 40),
+        padding: const EdgeInsets.only(top: 30),
         child: Column(
           children: [
-            Icon(Icons.warehouse_outlined, size: 60, color: Colors.grey.shade300),
-            const SizedBox(height: 12),
-            Text(
-              isAr ? "لم يتم اختيار إمارة" : "No Emirate Selected",
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
-            ),
+            Icon(Icons.warehouse_outlined, size: 48, color: Colors.grey.shade300), // Smaller Icon
+            const SizedBox(height: 8),
+            Text(l10n.noEmirateSelected, style: TextStyle(color: Colors.grey.shade500, fontSize: 14)),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildBottomQuoteBar(NumberFormat format, bool isAr) {
+class _BottomQuoteBar extends StatelessWidget {
+  final AppLocalizations l10n;
+  final double grandTotal;
+  final NumberFormat currencyFormat;
+  final VoidCallback onBook;
+
+  const _BottomQuoteBar({required this.l10n, required this.grandTotal, required this.currencyFormat, required this.onBook});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), // Reduced Padding
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -5))],
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: const [BoxShadow(color: BookingTheme.cardShadow, blurRadius: 15, offset: Offset(0, -3))],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
+        top: false,
         child: Row(
           children: [
             Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isAr ? "الإجمالي" : "Grand Total",
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                Text(
-                  format.format(_grandTotal),
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: BookingColors.primary),
-                ),
+                Text(l10n.grandTotalSimple, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(currencyFormat.format(grandTotal), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: BookingTheme.primary)),
               ],
             ),
             const Spacer(),
             ElevatedButton(
-              onPressed: () async {
-                 final newInvoice = Invoice(
-                    id: 'INV-${DateTime.now().millisecondsSinceEpoch}',
-                    number: 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-                    warehouseName: 'Single/Multi Warehouse Booking', // Simplified
-                    date: DateTime.now(),
-                    amount: _grandTotal * 0.95, // Subtotal approx
-                    vat: _grandTotal * 0.05,
-                    paid: false,
-                    type: InvoiceType.rental,
-                    metaData: {
-                      'warehouseIds': _configs.keys.where((k) => _configs[k]!.isSelected).toList(),
-                      // Just taking the first one for simplicity in this aggregate invoice, 
-                      // or we could handle multiple subscriptions in the service.
-                      // For this demo, let's assume we pass the primary one or map them later.
-                      'primaryWarehouseId': _configs.keys.firstWhere((k) => _configs[k]!.isSelected), 
-                      'shelves': _configs.values.firstWhere((c) => c.isSelected).shelves,
-                      'duration': _configs.values.firstWhere((c) => c.isSelected).durationMonths,
-                    },
-                 );
-                 
-                 // Persist to DB
-                 try {
-                   await MarketplaceService().createInvoice(newInvoice);
-                 } catch (e) {
-                   debugPrint('Error saving invoice: $e');
-                   // optionally show error or proceed with ephemeral
-                 }
-
-                 if (!mounted) return;
-
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => PaymentsPage(
-                            initialInvoice:
-                                newInvoice)), // Still passing it for immediate display focus
-                  );
-              },
+              onPressed: onBook,
               style: ElevatedButton.styleFrom(
-                backgroundColor: BookingColors.primary,
+                backgroundColor: BookingTheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20), // Large pill button
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 4,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10), // Smaller Button padding
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
               ),
-              child: Text(
-                isAr ? "احجز الآن" : "Book Now",
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              child: Text(l10n.bookNow, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuoteDialog extends StatelessWidget {
+  final List<PrimeWarehouse> warehouses;
+  final Map<String, BookingConfig> configs;
+  final NumberFormat currencyFormat;
+  final bool isAr;
+  final double grandTotal;
+
+  const _QuoteDialog({required this.warehouses, required this.configs, required this.currencyFormat, required this.isAr, required this.grandTotal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Combined Quote Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: BookingTheme.textDark)),
+            const SizedBox(height: 12),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: warehouses.map((w) {
+                    final config = configs[w.id]!;
+                    final breakdown = config.calculateBreakdown();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("${isAr ? w.nameAr : w.nameEn} Central Warehouse", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                          const SizedBox(height: 6),
+                          _QuoteRow("Shelves", "${config.shelves}"),
+                          _QuoteRow("Subtotal (mo)", currencyFormat.format(breakdown.subtotal)),
+                          _QuoteRow("Platform fee (mo)", currencyFormat.format(breakdown.platformFee)),
+                          _QuoteRow("VAT (mo)", currencyFormat.format(breakdown.vat)),
+                          const Divider(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text("Total (mo)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: BookingTheme.textDark)),
+                              Text(currencyFormat.format(breakdown.total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: BookingTheme.textDark)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(context), child: const Text("Close", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: BookingTheme.textGrey)))),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _handleBooking(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: BookingTheme.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: Colors.grey.shade300, width: 1),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.arrow_forward, size: 16),
+                label: const Text("Continue to payment", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _handleBooking(BuildContext context) async {
+    final newInvoice = Invoice(
+      id: 'INV-${DateTime.now().millisecondsSinceEpoch}',
+      number: 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+      warehouseName: 'Single/Multi Warehouse Booking',
+      date: DateTime.now(),
+      amount: grandTotal * 0.95,
+      vat: grandTotal * 0.05,
+      paid: false,
+      type: InvoiceType.rental,
+      metaData: {
+        'warehouseIds': configs.keys.where((k) => configs[k]!.isSelected).toList(),
+      },
+    );
+
+    try {
+      await MarketplaceService().createInvoice(newInvoice);
+    } catch (e) {
+      debugPrint('Error saving invoice: $e');
+    }
+
+    if (context.mounted) {
+      Navigator.pop(context);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentsPage(initialInvoice: newInvoice)));
+    }
+  }
+}
+
+class _QuoteRow extends StatelessWidget {
+  final String label, value;
+  const _QuoteRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: BookingTheme.textGrey, fontWeight: FontWeight.w500)),
+          Text(value, style: const TextStyle(fontSize: 12, color: BookingTheme.textGrey, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }

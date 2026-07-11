@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 
+import '../theme.dart';
+import '../widgets/brand_logo.dart';
+
 // Match BookingPage colors
 class ReceiveColors {
-  static const primary = Color(0xFF0057FF); // Vibrant Blue
+  static const primary = AppColors.bluePrimary; // Match App Theme
   static const background = Color(0xFFF3F6FB); // Light Grey-Blue
   static const textDark = Color(0xFF1A1F36); // Dark user text
   static const cardBorder = Color(0xFFE0E6F2);
@@ -23,7 +26,6 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
   TimeOfDay? _scheduledTime;
 
   // 2) Preparation
-  String? _bay;
   bool _isPrepared = false;
 
   // 3) Inspection / extra services
@@ -35,7 +37,6 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
   String? _stockStatus;
   bool _isUpdated = false;
 
-  final _bays = const ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
   final TextEditingController _notesCtrl = TextEditingController();
 
   // ---------- helpers ----------
@@ -128,16 +129,16 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
       // reset following stages
       _isPrepared = false;
       _isUpdated = false;
-      _bay = null;
       _damagePhotosByAdmin = false;
       _notesCtrl.clear();
       _storageNo = null;
-      _stockStatus = 'Pending';
+      _storageNo = null;
+      _stockStatus = AppLocalizations.of(context)!.statusPending;
     });
     if (!mounted) return;
     _toast(
       AppLocalizations.of(context)!.scheduleDropoffSubtitleScheduled(_fmtDateTime(date, time)),
-      undoLabel: 'Undo',
+      undoLabel: AppLocalizations.of(context)!.undoAction,
       onUndo: () {
         setState(() {
           _scheduledDate = old.$1;
@@ -149,29 +150,21 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
 
   void _prepareWarehouse() {
     if (_scheduledDate == null || _scheduledTime == null) {
-      _toast("Please schedule the drop-off time first.");
+      _toast(AppLocalizations.of(context)!.scheduleFirstToast);
       return;
     }
-    if (_bay == null) {
-      _toast('Select a bay first.');
-      return;
-    }
-
     setState(() => _isPrepared = true);
 
     _toast(
-      AppLocalizations.of(context)!.prepareBaySubtitlePrepared(
-        _bay!,
-        AppLocalizations.of(context)!.storageModelValue,
-      ),
-      undoLabel: 'Undo',
+      "Warehouse Prepared", // Specific bay logic removed
+      undoLabel: AppLocalizations.of(context)!.undoAction,
       onUndo: () => setState(() => _isPrepared = false),
     );
   }
 
   Future<void> _updateSystemInstantly() async {
     if (!_isPrepared) {
-      _toast("Prepare warehouse first.");
+      _toast(AppLocalizations.of(context)!.prepareWarehouseFirst);
       return;
     }
 
@@ -180,14 +173,15 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
 
     setState(() {
       _storageNo = "STO-$stamp";
-      _stockStatus = 'Received & Stored';
+      _storageNo = "STO-$stamp";
+      _stockStatus = AppLocalizations.of(context)!.statusReceived;
       _isUpdated = true;
     });
 
-    _toast("Updated. Storage # $_storageNo", undoLabel: 'Undo', onUndo: () {
+    _toast(AppLocalizations.of(context)!.updatedStorage(_storageNo!), undoLabel: AppLocalizations.of(context)!.undoAction, onUndo: () {
       setState(() {
         _storageNo = prev.$1;
-        _stockStatus = prev.$2 ?? 'Pending';
+        _stockStatus = prev.$2 ?? AppLocalizations.of(context)!.statusPending;
         _isUpdated = prev.$3;
       });
     });
@@ -245,21 +239,7 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "NXN",
-                            style: TextStyle(
-                              color: ReceiveColors.primary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
+                        child: const BrandLogo(height: 32),
                       ),
                       const Spacer(),
                       Text(
@@ -351,28 +331,8 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (_scheduledDate == null)
-                          Text("Please schedule drop-off first.", style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic))
+                          Text(AppLocalizations.of(context)!.scheduleFirstText, style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic))
                         else ...[
-                          Text(
-                            AppLocalizations.of(context)!.assignBayLabel,
-                            style: const TextStyle(fontWeight: FontWeight.w600, color: ReceiveColors.textDark),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: _bays.map((b) {
-                              final sel = _bay == b;
-                              return ChoiceChip(
-                                label: Text(b),
-                                selected: sel,
-                                onSelected: (_) => setState(() => _bay = b),
-                                selectedColor: ReceiveColors.primary,
-                                labelStyle: TextStyle(color: sel ? Colors.white : Colors.grey[700]),
-                                backgroundColor: Colors.grey[100],
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              );
-                            }).toList(),
-                          ),
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
@@ -399,7 +359,7 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
                        crossAxisAlignment: CrossAxisAlignment.start,
                        children: [
                          if (!_isPrepared)
-                            Text("Prepare warehouse first.", style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic))
+                            Text(AppLocalizations.of(context)!.prepareWarehouseFirst, style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic))
                          else ...[
                             SwitchListTile.adaptive(
                               contentPadding: EdgeInsets.zero,
@@ -428,7 +388,7 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
                                   backgroundColor: ReceiveColors.primary,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
-                                child: Text(_isUpdated ? "All Done" : AppLocalizations.of(context)!.updateNowButton, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                child: Text(_isUpdated ? AppLocalizations.of(context)!.allDoneButton : AppLocalizations.of(context)!.updateNowButton, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                               ),
                             ),
                          ]
@@ -461,7 +421,7 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "Progress",
+                AppLocalizations.of(context)!.progressTitle,
                 style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w600),
               ),
               Text(

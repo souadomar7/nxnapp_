@@ -476,7 +476,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get subtotalLabel => 'المجموع الفرعي';
 
   @override
-  String get vatLabel => 'ضريبة القيمة المضافة (5%)';
+  String get vatLabel => 'ضريبة القيمة المضافة 5%';
 
   @override
   String get totalLabel => 'المجموع';
@@ -638,6 +638,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get unknownProduct => 'منتج غير معروف';
+
+  @override
+  String inventorySubtitle(int count) {
+    return 'إدارة $count عنصر عبر جميع الفروع';
+  }
 
   @override
   String get productCatalogTitle => 'كتالوج المنتجات';
@@ -916,7 +921,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get restockCreated => 'تم إنشاء طلب إعادة التخزين';
 
   @override
-  String get restockFailed => 'فشل إعادة التخزين';
+  String get restockFailed => 'فشل في إنشاء طلب إعادة التخزين';
 
   @override
   String get openingReports => 'جاري فتح التقارير...';
@@ -925,7 +930,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noReportsAvailable => 'لا توجد تقارير متاحة';
 
   @override
-  String get instantQuoteTitle => 'عروض أسعار فورية';
+  String get instantQuoteTitle => 'عرض سعر فوري';
 
   @override
   String get instantQuoteMultiTitle => 'عروض أسعار فورية (مخازن متعددة)';
@@ -964,7 +969,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get totalAedLabel => 'الإجمالي (درهم)';
 
   @override
-  String get estimatedTotalTitle => 'إجمالي التكلفة التقديرية (شهرياً)';
+  String get estimatedTotalTitle => 'الإجمالي التقديري (شهرياً)';
 
   @override
   String platformFeeRateLabel(Object rate) {
@@ -1139,4 +1144,348 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get recentActivity => 'النشاط الأخير';
+
+  @override
+  String get alAinBranch => 'فرع العين';
+
+  @override
+  String activeShelves(Object count) {
+    return 'نشط • $count أرفف';
+  }
+
+  @override
+  String get showQr => 'عرض الرمز';
+
+  @override
+  String get failedToLoadHistory => 'فشل تحميل السجل';
+
+  @override
+  String get noRecentActivity => 'لا يوجد نشاط حديث';
+
+  @override
+  String get managingTag => 'إدارة';
+
+  @override
+  String minutesAgo(Object count) {
+    return 'منذ $count دقيقة';
+  }
+
+  @override
+  String hoursAgo(Object count) {
+    return 'منذ $count ساعة';
+  }
+
+  @override
+  String get yesterday => 'أمس';
+
+  @override
+  String daysAgo(Object count) {
+    return 'منذ $count أيام';
+  }
+
+  @override
+  String get guestUser => 'زائر';
+
+  @override
+  String get accountSection => 'الحساب';
+
+  @override
+  String get mySubscriptions => 'اشتراكاتي';
+
+  @override
+  String get walletInvoices => 'المحفظة والفواتير';
+
+  @override
+  String get preferencesSection => 'التفضيلات';
+
+  @override
+  String get businessSection => 'الأعمال';
+
+  @override
+  String get allFeatures => 'كل الميزات / تجريبي';
+
+  @override
+  String get exploreScreens => 'استكشاف كل الشاشات';
+
+  @override
+  String version(Object version) {
+    return 'الإصدار $version';
+  }
+
+  @override
+  String get dubai => 'دبي';
+
+  @override
+  String get abuDhabi => 'أبو ظبي';
+
+  @override
+  String get sharjah => 'الشارقة';
+
+  @override
+  String get alAin => 'العين';
+
+  @override
+  String welcomeUser(Object name) {
+    return 'مرحباً $name!';
+  }
+
+  @override
+  String get step2CustomizeSpace => 'الخطوة 2 - تخصيص المساحة';
+
+  @override
+  String get locationError => 'خطأ: لا توجد بيانات للموقع.';
+
+  @override
+  String get shelvesLabelSimple => 'عدد الرفوف';
+
+  @override
+  String get monthsLabel => 'المدة (أشهر)';
+
+  @override
+  String get addWorkersLabel => 'إضافة عمال؟ (+50 درهم/عامل)';
+
+  @override
+  String get grandTotalSimple => 'الإجمالي';
+
+  @override
+  String get bookNow => 'احجز الآن';
+
+  @override
+  String get verifiedSeller => 'بائع موثوق';
+
+  @override
+  String trendPlusMonth(Object count) {
+    return '+$count هذا الشهر';
+  }
+
+  @override
+  String trendStocked(Object percent) {
+    return '$percent% مخزن';
+  }
+
+  @override
+  String get actionRequired => 'يتطلب إجراء';
+
+  @override
+  String get selectShippingCompanyFirst => 'الرجاء اختيار شركة شحن أولاً.';
+
+  @override
+  String get cashOnPostOffice => 'الدفع في مكتب البريد';
+
+  @override
+  String get payAtPostOfficeSubtitle => 'ادفع في أقرب مكتب بريد';
+
+  @override
+  String get cardError => 'حدث خطأ ما أثناء معالجة البطاقة.';
+
+  @override
+  String get openingApplePay => 'جاري فتح Apple Pay...';
+
+  @override
+  String get applePaySuccess => 'تم الدفع بنجاح عبر Apple Pay.';
+
+  @override
+  String get applePayError => 'فشل الدفع عبر Apple Pay. حاول مرة أخرى.';
+
+  @override
+  String get orderPlacedPostOffice => 'تم الطلب! يرجى الدفع في مكتب البريد.';
+
+  @override
+  String get viewButton => 'عرض';
+
+  @override
+  String invoicesFoundCount(Object count) {
+    return '$count فواتير موجودة';
+  }
+
+  @override
+  String get standard => 'قياسي';
+
+  @override
+  String get express => 'سريع';
+
+  @override
+  String get economy => 'اقتصادي';
+
+  @override
+  String get premium => 'متميز';
+
+  @override
+  String get sameDay => 'نفس اليوم';
+
+  @override
+  String get days2to3 => '2-3 أيام';
+
+  @override
+  String get days5to7 => '5-7 أيام';
+
+  @override
+  String get addProductFirst => 'أضف منتجك الأول لتبدأ البيع';
+
+  @override
+  String get activeStatus => 'نشط';
+
+  @override
+  String stockLabel(Object count) {
+    return 'المخزون: $count';
+  }
+
+  @override
+  String get searchInventoryHint => 'بحث عن عناصر، SKU، أو رف...';
+
+  @override
+  String get statusFilter => 'الحالة: ';
+
+  @override
+  String get branchFilter => 'الفرع: ';
+
+  @override
+  String get all => 'الكل';
+
+  @override
+  String get goodStatus => 'جيد';
+
+  @override
+  String get damagedStatus => 'تالف';
+
+  @override
+  String get lowStock => 'مخزون منخفض';
+
+  @override
+  String error(Object error) {
+    return 'خطأ: $error';
+  }
+
+  @override
+  String get scheduleFirstToast => 'يرجى جدولة وقت التسليم أولاً.';
+
+  @override
+  String get selectBayToast => 'اختر رصيف الشحن أولاً.';
+
+  @override
+  String get prepareWarehouseFirst => 'يرجى تجهيز المخزن أولاً.';
+
+  @override
+  String updatedStorage(Object no) {
+    return 'تم التحديث. التخزين رقم $no';
+  }
+
+  @override
+  String get statusReceived => 'تم الاستلام والتخزين';
+
+  @override
+  String get progressTitle => 'التقدم';
+
+  @override
+  String get scheduleFirstText => 'يرجى جدولة التسليم أولاً.';
+
+  @override
+  String get allDoneButton => 'تم الانتهاء';
+
+  @override
+  String get undoAction => 'تراجع';
+
+  @override
+  String get gatePassSaved => 'تم حفظ تصريح الدخول';
+
+  @override
+  String get saveToGallery => 'حفظ في الاستوديو';
+
+  @override
+  String get warehouseLocationName => 'مركز NXN - القوز';
+
+  @override
+  String get unitsLabel => 'الوحدات';
+
+  @override
+  String get unitsHelper => 'عدد الوحدات / الغرف / الرفوف';
+
+  @override
+  String get platformFeeLabel => 'رسوم المنصة (5%)';
+
+  @override
+  String get itemNameLabel => 'اسم العنصر';
+
+  @override
+  String get enterItemNameError => 'يرجى إدخال اسم العنصر';
+
+  @override
+  String get quantityLabel => 'الكمية';
+
+  @override
+  String get enterQuantityError => 'يرجى إدخال الكمية';
+
+  @override
+  String get mustBeNumberError => 'يجب أن يكون رقماً';
+
+  @override
+  String get notesOptionalLabel => 'ملاحظات (اختياري)';
+
+  @override
+  String get additionalDetailsHint => 'أي تفاصيل إضافية...';
+
+  @override
+  String get amenitiesLabel => 'المرافق';
+
+  @override
+  String priceAed(Object price) {
+    return '$price د.إ';
+  }
+
+  @override
+  String get completeProfileTitle => 'أكمل ملفك الشخصي';
+
+  @override
+  String get uaePassVerifiedMessage =>
+      'تم التحقق من الهوية عبر الهوية الرقمية. تم تعبئة البيانات تلقائياً.';
+
+  @override
+  String get businessDetailsTitle => 'تفاصيل العمل';
+
+  @override
+  String get businessNameLabel => 'اسم العمل التجاري';
+
+  @override
+  String get mobileNumberLabel => 'رقم الهاتف المتحرك';
+
+  @override
+  String get tradeLicenseLabel => 'رقم الرخصة التجارية';
+
+  @override
+  String get requiredDocumentsTitle => 'المستندات المطلوبة';
+
+  @override
+  String get uploadedLabel => 'تم الرفع';
+
+  @override
+  String get changeButton => 'تغيير';
+
+  @override
+  String get tapToUploadDoc => 'انقر لرفع الرخصة التجارية / الهوية';
+
+  @override
+  String get docUploadRequiredError => 'رفع المستند مطلوب.';
+
+  @override
+  String get saveAndContinueButton => 'حفظ ومتابعة';
+
+  @override
+  String get loginWithUaePass => 'تسجيل الدخول بالهوية الرقمية';
+
+  @override
+  String get termsReviewRequest => 'يرجى مراجعة وقبول شروطنا للمتابعة.';
+
+  @override
+  String get verifyEmailTitle => 'تحقق من بريدك الإلكتروني';
+
+  @override
+  String verifyEmailMessage(Object email) {
+    return 'تم إرسال رابط التحقق إلى $email.\nيمكنك أيضاً استخدام \"تخطي الآن\" للمتابعة في النسخة التجريبية.';
+  }
+
+  @override
+  String get okButton => 'حسناً';
+
+  @override
+  String get alreadyHaveAccountLabel => 'هل لديك حساب بالفعل؟';
 }

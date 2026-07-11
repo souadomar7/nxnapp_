@@ -6,6 +6,8 @@ class SmeProduct {
   final String? description;
   final double price;
   final String? photoUrl;
+  final String? shopName;
+  final bool isShopVerified;
   final DateTime createdAt;
 
   SmeProduct({
@@ -15,6 +17,8 @@ class SmeProduct {
     this.description,
     required this.price,
     this.photoUrl,
+    this.shopName,
+    this.isShopVerified = false,
     required this.createdAt,
   });
 
@@ -26,6 +30,8 @@ class SmeProduct {
       description: json['description'],
       price: (json['price'] as num).toDouble(),
       photoUrl: json['photo_url'],
+      shopName: json['shop_name'], // Either joined from DB or assigned manually
+      isShopVerified: json['is_shop_verified'] ?? false,
       createdAt: DateTime.parse(json['created_at']),
     );
   }
@@ -142,5 +148,44 @@ class SmeOrder {
       totalAmount: json['total_amount'] != null ? (json['total_amount'] as num).toDouble() : null,
       createdAt: DateTime.parse(json['created_at']),
     );
+  }
+}
+
+class MarketplaceShop {
+  final String id;
+  final String sellerId;
+  final String shopName;
+  final String licenseName;
+  final bool isVerified;
+  final DateTime createdAt;
+
+  MarketplaceShop({
+    required this.id,
+    required this.sellerId,
+    required this.shopName,
+    required this.licenseName,
+    required this.isVerified,
+    required this.createdAt,
+  });
+
+  factory MarketplaceShop.fromJson(Map<String, dynamic> json) {
+    return MarketplaceShop(
+      id: json['id'],
+      sellerId: json['seller_id'],
+      shopName: json['shop_name'],
+      licenseName: json['license_name'],
+      isVerified: json['is_verified'] ?? false,
+      createdAt: DateTime.parse(json['created_at']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'seller_id': sellerId,
+      'shop_name': shopName,
+      'license_name': licenseName,
+      'is_verified': isVerified,
+    };
   }
 }

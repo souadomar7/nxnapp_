@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
+import '../../models/invoice.dart';
 import 'receiving_flow.dart';
 import 'put_away_page.dart';
 import 'dispatch_page.dart';
@@ -90,6 +91,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       label: Text('Overview'),
                     ),
                     NavigationRailDestination(
+                      icon: Icon(Icons.corporate_fare_outlined),
+                      selectedIcon: Icon(Icons.corporate_fare),
+                      label: Text('Rentals'),
+                    ),
+                    NavigationRailDestination(
                       icon: Icon(Icons.local_shipping_outlined),
                       selectedIcon: Icon(Icons.local_shipping),
                       label: Text('Dispatch'),
@@ -115,11 +121,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
             unselectedItemColor: Colors.grey,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Overview'),
+              BottomNavigationBarItem(icon: Icon(Icons.corporate_fare), label: 'Rentals'),
               BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Dispatch'),
               BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
             ],
           ) : null,
           floatingActionButton: _selectedIndex == 0 ? FloatingActionButton.extended(
+            heroTag: 'admin_fab',
             onPressed: () async {
                  // Open Scan Flow (Generic/Manual)
                  final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceivingFlowPage()));
@@ -139,8 +147,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case 0:
         return _buildOverview(isWide, isUltraWide);
       case 1:
-        return const DispatchPage();
+        return _buildSpaceRentals();
       case 2:
+        return const DispatchPage();
+      case 3:
         return const HistoryPage();
       default:
         return _buildOverview(isWide, isUltraWide);
@@ -222,7 +232,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
              final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => ReceivingFlowPage(bookingData: task['raw'])));
              if (result == true) _onTaskComplete();
           } else {
-             final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const PutAwayPage()));
+             await Navigator.push(context, MaterialPageRoute(builder: (_) => const PutAwayPage()));
              // Simple mock completion for put away too if it returns true
           }
         },
@@ -260,6 +270,97 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSpaceRentals() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Space Rentals', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 24),
+          Expanded(
+            child: FutureBuilder<List<Invoice>>(
+              future: _mp.getAdminInvoices(InvoiceType.rental),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                final rentals = snapshot.data ?? [];
+                if (rentals.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.warehouse_outlined, size: 80, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text('No active space rentals found.', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: rentals.length,
+                  itemBuilder: (context, index) {
+                    final rental = rentals[index];
+                    final String warehouseIds = (rental.metaData?['warehouseIds'] as List?)?.join(', ') ?? 'N/A';
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.shade50,
+                          child: const Icon(Icons.warehouse, color: AppColors.bluePrimary),
+                        ),
+                        title: Text(rental.warehouseName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'Locations: ${warehouseIds.toUpperCase()}\nDate: ${rental.formattedDate}',
+                            style: const TextStyle(height: 1.4),
+                          ),
+                        ),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('AED ${rental.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: rental.paid ? Colors.green.shade50 : Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                rental.paid ? 'Paid' : 'Unpaid',
+                                style: TextStyle(
+                                  color: rental.paid ? Colors.green : Colors.orange,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

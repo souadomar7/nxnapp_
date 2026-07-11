@@ -10,6 +10,7 @@ import '../services/payment_service.dart';
 import '../l10n/app_localizations.dart';
 import '../pages/receipt_page.dart';
 import '../services/marketplace_service.dart';
+import '../widgets/brand_logo.dart';
 
 
 
@@ -128,8 +129,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
               // Cash on Post Office
               ListTile(
                leading: const Icon(Icons.local_post_office_outlined, color: Colors.orange),
-               title: const Text('Cash on Post Office'),
-               subtitle: const Text('Pay at your nearest post office'),
+               title: Text(AppLocalizations.of(context)!.cashOnPostOffice),
+               subtitle: Text(AppLocalizations.of(context)!.payAtPostOfficeSubtitle),
                onTap: () => Navigator.pop(context, PaymentMethod.cash),
                shape: RoundedRectangleBorder(
                  side: BorderSide(color: AppColors.border),
@@ -167,7 +168,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       case PaymentMethod.cash:
         // Cash payment simulation
         _markInvoicePaid(inv.id);
-         _toast('Order placed! Please pay at the post office.');
+         _toast(AppLocalizations.of(context)!.orderPlacedPostOffice);
         // pop back to finding space or home
         Navigator.pop(context);
         break;
@@ -197,14 +198,14 @@ class _PaymentsPageState extends State<PaymentsPage> {
     } catch (_) {
       if (mounted) {
         Navigator.pop(context);
-        _toast('Something went wrong while processing the card.');
+        _toast(AppLocalizations.of(context)!.cardError);
       }
     }
   }
 
   Future<void> _handleApplePay(Invoice inv) async {
     try {
-      _showProgress('Opening Apple Pay…');
+      _showProgress(AppLocalizations.of(context)!.openingApplePay);
       await PaymentService.payWithApplePay(invoice: inv);
       if (!mounted) return;
       Navigator.pop(context); // close progress
@@ -212,7 +213,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       _markInvoicePaid(inv.id);
       
       if (!mounted) return;
-      _toast('Apple Pay successful.');
+      _toast(AppLocalizations.of(context)!.applePaySuccess);
       
       // Return to Dashboard/Previous
       Navigator.pop(context);
@@ -225,7 +226,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
     } catch (_) {
       if (mounted) {
         Navigator.pop(context);
-        _toast('Apple Pay failed. Please try again.');
+        _toast(AppLocalizations.of(context)!.applePayError);
       }
     }
   }
@@ -339,7 +340,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         slivers: [
           // 1. Premium Blue Header
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 170, // Increased for better spacing
             pinned: true,
             backgroundColor: AppColors.bluePrimary,
             elevation: 0,
@@ -350,97 +351,102 @@ class _PaymentsPageState extends State<PaymentsPage> {
             flexibleSpace: FlexibleSpaceBar(
               background: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 50), // Increased bottom padding to clear overlap
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "NXN",
-                            style: TextStyle(
-                              color: AppColors.bluePrimary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Center(child: BrandLogo(height: 28)),
                       ),
-                      const Spacer(),
-                      Row(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 24),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              AppLocalizations.of(context)!.paymentsTitle,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
                               ),
-                            ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  AppLocalizations.of(context)!.paymentsTitle,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            AppLocalizations.of(context)!.invoicesFoundCount(invoices.length),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "${invoices.length} invoices found",
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
-                      const SizedBox(height: 20),
                     ],
+                  ),
                   ),
                 ),
               ),
             ),
-          ),
+
 
           // 2. Main Content
           SliverToBoxAdapter(
             child: Container(
               decoration: const BoxDecoration(
                 color: Color(0xFFF3F6FB),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              transform: Matrix4.translationValues(0, -20, 0),
+              transform: Matrix4.translationValues(0, -24, 0), // Adjusted overlap
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 30, 20, 40),
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 40), // Adjusted top padding
                 child: Column(
                   children: [
-                    // Filter Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE0E6F2)),
-                      ),
-                      child: AppDropdown<String>(
-                        label: AppLocalizations.of(context)!.filterByStatus,
-                        value: _statusFilter,
-                        items: _statusOptions,
-                        onChanged: (v) => setState(() => _statusFilter = v ?? 'All'),
-                        itemLabelBuilder: (e) {
-                          final isAr = Localizations.localeOf(context).languageCode == 'ar';
-                          if (!isAr) return e;
-                          if (e == 'All') return 'الكل';
-                          if (e == 'Paid') return 'مدفوع';
-                          if (e == 'Pending') return 'قيد الانتظار';
-                          return e;
+                    // Filter Chips (User Friendly & Compact)
+                    SizedBox(
+                      height: 32,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _statusOptions.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final status = _statusOptions[index];
+                          final isSelected = _statusFilter == status;
+                          return InkWell(
+                            onTap: () => setState(() => _statusFilter = status),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.bluePrimary : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.bluePrimary : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: Text(
+                                status == 'All' ? AppLocalizations.of(context)!.all : 
+                                status == 'Paid' ? AppLocalizations.of(context)!.paidTag : 
+                                AppLocalizations.of(context)!.pendingTag,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.grey.shade600,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          );
                         },
                       ),
                     ),
@@ -541,83 +547,96 @@ class _InvoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 0,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top row: number + status tag
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    invoice.number,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onView,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              // 1. Status Icon
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: invoice.paid ? Colors.green.withValues(alpha: 0.1) : AppColors.bluePrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  invoice.paid ? Icons.check_circle_rounded : Icons.receipt_long_rounded,
+                  color: invoice.paid ? Colors.green : AppColors.bluePrimary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              
+              // 2. Main Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      invoice.warehouseName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF1A1F36)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "${invoice.number} • ${invoice.formattedDate}",
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // 3. Amount & Action
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    aed.format(invoice.total),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: invoice.paid ? Colors.green.shade700 : const Color(0xFF1A1F36),
                     ),
                   ),
-                ),
-                Tag(invoice.paid ? AppLocalizations.of(context)!.paidTag : AppLocalizations.of(context)!.pendingTag),
-              ],
-            ),
-            const SizedBox(height: 6),
-            // Warehouse/Product + date
-            Text(
-              invoice.warehouseName,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              invoice.formattedDate,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 10),
-
-            // Amounts
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(AppLocalizations.of(context)!.totalLabel,
-                    style: Theme.of(context).textTheme.bodyMedium),
-                Text(
-                  aed.format(invoice.total),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Actions
-            Row(
-              children: [
-                Expanded(
-                  child: PrimaryButton(text: 'View', onPressed: onView), // Using basic visual view
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: AbsorbPointer(
-                    absorbing: onPay == null,
-                    child: Opacity(
-                      opacity: onPay == null ? 0.5 : 1,
-                      child: PrimaryButton(
-                        text: invoice.paid ? AppLocalizations.of(context)!.paidTag : AppLocalizations.of(context)!.payNow,
-                        onPressed: onPay ?? () {},
+                  const SizedBox(height: 4),
+                  if (!invoice.paid)
+                    SizedBox(
+                      height: 24,
+                      child: ElevatedButton(
+                        onPressed: onPay,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.bluePrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          AppLocalizations.of(context)!.payNow,
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
                       ),
+                    )
+                  else
+                     Text(
+                      AppLocalizations.of(context)!.paidTag,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.green.shade600),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

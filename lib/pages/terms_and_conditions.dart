@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nxnapp/l10n/app_localizations.dart';
 import '../theme.dart';
-import '../widgets/brand_logo.dart';
+
 import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
 import 'login.dart';
@@ -50,7 +50,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 10),
-              const BrandLogo(height: 90),
+              Center(child: Image.asset('assets/images/nxn_logo.jpg', height: 90)),
               const SizedBox(height: 32),
               
               Text(
@@ -64,7 +64,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Please review and accept our terms to proceed.',
+                l10n.termsReviewRequest,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14, 

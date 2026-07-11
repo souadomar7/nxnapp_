@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme.dart';
+import '../../services/marketplace_service.dart';
 
 
 class SellerSettingsPage extends StatefulWidget {
@@ -11,6 +12,7 @@ class SellerSettingsPage extends StatefulWidget {
 }
 
 class _SellerSettingsPageState extends State<SellerSettingsPage> {
+  final MarketplaceService _service = MarketplaceService();
   bool _autoAccept = true;
   bool _vacationMode = false;
 
@@ -119,6 +121,42 @@ class _SellerSettingsPageState extends State<SellerSettingsPage> {
                       iconColor: Colors.orange,
                       value: _vacationMode,
                       onChanged: (val) => setState(() => _vacationMode = val),
+                    ),
+                    const SizedBox(height: 32),
+                    // Developer Tools
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('DEVELOPER TOOLS', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Force Verify Shop', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                          const SizedBox(height: 4),
+                          const Text('Instantly marks your shop as verified (For testing purposes only).', style: TextStyle(fontSize: 12, color: Colors.red)),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () async {
+                              await _service.forceVerifyShop();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop forcefully verified!')));
+                                Navigator.pop(context); // Go back to refresh
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                            child: const Text('Force Verify Now'),
+                          )
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 40),
                     SizedBox(

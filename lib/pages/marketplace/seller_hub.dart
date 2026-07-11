@@ -6,7 +6,9 @@ import 'inventory_page.dart';
 import 'dropoff_booking_page.dart';
 import 'delivery_request_page.dart';
 import 'seller_settings_page.dart';
+import 'create_shop_page.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/marketplace_models.dart';
 
 class SellerHub extends StatefulWidget {
   const SellerHub({super.key});
@@ -17,7 +19,8 @@ class SellerHub extends StatefulWidget {
 
 class _SellerHubState extends State<SellerHub> {
   final MarketplaceService _service = MarketplaceService();
-  late Future<Map<String, dynamic>> _statsFuture; // Changed from int to dynamic
+  late Future<Map<String, dynamic>> _statsFuture;
+  late Future<MarketplaceShop?> _shopFuture;
 
   @override
   void initState() {
@@ -28,6 +31,7 @@ class _SellerHubState extends State<SellerHub> {
   void _loadStats() {
     setState(() {
       _statsFuture = _service.getDashboardStats();
+      _shopFuture = _service.getMyShop();
     });
   }
 
@@ -35,17 +39,21 @@ class _SellerHubState extends State<SellerHub> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FC), // Lighter, cooler background
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _statsFuture,
-        builder: (context, snapshot) {
+      body: FutureBuilder(
+        future: Future.wait([_statsFuture, _shopFuture]),
+        builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
           int activeShelves = 0;
           int totalItems = 0;
           int pendingOrders = 0;
+          MarketplaceShop? shop;
 
           if (snapshot.hasData) {
-            activeShelves = snapshot.data!['shelves'] ?? 0;
-            totalItems = snapshot.data!['items'] ?? 0;
-            pendingOrders = snapshot.data!['pendingOrders'] ?? 0;
+            final stats = snapshot.data![0] as Map<String, dynamic>;
+            shop = snapshot.data![1] as MarketplaceShop?;
+            
+            activeShelves = stats['shelves'] ?? 0;
+            totalItems = stats['items'] ?? 0;
+            pendingOrders = stats['pendingOrders'] ?? 0;
           }
 
           return CustomScrollView(
@@ -77,24 +85,25 @@ class _SellerHubState extends State<SellerHub> {
                         Row(
                           children: [
                             Text(
-                              AppLocalizations.of(context)!.dashboardSubtitle,
+                              shop != null ? shop.shopName : AppLocalizations.of(context)!.dashboardSubtitle,
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
                             ),
                             const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
+                            if (shop != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: shop.isVerified ? Colors.green.withValues(alpha: 0.2) : Colors.orange.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(shop.isVerified ? Icons.verified : Icons.pending, color: shop.isVerified ? Colors.greenAccent : Colors.orangeAccent, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(shop.isVerified ? AppLocalizations.of(context)!.verifiedSeller : 'Pending Approval', style: TextStyle(color: shop.isVerified ? Colors.greenAccent : Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
                               ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.verified, color: Colors.white, size: 14),
-                                  SizedBox(width: 4),
-                                  Text('Verified Seller', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ],
@@ -108,6 +117,49 @@ class _SellerHubState extends State<SellerHub> {
                   ),
                 ],
               ),
+              
+              if (shop == null && snapshot.connectionState == ConnectionState.done)
+                SliverToBoxAdapter(
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.store, color: Colors.orange.shade700, size: 32),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Setup Your Shop', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900)),
+                              const SizedBox(height: 4),
+                              Text('Create a verified marketplace profile to list your products publicly.', style: TextStyle(fontSize: 12, color: Colors.orange.shade800)),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateShopPage()));
+                            if (result == true) {
+                              _loadStats();
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange.shade600,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Setup'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
               // 2. Stats Section
               SliverToBoxAdapter(
@@ -124,7 +176,7 @@ class _SellerHubState extends State<SellerHub> {
                               value: '$activeShelves',
                               icon: Icons.shelves,
                               color: Colors.orange,
-                              trend: '+2 this month',
+                              trend: AppLocalizations.of(context)!.trendPlusMonth(2),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -134,7 +186,7 @@ class _SellerHubState extends State<SellerHub> {
                               value: '$totalItems',
                               icon: Icons.inventory_2,
                               color: AppColors.bluePrimary,
-                              trend: '98% Stocked',
+                              trend: AppLocalizations.of(context)!.trendStocked(98),
                             ),
                           ),
                         ],
@@ -146,7 +198,7 @@ class _SellerHubState extends State<SellerHub> {
                         icon: Icons.local_shipping,
                         color: Colors.redAccent,
                         isFullWidth: true,
-                        trend: 'Action Required',
+                        trend: AppLocalizations.of(context)!.actionRequired,
                         trendColor: Colors.red,
                       ),
                       

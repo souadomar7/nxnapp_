@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/warehouse.dart';
 
+import '../l10n/app_localizations.dart';
+
 void showQuoteSheet(BuildContext context, Warehouse w) {
   // Default: 1 unit (room / rack / space)
   final unitsController = TextEditingController(text: '1');
@@ -26,9 +28,9 @@ void showQuoteSheet(BuildContext context, Warehouse w) {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Instant Quote',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              Text(
+                AppLocalizations.of(context)!.instantQuoteTitle,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
@@ -42,9 +44,9 @@ void showQuoteSheet(BuildContext context, Warehouse w) {
           TextField(
             controller: unitsController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Units',
-              helperText: 'Number of units / rooms / racks',
+            decoration: InputDecoration( // const removed because of dynamic access
+              labelText: AppLocalizations.of(context)!.unitsLabel,
+              helperText: AppLocalizations.of(context)!.unitsHelper,
             ),
           ),
 
@@ -66,36 +68,36 @@ void showQuoteSheet(BuildContext context, Warehouse w) {
                 showDialog(
                   context: context,
                   builder: (_) => AlertDialog(
-                    title: const Text('Estimated Total (per month)'),
+                    title: Text(AppLocalizations.of(context)!.estimatedTotalTitle),
                     content: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _priceRow('Units', units.toString(), isPlainText: true),
+                        _priceRow(AppLocalizations.of(context)!.unitsLabel, units.toString(), isPlainText: true),
                         const SizedBox(height: 4),
-                        _priceRow('Subtotal', subtotal),
-                        _priceRow('Platform fee (5%)', platformFee),
-                        _priceRow('VAT 5%', vat),
+                        _priceRow(AppLocalizations.of(context)!.subtotalLabel, subtotal),
+                        _priceRow(AppLocalizations.of(context)!.platformFeeLabel, platformFee),
+                        _priceRow(AppLocalizations.of(context)!.vatLabel, vat),
                         const Divider(),
-                        _priceRow('Total (AED)', total, bold: true),
+                        _priceRow(AppLocalizations.of(context)!.totalAedLabel, total, bold: true),
                       ],
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Close'),
+                        child: Text(AppLocalizations.of(context)!.closeButton),
                       ),
                       ElevatedButton(
                         onPressed: () {
                           // TODO: connect this to your Payments / Next step
                         },
-                        child: const Text('Continue'),
+                        child: Text(AppLocalizations.of(context)!.continueButton),
                       ),
                     ],
                   ),
                 );
               },
-              child: const Text('Calculate'),
+              child: Text(AppLocalizations.of(context)!.calculateButton),
             ),
           ),
         ],

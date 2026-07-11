@@ -15,8 +15,12 @@ import 'data/inventory_controller.dart';
 import 'data/supabase_inventory_service.dart';
 import 'data/receive_result.dart'; 
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await dotenv.load(fileName: ".env");
   
   await Supabase.initialize(
     url: 'https://hvstjsygmijbvjnyiqli.supabase.co',

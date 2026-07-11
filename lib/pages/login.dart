@@ -182,7 +182,7 @@ class _LoginPageState extends State<LoginPage> {
                    }
                 },
                 icon: const Icon(Icons.fingerprint, color: Colors.white),
-                label: const Text('Login with UAE PASS', style: TextStyle(color: Colors.white, fontSize: 16)),
+                label: Text(l10n.loginWithUaePass, style: const TextStyle(color: Colors.white, fontSize: 16)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[700],
                   padding: const EdgeInsets.symmetric(vertical: 16),
