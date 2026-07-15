@@ -22,9 +22,12 @@ void main() async {
   
   await dotenv.load(fileName: ".env");
   
+  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://hvstjsygmijbvjnyiqli.supabase.co';
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2c3Rqc3lnbWlqYnZqbnlpcWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzODExNDMsImV4cCI6MjA4MDk1NzE0M30._9FuRhokLoqX5ndQu13CAm67Y02wBY_Lh7Zow2OVjYo';
+
   await Supabase.initialize(
-    url: 'https://hvstjsygmijbvjnyiqli.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2c3Rqc3lnbWlqYnZqbnlpcWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzODExNDMsImV4cCI6MjA4MDk1NzE0M30._9FuRhokLoqX5ndQu13CAm67Y02wBY_Lh7Zow2OVjYo',
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
 
   runApp(const WarehouseApp());

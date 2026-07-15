@@ -1,30 +1,33 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:nxnapp/main.dart';
+import 'package:nxnapp/providers/locale_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const WarehouseApp());
+  group('LocaleProvider Tests', () {
+    test('Initial locale should be English (en)', () {
+      final provider = LocaleProvider();
+      expect(provider.locale.languageCode, 'en');
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('toggleLocale should switch between English and Arabic', () {
+      final provider = LocaleProvider();
+      
+      provider.toggleLocale();
+      expect(provider.locale.languageCode, 'ar');
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      provider.toggleLocale();
+      expect(provider.locale.languageCode, 'en');
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('setLocale should change to a valid locale', () {
+      final provider = LocaleProvider();
+      
+      provider.setLocale(const Locale('ar'));
+      expect(provider.locale.languageCode, 'ar');
+
+      // Invalid locale change should be ignored
+      provider.setLocale(const Locale('fr'));
+      expect(provider.locale.languageCode, 'ar');
+    });
   });
 }

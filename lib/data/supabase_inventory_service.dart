@@ -2,6 +2,7 @@
 import 'inventory_models.dart';
 import 'inventory_service.dart';
 import '../services/marketplace_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SupabaseInventoryService implements InventoryService {
   final MarketplaceService _mp = MarketplaceService();
@@ -110,7 +111,12 @@ class SupabaseInventoryService implements InventoryService {
 
   @override
   Future<String?> openReportsUrl() async {
-    // Dummy URL
-    return 'https://supabase.com/dashboard/project/hvstjsygmijbvjnyiqli'; 
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://hvstjsygmijbvjnyiqli.supabase.co';
+    // Extract project ID (subdomain) from URL (e.g. https://id.supabase.co -> id)
+    final uri = Uri.tryParse(supabaseUrl);
+    final host = uri?.host ?? '';
+    final parts = host.split('.');
+    final projectId = parts.isNotEmpty ? parts.first : 'hvstjsygmijbvjnyiqli';
+    return 'https://supabase.com/dashboard/project/$projectId'; 
   }
 }
