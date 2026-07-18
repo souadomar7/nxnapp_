@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
+import '../settings/wms_integration_page.dart';
 
 
 class SellerSettingsPage extends StatefulWidget {
@@ -121,6 +122,41 @@ class _SellerSettingsPageState extends State<SellerSettingsPage> {
                       iconColor: Colors.orange,
                       value: _vacationMode,
                       onChanged: (val) => setState(() => _vacationMode = val),
+                    ),
+                    const SizedBox(height: 16),
+                    // WMS & IoT Integration
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      color: Colors.white,
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.settings_input_hdmi_rounded, color: AppColors.bluePrimary, size: 20),
+                        ),
+                        title: const Text(
+                          'WMS & IoT Integration',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: const Text(
+                          'Link physical warehouse API and RFID gates',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const WmsIntegrationPage()),
+                          );
+                        },
+                      ),
                     ),
                     const SizedBox(height: 32),
                     // Developer Tools

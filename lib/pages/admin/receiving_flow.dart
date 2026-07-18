@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 
@@ -131,13 +132,28 @@ class _ReceivingFlowPageState extends State<ReceivingFlowPage> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.bluePrimary, width: 4),
                 ),
-                child: const Center(child: Icon(Icons.qr_code_scanner, color: Colors.white, size: 60)),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: MobileScanner(
+                    onDetect: (capture) {
+                      final List<Barcode> barcodes = capture.barcodes;
+                      for (final barcode in barcodes) {
+                        final code = barcode.rawValue;
+                        if (code != null && code.isNotEmpty) {
+                          // Auto advance step
+                          _nextStep();
+                          break;
+                        }
+                      }
+                    },
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
               const Text('Scan Gate Pass QR', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               const Text('Align QR code within the frame', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _simulateScan,
                 icon: const Icon(Icons.camera_alt),

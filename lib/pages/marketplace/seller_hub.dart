@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import 'product_catalog_page.dart';
-import 'inventory_page.dart';
-import 'dropoff_booking_page.dart';
-import 'delivery_request_page.dart';
+import '../smart_inventory_stage.dart';
+import '../receive_goods_stage.dart';
+import '../request_delivery_page.dart';
 import 'seller_settings_page.dart';
 import 'create_shop_page.dart';
 import '../../l10n/app_localizations.dart';
@@ -45,6 +45,7 @@ class _SellerHubState extends State<SellerHub> {
           int activeShelves = 0;
           int totalItems = 0;
           int pendingOrders = 0;
+          int shelvesThisMonth = 0;
           MarketplaceShop? shop;
 
           if (snapshot.hasData) {
@@ -54,13 +55,18 @@ class _SellerHubState extends State<SellerHub> {
             activeShelves = stats['shelves'] ?? 0;
             totalItems = stats['items'] ?? 0;
             pendingOrders = stats['pendingOrders'] ?? 0;
+            shelvesThisMonth = stats['shelvesThisMonth'] ?? 0;
           }
+
+          // Calculate capacity metrics
+          double capacityPercentage = activeShelves > 0 ? (totalItems / (activeShelves * 50.0)) : 0.0;
+          capacityPercentage = capacityPercentage.clamp(0.0, 1.0);
 
           return CustomScrollView(
             slivers: [
-              // 1. Professional Header
+              // 1. Professional Gradient Header
               SliverAppBar(
-                expandedHeight: 140,
+                expandedHeight: 150,
                 pinned: true,
                 backgroundColor: AppColors.bluePrimary,
                 flexibleSpace: FlexibleSpaceBar(
@@ -69,7 +75,7 @@ class _SellerHubState extends State<SellerHub> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF1A47B8), Color(0xFF0D2566)], // NXN Blue Gradient
+                        colors: [Color(0xFF1E3C72), Color(0xFF2A5298)], // Premium Navy/Blue Gradient
                       ),
                     ),
                     padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
@@ -77,30 +83,48 @@ class _SellerHubState extends State<SellerHub> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text(
-                          AppLocalizations.of(context)!.dashboardTitle,
-                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                        const Text(
+                          'Store Dashboard',
+                          style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
+                            Icon(Icons.storefront_rounded, color: Colors.white.withValues(alpha: 0.7), size: 16),
+                            const SizedBox(width: 6),
                             Text(
-                              shop != null ? shop.shopName : AppLocalizations.of(context)!.dashboardSubtitle,
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
+                              shop != null ? shop.shopName : 'Setup pending',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                             const Spacer(),
                             if (shop != null)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: shop.isVerified ? Colors.green.withValues(alpha: 0.2) : Colors.orange.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: shop.isVerified ? Colors.green.withValues(alpha: 0.25) : Colors.orange.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: shop.isVerified ? Colors.greenAccent.withValues(alpha: 0.5) : Colors.orangeAccent.withValues(alpha: 0.5),
+                                    width: 1.5,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(shop.isVerified ? Icons.verified : Icons.pending, color: shop.isVerified ? Colors.greenAccent : Colors.orangeAccent, size: 14),
-                                    const SizedBox(width: 4),
-                                    Text(shop.isVerified ? AppLocalizations.of(context)!.verifiedSeller : 'Pending Approval', style: TextStyle(color: shop.isVerified ? Colors.greenAccent : Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    Icon(
+                                      shop.isVerified ? Icons.verified_user_rounded : Icons.hourglass_empty_rounded,
+                                      color: shop.isVerified ? Colors.greenAccent : Colors.orangeAccent,
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      shop.isVerified ? 'VERIFIED' : 'PENDING',
+                                      style: TextStyle(
+                                        color: shop.isVerified ? Colors.greenAccent : Colors.orangeAccent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -112,7 +136,7 @@ class _SellerHubState extends State<SellerHub> {
                 ),
                 actions: [
                   IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.white),
+                    icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 26),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerSettingsPage())),
                   ),
                 ],
@@ -122,52 +146,139 @@ class _SellerHubState extends State<SellerHub> {
                 SliverToBoxAdapter(
                   child: Container(
                     margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.orange.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.store, color: Colors.orange.shade700, size: 32),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Setup Your Shop', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900)),
-                              const SizedBox(height: 4),
-                              Text('Create a verified marketplace profile to list your products publicly.', style: TextStyle(fontSize: 12, color: Colors.orange.shade800)),
-                            ],
-                          ),
+                      gradient: LinearGradient(
+                        colors: [Colors.orange.shade50, Colors.orange.shade100],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateShopPage()));
-                            if (result == true) {
-                              _loadStats();
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange.shade600,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              child: Icon(Icons.storefront_rounded, color: Colors.orange.shade800, size: 28),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Register Your Store',
+                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.orange.shade900),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Setup your profile to sell on NXN Marketplace.',
+                                    style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateShopPage()));
+                              if (result == true) {
+                                _loadStats();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange.shade700,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Setup Store Now', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('Setup'),
                         ),
                       ],
                     ),
                   ),
                 ),
 
-              // 2. Stats Section
+              // 2. Capacity & Metrics Section
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Space Capacity Progress indicator
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF9DA8C4).withValues(alpha: 0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Warehouse Shelf Capacity',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+                                ),
+                                Text(
+                                  '${(capacityPercentage * 100).toInt()}% Used',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: capacityPercentage > 0.85 ? Colors.red : AppColors.bluePrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: LinearProgressIndicator(
+                                value: capacityPercentage,
+                                minHeight: 10,
+                                backgroundColor: Colors.grey.shade100,
+                                color: capacityPercentage > 0.85 ? Colors.red : AppColors.bluePrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              activeShelves > 0
+                                  ? '$totalItems items stored across $activeShelves active shelves.'
+                                  : 'No shelves rented yet. Book space to store inventory.',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
                       Row(
                         children: [
                           Expanded(
@@ -176,7 +287,7 @@ class _SellerHubState extends State<SellerHub> {
                               value: '$activeShelves',
                               icon: Icons.shelves,
                               color: Colors.orange,
-                              trend: AppLocalizations.of(context)!.trendPlusMonth(2),
+                              trend: AppLocalizations.of(context)!.trendPlusMonth(shelvesThisMonth),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -186,7 +297,9 @@ class _SellerHubState extends State<SellerHub> {
                               value: '$totalItems',
                               icon: Icons.inventory_2,
                               color: AppColors.bluePrimary,
-                              trend: AppLocalizations.of(context)!.trendStocked(98),
+                              trend: AppLocalizations.of(context)!.trendStocked(
+                                activeShelves > 0 ? ((totalItems / (activeShelves * 50)) * 100).clamp(0, 100).toInt() : 0
+                              ),
                             ),
                           ),
                         ],
@@ -198,15 +311,15 @@ class _SellerHubState extends State<SellerHub> {
                         icon: Icons.local_shipping,
                         color: Colors.redAccent,
                         isFullWidth: true,
-                        trend: AppLocalizations.of(context)!.actionRequired,
-                        trendColor: Colors.red,
+                        trend: pendingOrders > 0 ? AppLocalizations.of(context)!.actionRequired : "All Caught Up",
+                        trendColor: pendingOrders > 0 ? Colors.red : Colors.green,
                       ),
                       
                       const SizedBox(height: 32),
                       
-                      Text(
-                        AppLocalizations.of(context)!.quickActionsTitle,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      const Text(
+                        'Operations Management',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 16),
                       
@@ -219,32 +332,32 @@ class _SellerHubState extends State<SellerHub> {
                         mainAxisSpacing: 16,
                         childAspectRatio: 1.1,
                         children: [
-                           _ActionCard(
+                          _ActionCard(
                             title: AppLocalizations.of(context)!.myInventoryAction,
-                            icon: Icons.list_alt_rounded,
+                            icon: Icons.inventory_2_rounded,
                             color: const Color(0xFF2E86DE), // Nice Blue
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryPage())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SmartInventoryStageEN())),
                           ),
                           _ActionCard(
                             title: AppLocalizations.of(context)!.productCatalogAction,
-                            icon: Icons.category_rounded,
+                            icon: Icons.inventory_rounded,
                             color: const Color(0xFF10AC84), // Teal/Green
                             onTap: () async {
-                               await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductCatalogPage()));
-                               _loadStats();
+                              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductCatalogPage()));
+                              _loadStats();
                             },
                           ),
                           _ActionCard(
                             title: AppLocalizations.of(context)!.bookDropoffAction,
-                            icon: Icons.add_business_rounded,
+                            icon: Icons.move_to_inbox_rounded,
                             color: const Color(0xFFFF9F43), // Orange
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DropoffBookingPage())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceiveGoodsStagePageEN())),
                           ),
-                           _ActionCard(
+                          _ActionCard(
                             title: AppLocalizations.of(context)!.requestDeliveryAction,
-                            icon: Icons.local_shipping_rounded,
+                            icon: Icons.outbox_rounded,
                             color: const Color(0xFF5F27CD), // Purple
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeliveryRequestPage())),
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RequestDeliveryPage())),
                           ),
                         ],
                       ),

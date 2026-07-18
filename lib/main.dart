@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:nxnapp/core/services/notification_service.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:nxnapp/l10n/app_localizations.dart';
@@ -20,6 +22,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  try {
+    await Firebase.initializeApp();
+    await NotificationService().initialize();
+  } catch (e) {
+    debugPrint('Firebase messaging initialization warning: $e');
+  }
+
   await dotenv.load(fileName: ".env");
   
   final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://hvstjsygmijbvjnyiqli.supabase.co';

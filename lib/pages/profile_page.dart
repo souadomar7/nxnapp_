@@ -6,67 +6,115 @@ import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'splash_page.dart';
 import 'settings/kyc_page.dart';
 import 'settings/notification_settings_page.dart';
 import 'profile/my_subscriptions_page.dart';
 import 'profile/wallet_page.dart';
 import 'marketplace/seller_hub.dart';
-import 'demo_menu_page.dart';
+import '../services/marketplace_service.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final MarketplaceService _service = MarketplaceService();
+  int _activeShelves = 0;
+  int _pendingInvoices = 0;
+  int _catalogCount = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final stats = await _service.getDashboardStats();
+      final invoices = await _service.getInvoices();
+      final products = await _service.getProducts();
+      
+      if (mounted) {
+        setState(() {
+          _activeShelves = stats['shelves'] ?? 0;
+          _pendingInvoices = invoices.where((e) => !e.paid).length;
+          _catalogCount = products.length;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC), // Premium light grey bg
+      backgroundColor: const Color(0xFFF3F6FB), // Cooler, premium background
       body: CustomScrollView(
         slivers: [
+          // 1. Premium Profile Header
           SliverAppBar(
             pinned: true,
-            expandedHeight: 200,
+            expandedHeight: 220,
             backgroundColor: AppColors.bluePrimary,
+            elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.bluePrimary, AppColors.blueSecondary],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E3C72), Color(0xFF2A5298)], // Premium Navy Gradient
                   ),
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Row(
                           children: [
+                            // Avatar Frame
                             Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.white24,
                                 shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  )
-                                ],
                               ),
-                              child: const CircleAvatar(
-                                radius: 32,
-                                backgroundColor: Color(0xFFE3F2FD),
-                                child: Icon(Icons.person, color: AppColors.bluePrimary, size: 36),
+                              child: CircleAvatar(
+                                radius: 36,
+                                backgroundColor: Colors.white,
+                                child: Consumer<UserProvider>(
+                                  builder: (context, user, _) {
+                                    final initial = user.displayName.isNotEmpty 
+                                        ? user.displayName.substring(0, 1).toUpperCase() 
+                                        : 'G';
+                                    return Text(
+                                      initial,
+                                      style: const TextStyle(
+                                        color: Color(0xFF1E3C72),
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 20),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,21 +127,23 @@ class ProfilePage extends StatelessWidget {
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 22,
-                                          fontWeight: FontWeight.bold,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: -0.5,
                                         ),
                                       );
                                     },
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
+                                      color: Colors.white.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
                                     ),
                                     child: Text(
-                                      AppLocalizations.of(context)!.tenantOwnerLabel,
-                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                                      l10n.tenantOwnerLabel,
+                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                                     ),
                                   ),
                                 ],
@@ -102,15 +152,24 @@ class ProfilePage extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _HeaderStat(label: l10n.bookingsLabel, value: '3'),
-                            Container(width: 1, height: 30, color: Colors.white24),
-                            _HeaderStat(label: l10n.savedLabel, value: '8'),
-                            Container(width: 1, height: 30, color: Colors.white24),
-                            _HeaderStat(label: l10n.rentedShelvesLabel, value: '240'),
-                          ],
+                        // Real Profile Statistics
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _HeaderStat(label: 'Pending Bills', value: _isLoading ? '...' : '$_pendingInvoices'),
+                              Container(width: 1, height: 24, color: Colors.white12),
+                              _HeaderStat(label: 'Catalog Items', value: _isLoading ? '...' : '$_catalogCount'),
+                              Container(width: 1, height: 24, color: Colors.white12),
+                              _HeaderStat(label: 'Active Shelves', value: _isLoading ? '...' : '$_activeShelves'),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -160,7 +219,7 @@ class ProfilePage extends StatelessWidget {
                     _Divider(),
                     Consumer<LocaleProvider>(
                       builder: (context, provider, _) => _ProfileTile(
-                        icon: Icons.language,
+                        icon: Icons.language_rounded,
                         title: l10n.languageTitle,
                         trailingText: provider.locale.languageCode == 'en' ? 'English' : 'العربية',
                         onTap: () => provider.toggleLocale(),
@@ -170,7 +229,6 @@ class ProfilePage extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // --- Business Section ---
                   _SectionHeader(title: l10n.businessSection),
                   _MenuCard(children: [
                     _ProfileTile(
@@ -178,14 +236,6 @@ class ProfilePage extends StatelessWidget {
                       title: l10n.marketplaceTitle,
                       subtitle: l10n.marketplaceSubtitle,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerHub())),
-                    ),
-                    _Divider(),
-                     _ProfileTile(
-                      icon: Icons.layers_outlined,
-                      title: l10n.allFeatures,
-                      subtitle: l10n.exploreScreens,
-                      iconColor: Colors.purple,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DemoMenuPage())),
                     ),
                   ]),
 
@@ -199,7 +249,7 @@ class ProfilePage extends StatelessWidget {
                       iconColor: Colors.redAccent,
                       textColor: Colors.redAccent,
                       showTrailing: false,
-                        onTap: () async {
+                      onTap: () async {
                         // Clear guest mode persistence
                         final prefs = await SharedPreferences.getInstance();
                         await prefs.remove('is_guest');
@@ -245,12 +295,12 @@ class _HeaderStat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -270,7 +320,7 @@ class _SectionHeader extends StatelessWidget {
         child: Text(
           title,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.bold,
             color: AppColors.textSecondary,
             letterSpacing: 0.5,
@@ -290,17 +340,19 @@ class _MenuCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF9DA8C4).withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
-        border: Border.all(color: Colors.white),
       ),
-      child: Column(children: children),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(children: children),
+      ),
     );
   }
 }
@@ -308,7 +360,7 @@ class _MenuCard extends StatelessWidget {
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Divider(height: 1, thickness: 1, color: Colors.grey[100], indent: 60);
+    return Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 64);
   }
 }
 
@@ -337,35 +389,34 @@ class _ProfileTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), // Spacious click area
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       leading: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: iconColor.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: iconColor, size: 24),
+        child: Icon(icon, color: iconColor, size: 22),
       ),
       title: Text(
         title,
         style: TextStyle(
           color: textColor,
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          fontSize: 14.5,
         ),
       ),
       subtitle: subtitle != null 
-          ? Text(subtitle!, style: const TextStyle(fontSize: 12, color: Colors.grey)) 
+          ? Text(subtitle!, style: const TextStyle(fontSize: 11.5, color: Colors.grey)) 
           : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (trailingText != null) 
-            Text(trailingText!, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500)),
+            Text(trailingText!, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
           if (showTrailing) ...[
              const SizedBox(width: 8),
-             Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey[400]),
+             Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey.shade400),
           ],
         ],
       ),

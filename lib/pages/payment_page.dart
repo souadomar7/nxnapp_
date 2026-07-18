@@ -1,16 +1,14 @@
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/invoice.dart';
 import '../widgets/common.dart';
 import '../theme.dart';
-import '../services/payment_service.dart';
 import '../l10n/app_localizations.dart';
 import '../pages/receipt_page.dart';
 import '../services/marketplace_service.dart';
 import '../widgets/brand_logo.dart';
+import 'checkout_page.dart';
 
 
 
@@ -81,204 +79,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
     return _invoices.where((e) => !e.paid).toList();
   }
 
-  // Web-safe Apple Pay availability check
-  bool get _applePayAvailable =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
-  Future<void> _choosePaymentMethod(Invoice inv) async {
-    final method = await showModalBottomSheet<PaymentMethod>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                   const Icon(Icons.payment_rounded),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      AppLocalizations.of(context)!.choosePaymentMethod,
-                      style:
-                      const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Card
-              ListTile(
-                leading: const Icon(Icons.credit_card_rounded, color: AppColors.bluePrimary),
-                title: Text(AppLocalizations.of(context)!.payByCard),
-                 onTap: () => Navigator.pop(context, PaymentMethod.card),
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Cash on Post Office
-              ListTile(
-               leading: const Icon(Icons.local_post_office_outlined, color: Colors.orange),
-               title: Text(AppLocalizations.of(context)!.cashOnPostOffice),
-               subtitle: Text(AppLocalizations.of(context)!.payAtPostOfficeSubtitle),
-               onTap: () => Navigator.pop(context, PaymentMethod.cash),
-               shape: RoundedRectangleBorder(
-                 side: BorderSide(color: AppColors.border),
-                 borderRadius: BorderRadius.circular(12),
-               ),
-              ),
-              const SizedBox(height: 10),
-
-              // Apple Pay
-              if (_applePayAvailable)
-                ListTile(
-                  leading: const Icon(Icons.phone_iphone_rounded, color: Colors.black),
-                  title: Text(AppLocalizations.of(context)!.applePay),
-                  onTap: () => Navigator.pop(context, PaymentMethod.applePay),
-                   shape: RoundedRectangleBorder(
-                    side: BorderSide(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (!mounted || method == null) return;
-
-    switch (method) {
-      case PaymentMethod.card:
-        await _handleCardPay(inv);
-        break;
-      case PaymentMethod.applePay:
-        await _handleApplePay(inv);
-        break;
-      case PaymentMethod.cash:
-        // Cash payment simulation
-        _markInvoicePaid(inv.id);
-         _toast(AppLocalizations.of(context)!.orderPlacedPostOffice);
-        // pop back to finding space or home
-        Navigator.pop(context);
-        break;
-    }
-  }
-
-  Future<void> _handleCardPay(Invoice inv) async {
-    try {
-      _showProgress(AppLocalizations.of(context)!.processingPayment);
-      await PaymentService.payWithCard(invoice: inv);
-      if (!mounted) return;
-      Navigator.pop(context); // close progress
-      await _processActivityLog(inv); // Log activity before navigation
-      _markInvoicePaid(inv.id);
-      
-      if (!mounted) return;
-      _toast(AppLocalizations.of(context)!.paymentSuccessful);
-      
-      // Return to Dashboard/Previous
-      Navigator.pop(context); 
-
-    } on PaymentException catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        _toast(e.message);
-      }
-    } catch (_) {
-      if (mounted) {
-        Navigator.pop(context);
-        _toast(AppLocalizations.of(context)!.cardError);
-      }
-    }
-  }
-
-  Future<void> _handleApplePay(Invoice inv) async {
-    try {
-      _showProgress(AppLocalizations.of(context)!.openingApplePay);
-      await PaymentService.payWithApplePay(invoice: inv);
-      if (!mounted) return;
-      Navigator.pop(context); // close progress
-      await _processActivityLog(inv); // Log activity
-      _markInvoicePaid(inv.id);
-      
-      if (!mounted) return;
-      _toast(AppLocalizations.of(context)!.applePaySuccess);
-      
-      // Return to Dashboard/Previous
-      Navigator.pop(context);
-
-    } on PaymentException catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        _toast(e.message);
-      }
-    } catch (_) {
-      if (mounted) {
-        Navigator.pop(context);
-        _toast(AppLocalizations.of(context)!.applePayError);
-      }
-    }
-  }
-
-  Future<void> _markInvoicePaid(String id) async {
-    // 1. Update UI (Optimistic)
-    final idx = _invoices.indexWhere((e) => e.id == id);
-    if (idx != -1) {
-      final old = _invoices[idx];
-      _invoices[idx] = Invoice(
-        id: old.id,
-        number: old.number,
-        warehouseName: old.warehouseName,
-        date: old.date,
-        amount: old.amount,
-        vat: old.vat,
-        paid: true,
-        type: old.type,
-        metaData: old.metaData,
-      );
-      setState(() {});
-      
-      // 2. Persist
-      try {
-        await _marketService.updateInvoiceStatus(id, true);
-      } catch (e) {
-        debugPrint('Error updating invoice status: $e');
-        // Revert? For now, keep optimistic.
-      }
-    }
-  }
-
-  void _showProgress(String msg) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        content: Row(
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 16),
-            Expanded(child: Text(msg)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _toast(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
-  }
 
   Future<void> _showInvoiceDialog(BuildContext context, Invoice inv) async {
     final statusTag = Tag(inv.paid
@@ -313,7 +114,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
           ),
           PrimaryButton(
             text: inv.paid ? AppLocalizations.of(context)!.viewReceipt : AppLocalizations.of(context)!.payNow,
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
               if (inv.paid) {
                 Navigator.push(
@@ -321,7 +122,13 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   MaterialPageRoute(builder: (_) => ReceiptPage(invoice: inv)),
                 );
               } else {
-                _choosePaymentMethod(inv);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CheckoutPage(invoice: inv)),
+                );
+                if (result == true) {
+                  _loadInvoices();
+                }
               }
             },
           ),
@@ -478,7 +285,15 @@ class _PaymentsPageState extends State<PaymentsPage> {
                           invoice: inv,
                           aed: _aed,
                           onView: () => _showInvoiceDialog(context, inv),
-                          onPay: inv.paid ? null : () => _choosePaymentMethod(inv),
+                          onPay: inv.paid ? null : () async {
+                             final result = await Navigator.push(
+                               context,
+                               MaterialPageRoute(builder: (_) => CheckoutPage(invoice: inv)),
+                             );
+                             if (result == true) {
+                               _loadInvoices();
+                             }
+                           },
                         ),
                       ),
                   ],
@@ -506,29 +321,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
     );
   }
 
-  Future<void> _processActivityLog(Invoice inv) async {
-    // Only proceed if authenticated and we have metadata
-    final service = MarketplaceService();
-    
-    if (inv.type == InvoiceType.rental && inv.metaData != null) {
-      final data = inv.metaData!;
-      // 'primaryWarehouseId', 'shelves', 'duration'
-      await service.createSubscription(
-        data['primaryWarehouseId'] ?? 'unknown', 
-        data['shelves'] ?? 0, 
-        data['duration'] ?? 1, 
-        inv.total
-      );
-    } else if (inv.type == InvoiceType.delivery && inv.metaData != null) {
-      final data = inv.metaData!;
-      // 'customerName', 'customerAddress', 'deliveryMethod'
-      await service.createDeliveryRequest(
-        data['customerName'] ?? 'Unknown', 
-        data['customerAddress'] ?? 'Unknown', 
-        data['deliveryMethod'] ?? 'Standard'
-      );
-    }
-  }
+
 }
 
 class _InvoiceCard extends StatelessWidget {

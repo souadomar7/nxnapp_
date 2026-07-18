@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme.dart';
+import '../../widgets/camera_scanner.dart';
 
 class PutAwayPage extends StatefulWidget {
   const PutAwayPage({super.key});
@@ -12,6 +13,32 @@ class _PutAwayPageState extends State<PutAwayPage> {
   int _step = 0; // 0 = Scan Item, 1 = Scan Shelf, 2 = Success
   String? _scannedItem;
   String? _scannedShelf;
+
+  void _scanItemWithCamera() async {
+    final scannedCode = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const CameraScanner(title: 'Scan Item Label')),
+    );
+    if (scannedCode != null && mounted) {
+      setState(() {
+        _scannedItem = scannedCode;
+        _step = 1;
+      });
+    }
+  }
+
+  void _scanShelfWithCamera() async {
+    final scannedCode = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const CameraScanner(title: 'Scan Shelf QR')),
+    );
+    if (scannedCode != null && mounted) {
+      setState(() {
+        _scannedShelf = scannedCode;
+        _step = 2; // Finish
+      });
+    }
+  }
 
   void _scanItem() {
     // Mock Scan
@@ -88,14 +115,26 @@ class _PutAwayPageState extends State<PutAwayPage> {
           const Text('Scan the box inventory label', style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 32),
           ElevatedButton.icon(
-            onPressed: _scanItem,
+            onPressed: _scanItemWithCamera,
             icon: const Icon(Icons.camera_alt),
-            label: const Text('Simulate Scan Item'),
+            label: const Text('Scan with Camera'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.bluePrimary,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
               textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _scanItem,
+            icon: const Icon(Icons.videogame_asset_outlined),
+            label: const Text('Simulate Scan'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.bluePrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
@@ -109,21 +148,33 @@ class _PutAwayPageState extends State<PutAwayPage> {
             decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
             child: Text('Item Scanned: $_scannedItem', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 32),
           const Icon(Icons.shelves, size: 100, color: Colors.orange),
           const SizedBox(height: 24),
           const Text('Step 2: Scan Shelf Label', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const Text('Walk to the assigned location and scan shelf QR', style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 32),
           ElevatedButton.icon(
-            onPressed: _scanShelf,
+            onPressed: _scanShelfWithCamera,
             icon: const Icon(Icons.qr_code_2),
-            label: const Text('Simulate Scan Shelf'),
+            label: const Text('Scan with Camera'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
               textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _scanShelf,
+            icon: const Icon(Icons.videogame_asset_outlined),
+            label: const Text('Simulate Scan'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],

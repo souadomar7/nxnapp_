@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'payment_page.dart';
+import 'checkout_page.dart';
 import '../models/invoice.dart';
 import '../services/marketplace_service.dart';
 import '../l10n/app_localizations.dart';
@@ -302,9 +302,9 @@ class _WarehouseGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      childAspectRatio: 2.8, // Flatter aspect ratio for compactness
-      crossAxisSpacing: 6, // Reduced spacing
-      mainAxisSpacing: 6,
+      childAspectRatio: 2.2, // Taller boxes for better icon support
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
       children: warehouses.map((w) {
         final isSelected = configs[w.id]!.isSelected;
         return _GridItem(w: w, isSelected: isSelected, isAr: isAr, onTap: () => onToggle(w.id));
@@ -325,32 +325,53 @@ class _GridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: isSelected ? BookingTheme.primary : Colors.white,
-      borderRadius: BorderRadius.circular(10), // Smaller radius
-      elevation: isSelected ? 2 : 1, // Reduced elevation
+      borderRadius: BorderRadius.circular(14),
+      elevation: isSelected ? 3 : 1,
       shadowColor: BookingTheme.cardShadow,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected ? BookingTheme.primary : Colors.grey.shade300,
-              width: 1, // Thinner border
+              color: isSelected ? BookingTheme.primary : Colors.grey.shade200,
+              width: 1.5,
             ),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              if (isSelected) ...[const Icon(Icons.check_circle, color: Colors.white, size: 16), const SizedBox(width: 6)], // Smaller icon
-              Text(
-                isAr ? w.nameAr : w.nameEn,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : BookingTheme.textDark,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13, // Smaller font
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withValues(alpha: 0.2) : BookingTheme.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  w.icon,
+                  color: isSelected ? Colors.white : BookingTheme.primary,
+                  size: 18,
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isAr ? w.nameAr : w.nameEn,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : BookingTheme.textDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              if (isSelected)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
             ],
           ),
         ),
@@ -704,6 +725,15 @@ class _QuoteDialog extends StatelessWidget {
   }
 
   void _handleBooking(BuildContext context) async {
+    final selectedWarehouseIds = configs.keys.where((k) => configs[k]!.isSelected).toList();
+    final metadataMap = <String, dynamic>{
+      'warehouseIds': selectedWarehouseIds,
+    };
+    for (var wId in selectedWarehouseIds) {
+      metadataMap['shelves_$wId'] = configs[wId]!.shelves;
+      metadataMap['duration_$wId'] = configs[wId]!.durationMonths;
+    }
+
     final newInvoice = Invoice(
       id: 'INV-${DateTime.now().millisecondsSinceEpoch}',
       number: 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
@@ -713,9 +743,7 @@ class _QuoteDialog extends StatelessWidget {
       vat: grandTotal * 0.05,
       paid: false,
       type: InvoiceType.rental,
-      metaData: {
-        'warehouseIds': configs.keys.where((k) => configs[k]!.isSelected).toList(),
-      },
+      metaData: metadataMap,
     );
 
     try {
@@ -726,7 +754,7 @@ class _QuoteDialog extends StatelessWidget {
 
     if (context.mounted) {
       Navigator.pop(context);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentsPage(initialInvoice: newInvoice)));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => CheckoutPage(invoice: newInvoice)));
     }
   }
 }

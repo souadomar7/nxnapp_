@@ -1,186 +1,234 @@
 -- ==============================================================================
--- NXN Hub: COMPLETE CLOUD DATABASE SCHEMA FOR SUPABASE
--- Run this script in the Supabase SQL Editor to set up your entire application.
+-- NXN WAREHOUSES: CANONICAL SUPABASE SCHEMA (v2 — consolidated)
+-- 
+-- Run this ONCE in the Supabase SQL Editor to set up the complete database.
+-- If your database already exists, check each table first before running
+-- to avoid "already exists" errors.
+--
+-- Tables:
+--   1. warehouses              (static — pre-populated)
+--   2. sme_sellers             (user profiles, extends auth.users)
+--   3. sme_products            (product catalogue)
+--   4. sme_inventory           (physical stock on shelves)
+--   5. sme_inbound_requests    (gate passes / drop-offs)
+--   6. sme_subscriptions       (shelf rental periods)
+--   7. sme_invoices            (billing records)
+--   8. sme_orders              (outbound delivery orders)
+--   9. marketplace_shops       (verified public shop profiles)
+--  10. dashboard_activities    (activity log)
 -- ==============================================================================
 
--- Enable UUID extension if not enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==============================================================================
--- 1. Static Entities & Profiles
+-- 1. WAREHOUSES (Static lookup table — not per-user)
 -- ==============================================================================
-
--- A. WAREHOUSES DIRECTORY
 CREATE TABLE IF NOT EXISTS warehouses (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    total_shelves INTEGER NOT NULL DEFAULT 100,
-    address TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    name_ar         TEXT,
+    emirate         TEXT,
+    address         TEXT,
+    location_lat    NUMERIC,
+    location_lng    NUMERIC,
+    total_shelves   INTEGER NOT NULL DEFAULT 100,
+    price_per_shelf NUMERIC DEFAULT 100.0,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
--- Pre-populate default warehouses if empty
-INSERT INTO warehouses (id, name, total_shelves, address) VALUES
-('dxb', 'Dubai Central Warehouse', 200, 'Al Quoz, Dubai'),
-('auh', 'Abu Dhabi central Warehouse', 150, 'Mussafah, Abu Dhabi'),
-('shj', 'Sharjah Central Warehouse', 100, 'Industrial Area, Sharjah'),
-('aln', 'Al Ain Central Warehouse', 100, 'Sanaiya, Al Ain')
+INSERT INTO warehouses (id, name, name_ar, emirate, address, total_shelves, price_per_shelf) VALUES
+  ('dxb', 'Dubai Central Warehouse',    'مستودع دبي المركزي',        'Dubai',       'Al Quoz, Dubai',             200, 100.0),
+  ('auh', 'Abu Dhabi Central Warehouse','مستودع أبوظبي المركزي',     'Abu Dhabi',   'Mussafah, Abu Dhabi',        150, 100.0),
+  ('shj', 'Sharjah Central Warehouse',  'مستودع الشارقة المركزي',    'Sharjah',     'Industrial Area, Sharjah',   100, 100.0),
+  ('aln', 'Al Ain Central Warehouse',   'مستودع العين المركزي',      'Al Ain',      'Sanaiya, Al Ain',            100, 100.0)
 ON CONFLICT (id) DO NOTHING;
 
--- B. VERIFIED MARKETPLACE SHOPS
-CREATE TABLE IF NOT EXISTS marketplace_shops (
-    id TEXT PRIMARY KEY,
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    shop_name TEXT NOT NULL,
-    license_name TEXT NOT NULL,
-    is_verified BOOLEAN DEFAULT false NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(seller_id)
+-- ==============================================================================
+-- 2. SELLER PROFILES (extends auth.users)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS sme_sellers (
+    id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    business_name   TEXT,
+    contact_number  TEXT,
+    license_number  TEXT,
+    is_verified     BOOLEAN DEFAULT false NOT NULL,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
-
 -- ==============================================================================
--- 2. Products & Inventory
+-- 3. PRODUCT CATALOGUE
 -- ==============================================================================
-
--- C. PRODUCTS CATALOGUE
 CREATE TABLE IF NOT EXISTS sme_products (
-    id TEXT PRIMARY KEY,
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    name TEXT NOT NULL,
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id   UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    name        TEXT NOT NULL,
     description TEXT,
-    price NUMERIC(10,2) NOT NULL,
-    photo_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    price       NUMERIC(10,2) NOT NULL,
+    photo_url   TEXT,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
--- D. PHYSICAL SHELF INVENTORY
+-- ==============================================================================
+-- 4. PHYSICAL SHELF INVENTORY
+-- ==============================================================================
 CREATE TABLE IF NOT EXISTS sme_inventory (
-    id TEXT PRIMARY KEY,
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    product_id TEXT REFERENCES sme_products(id) ON DELETE SET NULL,
-    shelf_id TEXT,
-    quantity INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL, -- 'in_stock', 'damaged', 'out_of_stock'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    product_id      UUID REFERENCES sme_products(id) ON DELETE SET NULL,
+    warehouse_id    TEXT REFERENCES warehouses(id) ON DELETE SET NULL,
+    shelf_label     TEXT,           -- e.g. "Dubai-Shelf-04"
+    quantity        INTEGER NOT NULL DEFAULT 0,
+    status          TEXT NOT NULL CHECK (status IN ('in_stock', 'damaged', 'out_of_stock', 'reserved')),
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
-
 -- ==============================================================================
--- 3. Warehouse Subscriptions (Rentals) & Operations
+-- 5. INBOUND REQUESTS (Gate Pass / Drop-Off)
 -- ==============================================================================
-
--- E. RENTED SPACE SUBSCRIPTIONS
-CREATE TABLE IF NOT EXISTS sme_subscriptions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    warehouse_id TEXT REFERENCES warehouses(id) ON DELETE CASCADE NOT NULL,
-    shelves_count INTEGER NOT NULL DEFAULT 1,
-    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    is_active BOOLEAN DEFAULT true NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- F. INBOUND GATE PASS / DELIVERY REQUESTS (For receiving goods)
 CREATE TABLE IF NOT EXISTS sme_inbound_requests (
-    id TEXT PRIMARY KEY,
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    expected_date TIMESTAMP WITH TIME ZONE,
-    item_count INTEGER,
-    gate_pass_code TEXT,
-    labor_count INTEGER DEFAULT 0 NOT NULL,
-    visual_inspection_requested BOOLEAN DEFAULT false NOT NULL,
-    status TEXT NOT NULL, -- 'pending', 'received', 'completed'
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id                       UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    warehouse_id                    TEXT REFERENCES warehouses(id) ON DELETE SET NULL,
+    expected_date                   TIMESTAMP WITH TIME ZONE,
+    item_count                      INTEGER,
+    gate_pass_code                  TEXT,
+    labor_count                     INTEGER DEFAULT 0 NOT NULL,
+    visual_inspection_requested     BOOLEAN DEFAULT false NOT NULL,
+    status                          TEXT NOT NULL DEFAULT 'pending'
+                                        CHECK (status IN ('pending', 'accepted', 'received', 'completed', 'rejected')),
+    notes                           TEXT,
+    created_at                      TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
+-- ==============================================================================
+-- 6. SUBSCRIPTIONS (Shelf Rental Periods)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS sme_subscriptions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    warehouse_id    TEXT REFERENCES warehouses(id) ON DELETE CASCADE NOT NULL,
+    shelves_count   INTEGER NOT NULL DEFAULT 1,
+    start_date      TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date        TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_active       BOOLEAN DEFAULT true NOT NULL,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
+);
 
 -- ==============================================================================
--- 4. Invoices, Payments, Outbound Orders & Activities
+-- 7. INVOICES (Billing Records)
 -- ==============================================================================
-
--- G. GLOBAL BILLING INVOICES
 CREATE TABLE IF NOT EXISTS sme_invoices (
-    id TEXT PRIMARY KEY,
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    invoice_number TEXT NOT NULL,
-    warehouse_name TEXT NOT NULL,
-    amount NUMERIC(10,2) NOT NULL,
-    vat NUMERIC(10,2) NOT NULL,
-    worker_fee NUMERIC(10,2) DEFAULT 0.0 NOT NULL,
-    paid BOOLEAN DEFAULT false NOT NULL,
-    type TEXT NOT NULL, -- 'rental', 'delivery', 'generic'
-    metadata JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    id                  TEXT PRIMARY KEY,
+    seller_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    invoice_number      TEXT NOT NULL,
+    warehouse_name      TEXT NOT NULL,
+    amount              NUMERIC(10,2) NOT NULL,
+    vat                 NUMERIC(10,2) NOT NULL DEFAULT 0,
+    worker_fee          NUMERIC(10,2) NOT NULL DEFAULT 0,
+    paid                BOOLEAN DEFAULT false NOT NULL,
+    type                TEXT NOT NULL DEFAULT 'generic'
+                            CHECK (type IN ('rental', 'delivery', 'generic')),
+    metadata            JSONB,
+    stripe_payment_id   TEXT,       -- Stripe PaymentIntent ID (set after payment)
+    created_at          TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
--- H. OUTBOUND ORDERS (For shipment & courier delivery)
+-- ==============================================================================
+-- 8. OUTBOUND ORDERS (Delivery Requests)
+-- ==============================================================================
 CREATE TABLE IF NOT EXISTS sme_orders (
-    id TEXT PRIMARY KEY,
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    customer_name TEXT,
-    customer_address TEXT,
-    delivery_method TEXT,
-    status TEXT NOT NULL, -- 'pending', 'shipped', 'delivered', 'completed'
-    total_amount NUMERIC(10,2) DEFAULT 0.0 NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    seller_id           UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    customer_name       TEXT,
+    customer_address    TEXT,
+    delivery_method     TEXT CHECK (delivery_method IN ('pickup', 'standard', 'express', 'same_day')),
+    status              TEXT NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending', 'picked', 'out_for_delivery', 'delivered', 'completed', 'cancelled')),
+    total_amount        NUMERIC(10,2) DEFAULT 0.0 NOT NULL,
+    created_at          TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
--- I. SYSTEM LOG ACTIVITY HISTORIES
+-- ==============================================================================
+-- 9. MARKETPLACE SHOPS (Public Verified Shops)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS marketplace_shops (
+    id              TEXT PRIMARY KEY,
+    seller_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
+    shop_name       TEXT NOT NULL,
+    license_name    TEXT NOT NULL,
+    is_verified     BOOLEAN DEFAULT false NOT NULL,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
+);
+
+-- ==============================================================================
+-- 10. DASHBOARD ACTIVITY LOG
+-- ==============================================================================
 CREATE TABLE IF NOT EXISTS dashboard_activities (
-    id TEXT PRIMARY KEY,
-    seller_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    title TEXT NOT NULL,
-    subtitle TEXT NOT NULL,
-    type TEXT NOT NULL, -- 'rental', 'delivery', 'inventory', 'invoice'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    id          TEXT PRIMARY KEY,
+    seller_id   UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    title       TEXT NOT NULL,
+    subtitle    TEXT NOT NULL,
+    type        TEXT NOT NULL CHECK (type IN ('rental', 'delivery', 'inventory', 'invoice', 'inbound')),
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
 
-
 -- ==============================================================================
--- 5. Enable Row-Level Security (RLS) & Define Access Policies
+-- ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 
--- Enable RLS on all operational tables
-ALTER TABLE marketplace_shops ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sme_products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sme_inventory ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sme_subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sme_inbound_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sme_invoices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sme_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dashboard_activities ENABLE ROW LEVEL SECURITY;
+-- Enable RLS on all user-specific tables
+ALTER TABLE sme_sellers              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sme_products             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sme_inventory            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sme_inbound_requests     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sme_subscriptions        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sme_invoices             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sme_orders               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marketplace_shops        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dashboard_activities     ENABLE ROW LEVEL SECURITY;
 
--- 1. PUBLIC ACCESS POLICIES (Read-only for buyer-facing content)
-CREATE POLICY "Allow public read access to verified shops" 
-ON marketplace_shops FOR SELECT USING (true);
+-- Note: warehouses has NO RLS — it is a public read-only lookup table.
+-- Add a restrictive policy if you want to prevent public writes:
+ALTER TABLE warehouses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to warehouses"
+  ON warehouses FOR SELECT USING (true);
 
-CREATE POLICY "Allow public read access to products" 
-ON sme_products FOR SELECT USING (true);
+-- Seller profiles
+CREATE POLICY "Sellers can manage their own profile"
+  ON sme_sellers FOR ALL USING (auth.uid() = id);
 
--- 2. MERCHANT/SELLER DATA ISOLATION POLICIES (Users manage their own items)
-CREATE POLICY "Allow sellers to manage their own shop profile" 
-ON marketplace_shops FOR ALL USING (auth.uid() = seller_id);
+-- Products: public read, private write
+CREATE POLICY "Public can browse products"
+  ON sme_products FOR SELECT USING (true);
+CREATE POLICY "Sellers manage their own products"
+  ON sme_products FOR ALL USING (auth.uid() = seller_id);
 
-CREATE POLICY "Allow sellers to manage their own products" 
-ON sme_products FOR ALL USING (auth.uid() = seller_id);
+-- Inventory
+CREATE POLICY "Sellers manage their own inventory"
+  ON sme_inventory FOR ALL USING (auth.uid() = seller_id);
 
-CREATE POLICY "Allow sellers to view/manage their inventory" 
-ON sme_inventory FOR ALL USING (auth.uid() = seller_id);
+-- Inbound requests
+CREATE POLICY "Sellers manage their own inbound requests"
+  ON sme_inbound_requests FOR ALL USING (auth.uid() = seller_id);
 
-CREATE POLICY "Allow sellers to view/manage their subscriptions" 
-ON sme_subscriptions FOR ALL USING (auth.uid() = seller_id);
+-- Subscriptions
+CREATE POLICY "Sellers manage their own subscriptions"
+  ON sme_subscriptions FOR ALL USING (auth.uid() = seller_id);
 
-CREATE POLICY "Allow sellers to view/manage inbound requests" 
-ON sme_inbound_requests FOR ALL USING (auth.uid() = seller_id);
+-- Invoices
+CREATE POLICY "Sellers manage their own invoices"
+  ON sme_invoices FOR ALL USING (auth.uid() = seller_id);
 
-CREATE POLICY "Allow sellers to view/manage their invoices" 
-ON sme_invoices FOR ALL USING (auth.uid() = seller_id);
+-- Orders
+CREATE POLICY "Sellers manage their own orders"
+  ON sme_orders FOR ALL USING (auth.uid() = seller_id);
 
-CREATE POLICY "Allow sellers to view/manage their orders" 
-ON sme_orders FOR ALL USING (auth.uid() = seller_id);
+-- Marketplace shops: public read
+CREATE POLICY "Public can browse verified shops"
+  ON marketplace_shops FOR SELECT USING (true);
+CREATE POLICY "Sellers manage their own shop"
+  ON marketplace_shops FOR ALL USING (auth.uid() = seller_id);
 
-CREATE POLICY "Allow sellers to view their dashboard activity logs" 
-ON dashboard_activities FOR ALL USING (auth.uid() = seller_id);
+-- Dashboard activity log
+CREATE POLICY "Sellers view their own activity"
+  ON dashboard_activities FOR ALL USING (auth.uid() = seller_id);

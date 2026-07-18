@@ -59,6 +59,7 @@ class ChatbotEngine {
 
   ChatbotIntent? _findBestMatch(String message) {
     message = message.toLowerCase().trim();
+    message = _normalizeSynonyms(message);
     final msgClean = message.replaceAll(RegExp(r'[?؟.,!]'), '');
     
     int maxMatches = 0;
@@ -107,6 +108,138 @@ class ChatbotEngine {
 
     // Require a reasonable threshold if it's just word matching, or >0 if it's keywords/exact
     return maxMatches > 0 ? bestIntent : null;
+  }
+
+  String _normalizeSynonyms(String message) {
+    // 1. Cost / Price / Fees (سعر / تكلفة / رسوم)
+    final priceSynonymsAr = ['تكلفة', 'تكلفه', 'سعر', 'أسعار', 'اسعار', 'رسوم', 'مبلغ', 'قيمة', 'قيمه'];
+    for (var synonym in priceSynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' سعر تكلفة رسوم أسعار';
+        break;
+      }
+    }
+    final priceSynonymsEn = ['cost', 'price', 'pricing', 'fees', 'charges', 'rate', 'rates', 'fare'];
+    for (var synonym in priceSynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' cost price fees pricing';
+        break;
+      }
+    }
+
+    // 2. Warehouse / Storage / Shelves (مستودع / تخزين / مخزن)
+    final storageSynonymsAr = ['مخزن', 'مخازن', 'مستودع', 'مستودعات', 'تخزين', 'خزن', 'رف', 'رفوف'];
+    for (var synonym in storageSynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' تخزين مستودع مخزن مخازن';
+        break;
+      }
+    }
+    final storageSynonymsEn = ['storage', 'warehouse', 'store', 'warehousing', 'depot', 'shelf', 'shelves'];
+    for (var synonym in storageSynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' storage warehouse store';
+        break;
+      }
+    }
+
+    // 3. Delivery / Shipping / Logistics (توصيل / شحن / ارسال)
+    final deliverySynonymsAr = ['توصيل', 'شحن', 'ارسال', 'توزيع', 'طرد', 'بريد', 'ارساليات'];
+    for (var synonym in deliverySynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' توصيل شحن ارسال طرد';
+        break;
+      }
+    }
+    final deliverySynonymsEn = ['delivery', 'shipping', 'ship', 'send', 'outbound', 'dispatch', 'courier', 'parcel'];
+    for (var synonym in deliverySynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' delivery shipping outbound ship';
+        break;
+      }
+    }
+
+    // 4. Inbound / Receiving / Drop-off (استلام / توريد / ادخال)
+    final inboundSynonymsAr = ['استلام', 'شحن للمخزن', 'توريد', 'ادخال', 'تنزيل', 'موعد', 'حجز'];
+    for (var synonym in inboundSynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' استلام توريد موعد حجز';
+        break;
+      }
+    }
+    final inboundSynonymsEn = ['receive', 'receiving', 'inbound', 'dropoff', 'arrival', 'appointment', 'booking'];
+    for (var synonym in inboundSynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' receive inbound dropoff booking';
+        break;
+      }
+    }
+
+    // 5. Account / Profile / KYC (حساب / تسجيل / توثيق)
+    final accountSynonymsAr = ['حساب', 'تسجيل', 'توثيق', 'اشتراك', 'ملف', 'تفعيل', 'دخول', 'البيانات'];
+    for (var synonym in accountSynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' حساب تسجيل توثيق اشتراك';
+        break;
+      }
+    }
+    final accountSynonymsEn = ['account', 'register', 'signup', 'verify', 'verification', 'profile', 'login', 'kyc'];
+    for (var synonym in accountSynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' account register verification profile';
+        break;
+      }
+    }
+
+    // 6. Payment / Invoices / Billing (دفع / فواتير / سداد)
+    final paymentSynonymsAr = ['دفع', 'فاتورة', 'فواتير', 'بطاقة', 'كرت', 'سداد', 'فيزا', 'رصيد'];
+    for (var synonym in paymentSynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' دفع فاتورة فواتير سداد';
+        break;
+      }
+    }
+    final paymentSynonymsEn = ['pay', 'payment', 'bill', 'billing', 'invoice', 'card', 'credit', 'visa', 'balance'];
+    for (var synonym in paymentSynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' pay payment bill invoice';
+        break;
+      }
+    }
+
+    // 7. Human Support / Customer Service (دعم / موظف / انسان)
+    final supportSynonymsAr = ['دعم', 'موظف', 'انسان', 'شخص', 'مساعدة', 'تواصل', 'عملاء', 'مشكلة'];
+    for (var synonym in supportSynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' دعم موظف مساعدة تواصل';
+        break;
+      }
+    }
+    final supportSynonymsEn = ['support', 'human', 'agent', 'person', 'help', 'contact', 'chat', 'issue', 'problem'];
+    for (var synonym in supportSynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' support agent help contact';
+        break;
+      }
+    }
+
+    // 8. Products / Catalog / Items (منتج / بضاعة / اصناف)
+    final productSynonymsAr = ['منتج', 'منتجات', 'بضاعة', 'بضائع', 'سلع', 'اغراض', 'اصناف', 'مخزون'];
+    for (var synonym in productSynonymsAr) {
+      if (message.contains(synonym)) {
+        message += ' منتج منتجات بضاعة اصناف';
+        break;
+      }
+    }
+    final productSynonymsEn = ['product', 'products', 'item', 'items', 'goods', 'stock', 'cargo', 'catalog'];
+    for (var synonym in productSynonymsEn) {
+      if (message.contains(synonym)) {
+        message += ' product item catalog stock';
+        break;
+      }
+    }
+
+    return message;
   }
 
   ChatMessage _handleIntent(ChatbotIntent intent) {

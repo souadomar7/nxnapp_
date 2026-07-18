@@ -179,6 +179,10 @@ class _HomePageState extends State<HomePage> {
 
   // 2. Stats: Floating effect
   Widget _buildStatsOverview(AppLocalizations l10n) {
+    final double val = (_stats['totalValue'] as num?)?.toDouble() ?? 0.0;
+    final String valStr = val >= 1000 
+        ? '${(val / 1000).toStringAsFixed(1)}k'
+        : val.toStringAsFixed(0);
     return Transform.translate(
       offset: const Offset(0, -30),
       child: Row(
@@ -192,7 +196,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 16),
           _buildStatCard(
             title: l10n.stockValue,
-            value: 'AED ${( (_stats['totalValue'] as num) / 1000).toStringAsFixed(1)}k',
+            value: 'AED $valStr',
             icon: Icons.monetization_on_rounded,
             color: Colors.green,
           ),
@@ -259,27 +263,32 @@ class _HomePageState extends State<HomePage> {
 
   // 3. Alerts: Cleaner look
   Widget _buildAlertsSection(AppLocalizations l10n) {
-    if (_stats['pendingOrders'] == 0) return const SizedBox.shrink(); // Hide if empty
+    final lowStock = _stats['lowStock'] as int? ?? 0;
+    final outOfStock = _stats['outOfStock'] as int? ?? 0;
+
+    if (lowStock == 0 && outOfStock == 0) return const SizedBox.shrink(); // Hide if empty
 
     return Row(
       children: [
-        Expanded(
-          child: _buildAlertChip(
-            label: l10n.lowStockCount(3),
-            icon: Icons.warning_amber_rounded,
-            color: Colors.amber,
-            bgColor: Colors.amber.shade50,
+        if (lowStock > 0)
+          Expanded(
+            child: _buildAlertChip(
+              label: l10n.lowStockCount(lowStock),
+              icon: Icons.warning_amber_rounded,
+              color: Colors.amber,
+              bgColor: Colors.amber.shade50,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildAlertChip(
-            label: l10n.outOfStockCount(1),
-            icon: Icons.error_outline_rounded,
-            color: Colors.red,
-            bgColor: Colors.red.shade50,
+        if (lowStock > 0 && outOfStock > 0) const SizedBox(width: 12),
+        if (outOfStock > 0)
+          Expanded(
+            child: _buildAlertChip(
+              label: l10n.outOfStockCount(outOfStock),
+              icon: Icons.error_outline_rounded,
+              color: Colors.red,
+              bgColor: Colors.red.shade50,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -499,52 +508,107 @@ class _HomePageState extends State<HomePage> {
 
   // 6. Active Rental: Informational
   Widget _buildActiveRentals(AppLocalizations l10n) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+    final List<dynamic> rentals = _stats['activeRentals'] as List<dynamic>? ?? [];
+
+    if (rentals.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade100),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.warehouse_outlined, size: 40, color: Colors.grey.shade300),
+            const SizedBox(height: 10),
+            const Text(
+              "No active space rentals.",
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
             ),
-            child: const Icon(Icons.warehouse_rounded, color: Colors.green, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => BookingPage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.bluePrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(l10n.bookSpace, style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...rentals.map((rental) {
+          final String warehouse = rental['warehouse'] ?? 'Unknown Branch';
+          final int shelves = rental['shelves'] ?? 0;
+          
+          String branchName = warehouse;
+          if (branchName == 'aln') branchName = 'Al Ain Central Warehouse';
+          if (branchName == 'dxb') branchName = 'Dubai Central Warehouse';
+          if (branchName == 'auh') branchName = 'Abu Dhabi Central Warehouse';
+          if (branchName == 'shj') branchName = 'Sharjah Central Warehouse';
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade100),
+            ),
+            child: Row(
               children: [
-                Text(
-                  l10n.alAinBranch,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.warehouse_rounded, color: Colors.green, size: 24),
                 ),
-                Text(
-                  l10n.activeShelves(5),
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        branchName,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        l10n.activeShelves(shelves),
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                      l10n.managingTag,
+                      style: const TextStyle(color: AppColors.bluePrimary, fontSize: 11, fontWeight: FontWeight.bold)
+                  ),
                 ),
               ],
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.bluePrimary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-                l10n.managingTag,
-                style: const TextStyle(color: AppColors.bluePrimary, fontSize: 11, fontWeight: FontWeight.bold)
-            ),
-          ),
-        ],
-      ),
+          );
+        }),
+      ],
     );
   }
 

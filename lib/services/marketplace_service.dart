@@ -11,9 +11,11 @@ class MarketplaceService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   // --- Local Storage for Guest Mode (Static to persist across instances) ---
-  // --- Local Storage for Guest Mode (Static to persist across instances) ---
   static List<Invoice> _localInvoices = [];
   static List<DashboardActivity> _localActivity = [];
+  static List<SmeProduct> _localProducts = [];
+  static List<SmeInventory> _localInventory = [];
+  static List<SmeOrder> _localOrders = [];
   static bool _initialized = false;
 
   MarketplaceService() {
@@ -36,6 +38,90 @@ class MarketplaceService {
         final List<dynamic> json = jsonDecode(actString);
         _localActivity = json.map((e) => DashboardActivity.fromJson(e)).toList();
       }
+
+      final shopString = prefs.getString('local_shop');
+      if (shopString != null) {
+        _localShop = MarketplaceShop.fromJson(jsonDecode(shopString));
+      }
+
+      final prodString = prefs.getString('local_products');
+      if (prodString != null) {
+        final List<dynamic> json = jsonDecode(prodString);
+        _localProducts = json.map((e) => SmeProduct.fromJson(e)).toList();
+      }
+
+      final invenString = prefs.getString('local_inventory');
+      if (invenString != null) {
+        final List<dynamic> json = jsonDecode(invenString);
+        _localInventory = json.map((e) => SmeInventory.fromJson(e)).toList();
+      }
+
+      final ordString = prefs.getString('local_orders');
+      if (ordString != null) {
+        final List<dynamic> json = jsonDecode(ordString);
+        _localOrders = json.map((e) => SmeOrder.fromJson(e)).toList();
+      }
+
+      // Seed default mock items if empty
+      if (_localProducts.isEmpty) {
+        _localProducts = [
+          SmeProduct(
+            id: 'mock-beans',
+            sellerId: 'GUEST',
+            name: 'Premium Espresso Beans',
+            description: 'Locally roasted in Dubai, UAE. Rich flavor profile with hints of dark chocolate.',
+            price: 45.0,
+            shopName: 'My Guest Shop',
+            isShopVerified: true,
+            createdAt: DateTime.now(),
+          ),
+          SmeProduct(
+            id: 'mock-earbuds',
+            sellerId: 'GUEST',
+            name: 'Wireless Earbuds Pro',
+            description: 'Active noise cancellation with up to 30 hours of total playtime.',
+            price: 120.0,
+            shopName: 'My Guest Shop',
+            isShopVerified: true,
+            createdAt: DateTime.now(),
+          ),
+        ];
+        
+        _localInventory = [
+          SmeInventory(
+            id: 'mock-inv-1',
+            sellerId: 'GUEST',
+            productId: 'mock-beans',
+            productName: 'Premium Espresso Beans',
+            quantity: 45,
+            status: 'in_stock',
+            createdAt: DateTime.now(),
+          ),
+          SmeInventory(
+            id: 'mock-inv-2',
+            sellerId: 'GUEST',
+            productId: 'mock-earbuds',
+            productName: 'Wireless Earbuds Pro',
+            quantity: 8, // Low stock alert trigger!
+            status: 'in_stock',
+            createdAt: DateTime.now(),
+          ),
+        ];
+        
+        _localOrders = [
+          SmeOrder(
+            id: 'mock-order-1',
+            sellerId: 'GUEST',
+            customerName: 'Fatima Al Mansoori',
+            customerAddress: 'Al Barsha 2, Dubai',
+            deliveryMethod: 'standard',
+            status: 'pending',
+            totalAmount: 165.0,
+            createdAt: DateTime.now(),
+          )
+        ];
+      }
+
       _initialized = true;
       updateNotifier.value++; // Trigger UI update after load
     } catch (e) {
@@ -52,6 +138,40 @@ class MarketplaceService {
 
       final actString = jsonEncode(_localActivity.map((e) => e.toJson()).toList());
       await prefs.setString('local_activity', actString);
+
+      if (_localShop != null) {
+        final shopString = jsonEncode(_localShop!.toJson());
+        await prefs.setString('local_shop', shopString);
+      } else {
+        await prefs.remove('local_shop');
+      }
+
+      final prodString = jsonEncode(_localProducts.map((e) => e.toJson()).toList());
+      await prefs.setString('local_products', prodString);
+
+      final invenString = jsonEncode(_localInventory.map((e) => {
+        'id': e.id,
+        'seller_id': e.sellerId,
+        'product_id': e.productId,
+        'sme_products': e.productName != null ? {'name': e.productName} : null,
+        'shelf_id': e.shelfId,
+        'quantity': e.quantity,
+        'status': e.status,
+        'created_at': e.createdAt.toIso8601String(),
+      }).toList());
+      await prefs.setString('local_inventory', invenString);
+
+      final ordString = jsonEncode(_localOrders.map((e) => {
+        'id': e.id,
+        'seller_id': e.sellerId,
+        'customer_name': e.customerName,
+        'customer_address': e.customerAddress,
+        'delivery_method': e.deliveryMethod,
+        'status': e.status,
+        'total_amount': e.totalAmount,
+        'created_at': e.createdAt.toIso8601String(),
+      }).toList());
+      await prefs.setString('local_orders', ordString);
     } catch (e) {
       debugPrint('Error saving local data: $e');
     }
@@ -68,20 +188,74 @@ class MarketplaceService {
     // GUEST MODE / OFFLINE
     if (sellerId == null) {
       int totalShelves = 0;
+      int shelvesThisMonth = 0;
+      final List<Map<String, dynamic>> activeRentals = [];
+      final now = DateTime.now();
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
 
-      
       for (var inv in _localInvoices) {
         if (inv.paid && inv.type == InvoiceType.rental && inv.metaData != null) {
-          totalShelves += (inv.metaData!['shelves'] as int? ?? 0);
+          final data = inv.metaData!;
+          if (data.containsKey('warehouseIds')) {
+            final List<dynamic> warehouseIds = data['warehouseIds'] as List<dynamic>;
+            for (var wId in warehouseIds) {
+              final shelves = data['shelves_$wId'] ?? 0;
+              final duration = data['duration_$wId'] ?? 1;
+              final count = (shelves is num ? shelves.toInt() : int.tryParse(shelves.toString()) ?? 0);
+              totalShelves += count;
+              if (inv.date.isAfter(thirtyDaysAgo)) {
+                shelvesThisMonth += count;
+              }
+              activeRentals.add({
+                'warehouse': wId.toString(),
+                'shelves': count,
+                'end_date': inv.date.add(Duration(days: (duration is num ? duration.toInt() : int.tryParse(duration.toString()) ?? 1) * 30)).toIso8601String(),
+              });
+            }
+          } else {
+            final shelves = data['shelves'] ?? 0;
+            final duration = data['duration'] ?? 1;
+            final count = (shelves is num ? shelves.toInt() : int.tryParse(shelves.toString()) ?? 0);
+            totalShelves += count;
+            if (inv.date.isAfter(thirtyDaysAgo)) {
+              shelvesThisMonth += count;
+            }
+            activeRentals.add({
+              'warehouse': data['primaryWarehouseId'] ?? inv.warehouseName,
+              'shelves': count,
+              'end_date': inv.date.add(Duration(days: (duration is num ? duration.toInt() : int.tryParse(duration.toString()) ?? 1) * 30)).toIso8601String(),
+            });
+          }
         }
+      }
+      
+      // Calculate guest items
+      int totalItems = 0;
+      for (var item in _localInventory) {
+        if (item.status == 'in_stock') {
+          totalItems += item.quantity;
+        }
+      }
+      
+      // Calculate total stock value
+      double totalValue = 0.0;
+      for (var item in _localInventory) {
+        final prod = _localProducts.firstWhere(
+          (p) => p.id == item.productId,
+          orElse: () => SmeProduct(id: '', sellerId: '', name: '', price: 0.0, createdAt: DateTime.now()),
+        );
+        totalValue += (item.quantity * prod.price);
       }
       
       return {
         'shelves': totalShelves,
-        'items': 0, // Not tracking local inventory count deeply yet
-        'pendingOrders': 0,
-        'totalValue': 0.0,
-        'activeRentals': [], // detailed list optional for now
+        'shelvesThisMonth': shelvesThisMonth,
+        'items': totalItems,
+        'pendingOrders': _localOrders.where((e) => e.status == 'pending').length,
+        'lowStock': _localInventory.where((e) => e.status == 'in_stock' && e.quantity < 10 && e.quantity > 0).length,
+        'outOfStock': _localInventory.where((e) => e.quantity == 0 || e.status == 'out_of_stock').length,
+        'totalValue': totalValue,
+        'activeRentals': activeRentals,
       };
     }
 
@@ -95,31 +269,58 @@ class MarketplaceService {
           .eq('is_active', true);
       
       final activeRentals = (subsResponse as List).map((e) => {
-        'warehouse': e['warehouses']['name'] ?? 'Unknown',
+        'warehouse': e['warehouses'] != null ? (e['warehouses']['name'] ?? 'Unknown') : 'Unknown',
         'shelves': e['shelves_count'],
-        'end_date': e['end_date']
+        'end_date': e['end_date'],
+        'start_date': e['start_date']
       }).toList();
 
       int totalShelves = 0;
+      int shelvesThisMonth = 0;
+      final now = DateTime.now();
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+
       for (var sub in activeRentals) {
-        totalShelves += (sub['shelves'] as int);
+        final count = sub['shelves'] as int? ?? 0;
+        totalShelves += count;
+        final startDate = DateTime.tryParse(sub['start_date'] ?? '');
+        if (startDate != null && startDate.isAfter(thirtyDaysAgo)) {
+          shelvesThisMonth += count;
+        }
       }
 
-      // 2. Items & Total Value
+      // 2. Items & Total Value & stock alerts
       final inventoryResponse = await _supabase
           .from('sme_inventory')
-          .select('quantity, sme_products(price)')
-          .eq('seller_id', sellerId)
-          .eq('status', 'in_stock');
+          .select('quantity, status, sme_products(price)')
+          .eq('seller_id', sellerId);
       
       int totalItems = 0;
       double totalValue = 0.0;
+      int lowStockCount = 0;
+      int outOfStockCount = 0;
       
       for (var item in (inventoryResponse as List)) {
-        final qty = item['quantity'] as int;
-        totalItems += qty;
-        final price = (item['sme_products']['price'] as num).toDouble();
-        totalValue += (qty * price);
+        final qty = item['quantity'] as int? ?? 0;
+        final status = item['status'] as String? ?? 'out_of_stock';
+        
+        if (status == 'in_stock') {
+          if (qty > 0) {
+            totalItems += qty;
+            final priceObj = item['sme_products'];
+            final price = priceObj != null && priceObj['price'] != null
+                ? (priceObj['price'] as num).toDouble()
+                : 0.0;
+            totalValue += (qty * price);
+            if (qty < 10) {
+              lowStockCount++;
+            }
+          } else {
+            outOfStockCount++;
+          }
+        } else {
+          outOfStockCount++;
+        }
       }
 
       // 3. Pending Orders
@@ -134,8 +335,11 @@ class MarketplaceService {
 
       return {
         'shelves': totalShelves,
+        'shelvesThisMonth': shelvesThisMonth,
         'items': totalItems,
         'pendingOrders': pendingOrdersCount,
+        'lowStock': lowStockCount,
+        'outOfStock': outOfStockCount,
         'totalValue': totalValue,
         'activeRentals': activeRentals,
       };
@@ -144,8 +348,11 @@ class MarketplaceService {
       // Return empty stats on error (e.g. table missing)
       return {
         'shelves': 0,
+        'shelvesThisMonth': 0,
         'items': 0,
         'pendingOrders': 0,
+        'lowStock': 0,
+        'outOfStock': 0,
         'totalValue': 0.0,
         'activeRentals': [],
       };
@@ -293,15 +500,27 @@ class MarketplaceService {
 
   Future<List<SmeProduct>> getProducts() async {
     final user = _supabase.auth.currentUser;
-    if (user == null) return [];
+    if (user == null) return List.from(_localProducts);
 
-    final response = await _supabase
-        .from('sme_products')
-        .select()
-        .eq('seller_id', user.id)
-        .order('created_at', ascending: false);
-    
-    return (response as List).map((e) => SmeProduct.fromJson(e)).toList();
+    try {
+      final response = await _supabase
+          .from('sme_products')
+          .select()
+          .eq('seller_id', user.id)
+          .order('created_at', ascending: false);
+      
+      final remoteList = (response as List).map((e) => SmeProduct.fromJson(e)).toList();
+      final all = [..._localProducts, ...remoteList];
+      final ids = <String>{};
+      final deduped = <SmeProduct>[];
+      for (var p in all) {
+        if (ids.add(p.id)) deduped.add(p);
+      }
+      return deduped;
+    } catch (e) {
+      debugPrint('Error fetching products (fallback): $e');
+      return List.from(_localProducts);
+    }
   }
 
   Future<String?> uploadImage(dynamic file) async {
@@ -330,22 +549,57 @@ class MarketplaceService {
 
   Future<void> addProduct(String name, String description, double price, String photoUrl) async {
     final user = _supabase.auth.currentUser;
-    if (user == null) return;
+    final newProduct = SmeProduct(
+      id: 'PROD-${DateTime.now().millisecondsSinceEpoch}',
+      sellerId: user?.id ?? 'GUEST',
+      name: name,
+      description: description.isEmpty ? null : description,
+      price: price,
+      photoUrl: photoUrl.isEmpty ? null : photoUrl,
+      createdAt: DateTime.now(),
+    );
 
-    await _supabase.from('sme_products').insert({
-      'seller_id': user.id,
-      'name': name,
-      'description': description,
-      'price': price,
-      'photo_url': photoUrl,
-    });
+    if (user == null) {
+      _localProducts.add(newProduct);
+      // Auto-populate starting stock in guest mode
+      _localInventory.add(SmeInventory(
+        id: 'INV-${DateTime.now().millisecondsSinceEpoch}',
+        sellerId: 'GUEST',
+        productId: newProduct.id,
+        productName: newProduct.name,
+        quantity: 50,
+        status: 'in_stock',
+        createdAt: DateTime.now(),
+      ));
+      await _saveLocal();
+      updateNotifier.value++;
+      return;
+    }
+
+    try {
+      await _supabase.from('sme_products').insert(newProduct.toJson());
+    } catch (e) {
+      debugPrint('Error inserting product (fallback to local): $e');
+      _localProducts.add(newProduct);
+      _localInventory.add(SmeInventory(
+        id: 'INV-${DateTime.now().millisecondsSinceEpoch}',
+        sellerId: user.id,
+        productId: newProduct.id,
+        productName: newProduct.name,
+        quantity: 50,
+        status: 'in_stock',
+        createdAt: DateTime.now(),
+      ));
+      await _saveLocal();
+    }
+    updateNotifier.value++;
   }
 
   // --- Inventory ---
 
   Future<List<SmeInventory>> getInventory() async {
     final user = _supabase.auth.currentUser;
-    if (user == null) return [];
+    if (user == null) return List.from(_localInventory);
 
     try {
       // Join with products to get names
@@ -354,10 +608,17 @@ class MarketplaceService {
           .select('*, sme_products(name)')
           .eq('seller_id', user.id);
 
-      return (response as List).map((e) => SmeInventory.fromJson(e)).toList();
+      final remoteList = (response as List).map((e) => SmeInventory.fromJson(e)).toList();
+      final all = [..._localInventory, ...remoteList];
+      final ids = <String>{};
+      final deduped = <SmeInventory>[];
+      for (var inv in all) {
+        if (ids.add(inv.id)) deduped.add(inv);
+      }
+      return deduped;
     } catch (e) {
-      debugPrint('Error fetching inventory (returning empty): $e');
-      return [];
+      debugPrint('Error fetching inventory (fallback): $e');
+      return List.from(_localInventory);
     }
   }
 
@@ -449,7 +710,6 @@ class MarketplaceService {
     try {
       await _supabase.from('sme_invoices').insert(data);
     } catch (e) {
-        debugPrint('Error saving invoice (fallback): $e');
         debugPrint('Error saving invoice (fallback): $e');
         _localInvoices.add(invoice);
         _saveLocal(); // Persist
@@ -547,7 +807,7 @@ class MarketplaceService {
     try {
       final response = await _supabase
           .from('sme_inbound_requests')
-          .select('*, sme_subscriptions(sme_inventory(*))') // Join for context if needed
+          .select('*')
           .eq('status', 'pending')
           .order('expected_date', ascending: true);
 
@@ -704,6 +964,7 @@ class MarketplaceService {
     if (user == null) {
       if (_localShop != null) return false; // Prevent duplicate
       _localShop = newShop;
+      await _saveLocal();
       updateNotifier.value++;
       return true;
     }
@@ -714,12 +975,15 @@ class MarketplaceService {
       if (existing != null) return false;
 
       await _supabase.from('marketplace_shops').insert(newShop.toJson());
+      _localShop = newShop;
+      await _saveLocal();
       updateNotifier.value++;
       return true;
     } catch (e) {
       debugPrint('Error creating shop (fallback to local): $e');
       if (_localShop != null) return false; // Prevent duplicate fallback
       _localShop = newShop;
+      await _saveLocal();
       updateNotifier.value++;
       return true; // Still return true for demo UX
     }
@@ -738,6 +1002,7 @@ class MarketplaceService {
         isVerified: true,
         createdAt: _localShop!.createdAt,
       );
+      await _saveLocal();
     }
     
     if (user != null) {
@@ -755,59 +1020,32 @@ class MarketplaceService {
   }
 
   Future<List<SmeProduct>> getPublicMarketplaceProducts() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return List.from(_localProducts);
+
     try {
-      // In a real database, this is an inner join:
-      // select products.*, shops.shop_name from sme_products products
-      // join marketplace_shops shops on products.seller_id = shops.seller_id
-      // where shops.is_verified = true
-      
       final response = await _supabase
           .from('sme_products')
           .select('*, marketplace_shops!inner(shop_name, is_verified)')
           .eq('marketplace_shops.is_verified', true)
           .order('created_at', ascending: false);
           
-      return (response as List).map((e) {
-        // Flatten the joined data
+      final remoteList = (response as List).map((e) {
         e['shop_name'] = e['marketplace_shops']['shop_name'];
         e['is_shop_verified'] = e['marketplace_shops']['is_verified'];
         return SmeProduct.fromJson(e);
       }).toList();
+
+      final all = [..._localProducts, ...remoteList];
+      final ids = <String>{};
+      final deduped = <SmeProduct>[];
+      for (var p in all) {
+        if (ids.add(p.id)) deduped.add(p);
+      }
+      return deduped;
     } catch (e) {
-      debugPrint('Error fetching public marketplace products: $e');
-      // Mock data for demo
-      return [
-        SmeProduct(
-            id: 'mock1',
-            sellerId: 's1',
-            name: 'Premium Espresso Beans',
-            description: 'Locally roasted in UAE',
-            price: 45.0,
-            shopName: 'Arabica Coffee Roasters',
-            isShopVerified: true,
-            createdAt: DateTime.now(),
-        ),
-        SmeProduct(
-            id: 'mock2',
-            sellerId: 's2',
-            name: 'Wireless Earbuds',
-            description: 'Noise cancelling, 20h battery',
-            price: 120.0,
-            shopName: 'Tech Haven LLC',
-            isShopVerified: true,
-            createdAt: DateTime.now(),
-        ),
-        SmeProduct(
-            id: 'mock3',
-            sellerId: 's3',
-            name: 'Handcrafted Vase',
-            description: 'Ceramic decor',
-            price: 85.0,
-            shopName: 'Dubai Arts',
-            isShopVerified: true,
-            createdAt: DateTime.now(),
-        ),
-      ];
+      debugPrint('Error fetching public marketplace products (fallback): $e');
+      return List.from(_localProducts);
     }
   }
 

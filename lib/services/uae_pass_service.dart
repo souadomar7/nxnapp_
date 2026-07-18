@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -9,14 +10,14 @@ class UaePassService {
   factory UaePassService() => _instance;
   UaePassService._internal();
 
-  // Configuration - REPLACE WITH YOUR CREDENTIALS WHEN APPROVED
-  final String clientId = "sandbox_stage"; 
-  final String clientSecret = "sandbox_stage";
-  final String redirectUri = "https://your-redirect-uri.com/callback"; // Must match "Redirect URI" in UAE Pass portal
-  final bool isProduction = false; 
+  // Dynamic getters from dotenv configurations
+  String get clientId => dotenv.env['UAE_PASS_CLIENT_ID'] ?? "sandbox_stage"; 
+  String get clientSecret => dotenv.env['UAE_PASS_CLIENT_SECRET'] ?? "sandbox_stage";
+  String get redirectUri => dotenv.env['UAE_PASS_REDIRECT_URI'] ?? "https://your-redirect-uri.com/callback";
+  bool get isProduction => dotenv.env['UAE_PASS_IS_PRODUCTION'] == 'true'; 
 
-  // Simulation Mode: Set to false to use real API calls
-  bool isSimulationMode = true; 
+  // Simulation Mode: Defaults to true unless explicitly configured to false in .env
+  bool get isSimulationMode => dotenv.env['UAE_PASS_SIMULATION_MODE'] != 'false'; 
 
   // Endpoints
   String get _baseUrl => isProduction ? "https://id.uaepass.ae" : "https://stg-id.uaepass.ae";
@@ -119,12 +120,11 @@ class UaePassService {
 
   /// Verifies the Trade License via "Waslah" (Government Database).
   /// 
-  /// In a real scenario, this would call the DED/Waslah API.
+  /// In a real scenario, this calls the DED/Waslah API endpoint configured in .env.
   Future<bool> verifyTradeLicense(String licenseNo) async {
-    // Simulate API network call
-    await Future.delayed(const Duration(seconds: 2));
-
     if (isSimulationMode) {
+      // Simulate API network call
+      await Future.delayed(const Duration(seconds: 1));
       // Mock Logic: Accept any license starting with "CN-"
       // Reject others to demonstrate validation failure
       if (licenseNo.toUpperCase().startsWith("CN-")) {
@@ -132,9 +132,34 @@ class UaePassService {
       }
       return false; 
     } else {
-      // Stub for Real API
-      // final response = await http.post...
-      return true; // Default to true for now in "Production" stub
+      // Real API validation using Waslah endpoint
+      final url = dotenv.env['WASLAH_API_URL'];
+      final apiKey = dotenv.env['WASLAH_API_KEY'];
+      if (url == null || url.isEmpty) {
+        // Fallback or stub success if URL not yet set up
+        return true;
+      }
+
+      try {
+        final response = await http.post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $apiKey',
+          },
+          body: jsonEncode({
+            'trade_license_number': licenseNo,
+          }),
+        );
+        if (response.statusCode == 200) {
+          final resData = jsonDecode(response.body);
+          return resData['is_valid'] == true;
+        }
+        return false;
+      } catch (e) {
+        debugPrint('Waslah API verification error: $e');
+        return false;
+      }
     }
   }
 }
