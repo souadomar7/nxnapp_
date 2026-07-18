@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../core/auth/session_provider.dart';
 import 'home_page.dart';
 import 'profile_page.dart';
 import '../l10n/app_localizations.dart';
@@ -39,7 +40,8 @@ class HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return PopScope(
+    return SessionProviderBuilder(
+      child: PopScope(
       canPop: _index == 0,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
@@ -90,7 +92,8 @@ class HomeShellState extends State<HomeShell> {
             ),
           ],
         ),
-      ),
-    );
+      ),   // closes Scaffold
+    ),     // closes PopScope
+    );     // closes SessionProviderBuilder
   }
 }

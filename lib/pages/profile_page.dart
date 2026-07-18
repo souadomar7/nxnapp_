@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
 import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../core/auth/session_provider.dart';
+import '../core/auth/user_role.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +16,8 @@ import 'profile/my_subscriptions_page.dart';
 import 'profile/wallet_page.dart';
 import 'marketplace/seller_hub.dart';
 import '../services/marketplace_service.dart';
+import 'login.dart';
+import 'registration_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -40,7 +44,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final stats = await _service.getDashboardStats();
       final invoices = await _service.getInvoices();
       final products = await _service.getProducts();
-      
+
       if (mounted) {
         setState(() {
           _activeShelves = stats['shelves'] ?? 0;
@@ -50,24 +54,24 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+    final session = SessionProvider.of(context);
+    final isGuest = session.role == UserRole.guest;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F6FB), // Cooler, premium background
+      backgroundColor: const Color(0xFFF3F6FB),
       body: CustomScrollView(
         slivers: [
-          // 1. Premium Profile Header
+          // ─── HEADER ───────────────────────────────────────────────────────
           SliverAppBar(
             pinned: true,
-            expandedHeight: 220,
+            expandedHeight: isGuest ? 180 : 220,
             backgroundColor: AppColors.bluePrimary,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
@@ -76,203 +80,30 @@ class _ProfilePageState extends State<ProfilePage> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF1E3C72), Color(0xFF2A5298)], // Premium Navy Gradient
+                    colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
                   ),
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: [
-                            // Avatar Frame
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.white24,
-                                shape: BoxShape.circle,
-                              ),
-                              child: CircleAvatar(
-                                radius: 36,
-                                backgroundColor: Colors.white,
-                                child: Consumer<UserProvider>(
-                                  builder: (context, user, _) {
-                                    final initial = user.displayName.isNotEmpty 
-                                        ? user.displayName.substring(0, 1).toUpperCase() 
-                                        : 'G';
-                                    return Text(
-                                      initial,
-                                      style: const TextStyle(
-                                        color: Color(0xFF1E3C72),
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Consumer<UserProvider>(
-                                    builder: (context, user, _) {
-                                      return Text(
-                                        user.displayName.isNotEmpty ? user.displayName : l10n.guestUser,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: -0.5,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
-                                    ),
-                                    child: Text(
-                                      l10n.tenantOwnerLabel,
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        // Real Profile Statistics
-                        Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _HeaderStat(label: 'Pending Bills', value: _isLoading ? '...' : '$_pendingInvoices'),
-                              Container(width: 1, height: 24, color: Colors.white12),
-                              _HeaderStat(label: 'Catalog Items', value: _isLoading ? '...' : '$_catalogCount'),
-                              Container(width: 1, height: 24, color: Colors.white12),
-                              _HeaderStat(label: 'Active Shelves', value: _isLoading ? '...' : '$_activeShelves'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    child: isGuest
+                        ? _buildGuestHeader(context)
+                        : _buildMerchantHeader(l10n),
                   ),
                 ),
               ),
             ),
           ),
-          
+
+          // ─── BODY ────────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
-                children: [
-                  // --- Account Section ---
-                  _SectionHeader(title: l10n.accountSection),
-                  _MenuCard(children: [
-                    _ProfileTile(
-                      icon: Icons.inventory_2_outlined,
-                      title: l10n.mySubscriptions,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MySubscriptionsPage())),
-                    ),
-                    _Divider(),
-                    _ProfileTile(
-                      icon: Icons.account_balance_wallet_outlined,
-                      title: l10n.walletInvoices,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletPage())),
-                    ),
-                    _Divider(),
-                    _ProfileTile(
-                      icon: Icons.verified_user_outlined,
-                      title: l10n.kycDocsTitle,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KYCPage())),
-                    ),
-                  ]),
-                  
-                  const SizedBox(height: 24),
-
-                  // --- Settings Section ---
-                  _SectionHeader(title: l10n.preferencesSection), 
-                  _MenuCard(children: [
-                    _ProfileTile(
-                      icon: Icons.notifications_outlined,
-                      title: l10n.notificationsTitle,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsPage())),
-                    ),
-                    _Divider(),
-                    Consumer<LocaleProvider>(
-                      builder: (context, provider, _) => _ProfileTile(
-                        icon: Icons.language_rounded,
-                        title: l10n.languageTitle,
-                        trailingText: provider.locale.languageCode == 'en' ? 'English' : 'العربية',
-                        onTap: () => provider.toggleLocale(),
-                      ),
-                    ),
-                  ]),
-
-                  const SizedBox(height: 24),
-
-                  _SectionHeader(title: l10n.businessSection),
-                  _MenuCard(children: [
-                    _ProfileTile(
-                      icon: Icons.store_mall_directory_outlined,
-                      title: l10n.marketplaceTitle,
-                      subtitle: l10n.marketplaceSubtitle,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerHub())),
-                    ),
-                  ]),
-
-                  const SizedBox(height: 32),
-
-                  // --- Logout ---
-                  _MenuCard(children: [
-                    _ProfileTile(
-                      icon: Icons.logout_rounded,
-                      title: l10n.logoutTitle,
-                      iconColor: Colors.redAccent,
-                      textColor: Colors.redAccent,
-                      showTrailing: false,
-                      onTap: () async {
-                        // Clear guest mode persistence
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.remove('is_guest');
-
-                        await Supabase.instance.client.auth.signOut();
-                        if (context.mounted) {
-                          Navigator.pushAndRemoveUntil(
-                            context, 
-                            MaterialPageRoute(builder: (_) => const SplashPage()),
-                            (route) => false,
-                          );
-                        }
-                      },
-                    ),
-                  ]),
-                  
-                  const SizedBox(height: 40),
-                  Text(
-                    l10n.version('1.0.2'),
-                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                children: isGuest
+                    ? _buildGuestSections(context, l10n)
+                    : _buildMerchantSections(context, l10n),
               ),
             ),
           ),
@@ -280,9 +111,443 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
+  // ─── GUEST HEADER ─────────────────────────────────────────────────────────
+
+  Widget _buildGuestHeader(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: const BoxDecoration(
+            color: Colors.white24,
+            shape: BoxShape.circle,
+          ),
+          child: const CircleAvatar(
+            radius: 36,
+            backgroundColor: Colors.white,
+            child: Icon(Icons.person_outline_rounded,
+                color: Color(0xFF1E3C72), size: 36),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Guest User',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const LoginPage())),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white54),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Sign In',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const RegistrationPage())),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF1E3C72),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Register',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ─── MERCHANT HEADER ──────────────────────────────────────────────────────
+
+  Widget _buildMerchantHeader(AppLocalizations l10n) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.white24,
+                shape: BoxShape.circle,
+              ),
+              child: CircleAvatar(
+                radius: 36,
+                backgroundColor: Colors.white,
+                child: Consumer<UserProvider>(
+                  builder: (context, user, _) {
+                    final initial = user.displayName.isNotEmpty
+                        ? user.displayName.substring(0, 1).toUpperCase()
+                        : 'M';
+                    return Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Color(0xFF1E3C72),
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Consumer<UserProvider>(
+                    builder: (context, user, _) => Text(
+                      user.displayName.isNotEmpty
+                          ? user.displayName
+                          : l10n.guestUser,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          width: 1),
+                    ),
+                    child: Text(
+                      l10n.tenantOwnerLabel,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding:
+              const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1), width: 1),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _HeaderStat(
+                  label: 'Pending Bills',
+                  value: _isLoading ? '...' : '$_pendingInvoices'),
+              Container(width: 1, height: 24, color: Colors.white12),
+              _HeaderStat(
+                  label: 'Catalog Items',
+                  value: _isLoading ? '...' : '$_catalogCount'),
+              Container(width: 1, height: 24, color: Colors.white12),
+              _HeaderStat(
+                  label: 'Active Shelves',
+                  value: _isLoading ? '...' : '$_activeShelves'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── GUEST SECTIONS ───────────────────────────────────────────────────────
+
+  List<Widget> _buildGuestSections(
+      BuildContext context, AppLocalizations l10n) {
+    return [
+      // Locked account section with CTA
+      _buildGuestLockedCard(
+        icon: Icons.lock_outline_rounded,
+        title: 'Account Features Locked',
+        body:
+            'Sign in or register to access your subscriptions, invoices, wallet, and KYC documents.',
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const RegistrationPage())),
+      ),
+      const SizedBox(height: 20),
+
+      // Preferences (language still accessible)
+      _SectionHeader(title: l10n.preferencesSection),
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.notifications_outlined,
+          title: l10n.notificationsTitle,
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const NotificationSettingsPage())),
+        ),
+        _Divider(),
+        Consumer<LocaleProvider>(
+          builder: (context, provider, _) => _ProfileTile(
+            icon: Icons.language_rounded,
+            title: l10n.languageTitle,
+            trailingText: provider.locale.languageCode == 'en'
+                ? 'English'
+                : 'العربية',
+            onTap: () => provider.toggleLocale(),
+          ),
+        ),
+      ]),
+
+      const SizedBox(height: 24),
+
+      // Sign out / back
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.exit_to_app_rounded,
+          title: 'Exit Guest Mode',
+          iconColor: Colors.redAccent,
+          textColor: Colors.redAccent,
+          showTrailing: false,
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('is_guest');
+            await Supabase.instance.client.auth.signOut();
+            if (context.mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const SplashPage()),
+                (route) => false,
+              );
+            }
+          },
+        ),
+      ]),
+
+      const SizedBox(height: 40),
+      Text(
+        l10n.version('1.0.2'),
+        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+      ),
+      const SizedBox(height: 20),
+    ];
+  }
+
+  Widget _buildGuestLockedCard({
+    required IconData icon,
+    required String title,
+    required String body,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: AppColors.bluePrimary.withValues(alpha: 0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF9DA8C4).withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.bluePrimary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: AppColors.bluePrimary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            body,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onTap,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.bluePrimary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              child: const Text(
+                'Create Free Merchant Account',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── MERCHANT SECTIONS ────────────────────────────────────────────────────
+
+  List<Widget> _buildMerchantSections(
+      BuildContext context, AppLocalizations l10n) {
+    return [
+      _SectionHeader(title: l10n.accountSection),
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.inventory_2_outlined,
+          title: l10n.mySubscriptions,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const MySubscriptionsPage())),
+        ),
+        _Divider(),
+        _ProfileTile(
+          icon: Icons.account_balance_wallet_outlined,
+          title: l10n.walletInvoices,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const WalletPage())),
+        ),
+        _Divider(),
+        _ProfileTile(
+          icon: Icons.verified_user_outlined,
+          title: l10n.kycDocsTitle,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const KYCPage())),
+        ),
+      ]),
+
+      const SizedBox(height: 24),
+
+      _SectionHeader(title: l10n.preferencesSection),
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.notifications_outlined,
+          title: l10n.notificationsTitle,
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const NotificationSettingsPage())),
+        ),
+        _Divider(),
+        Consumer<LocaleProvider>(
+          builder: (context, provider, _) => _ProfileTile(
+            icon: Icons.language_rounded,
+            title: l10n.languageTitle,
+            trailingText: provider.locale.languageCode == 'en'
+                ? 'English'
+                : 'العربية',
+            onTap: () => provider.toggleLocale(),
+          ),
+        ),
+      ]),
+
+      const SizedBox(height: 24),
+
+      _SectionHeader(title: l10n.businessSection),
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.store_mall_directory_outlined,
+          title: l10n.marketplaceTitle,
+          subtitle: l10n.marketplaceSubtitle,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const SellerHub())),
+        ),
+      ]),
+
+      const SizedBox(height: 32),
+
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.logout_rounded,
+          title: l10n.logoutTitle,
+          iconColor: Colors.redAccent,
+          textColor: Colors.redAccent,
+          showTrailing: false,
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('is_guest');
+            await Supabase.instance.client.auth.signOut();
+            if (context.mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const SplashPage()),
+                (route) => false,
+              );
+            }
+          },
+        ),
+      ]),
+
+      const SizedBox(height: 40),
+      Text(
+        l10n.version('1.0.2'),
+        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+      ),
+      const SizedBox(height: 20),
+    ];
+  }
 }
 
-// --- Helper Widgets ---
+// ─── SHARED HELPER WIDGETS ────────────────────────────────────────────────────
 
 class _HeaderStat extends StatelessWidget {
   final String label;
@@ -293,15 +558,17 @@ class _HeaderStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
-        ),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w900)),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
-        ),
+        Text(label,
+            style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -310,7 +577,7 @@ class _HeaderStat extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   const _SectionHeader({required this.title});
-  
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -360,7 +627,11 @@ class _MenuCard extends StatelessWidget {
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 64);
+    return Divider(
+        height: 1,
+        thickness: 1,
+        color: Colors.grey.shade100,
+        indent: 64);
   }
 }
 
@@ -389,7 +660,8 @@ class _ProfileTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
@@ -406,17 +678,24 @@ class _ProfileTile extends StatelessWidget {
           fontSize: 14.5,
         ),
       ),
-      subtitle: subtitle != null 
-          ? Text(subtitle!, style: const TextStyle(fontSize: 11.5, color: Colors.grey)) 
+      subtitle: subtitle != null
+          ? Text(subtitle!,
+              style:
+                  const TextStyle(fontSize: 11.5, color: Colors.grey))
           : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (trailingText != null) 
-            Text(trailingText!, style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 13)),
+          if (trailingText != null)
+            Text(trailingText!,
+                style: TextStyle(
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13)),
           if (showTrailing) ...[
-             const SizedBox(width: 8),
-             Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey.shade400),
+            const SizedBox(width: 8),
+            Icon(Icons.arrow_forward_ios_rounded,
+                size: 14, color: Colors.grey.shade400),
           ],
         ],
       ),
