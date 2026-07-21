@@ -8,6 +8,7 @@ import '../providers/locale_provider.dart';
 import 'package:nxnapp/providers/user_provider.dart';
 import 'home_shell.dart';
 import 'login.dart';
+import '../services/uae_pass_service.dart';
 import 'onboarding/profile_setup_page.dart';
 
 class RegistrationPage extends StatefulWidget {
@@ -40,26 +41,35 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   Future<void> _continueWithUaePass() async {
     setState(() => _isLoading = true);
-    // Simulate network delay for demo
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    // Navigate to Profile Setup with PRE-FILLED demo data
-    // This satisfies "Fix the data" request
-    final demoData = {
-      'businessName': 'Al Falak Logistics',
-      'contactNumber': '+971 50 123 4567',
-      'licenseNumber': 'CN-1234567',
-    };
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProfileSetupPage(uaePassData: demoData),
-      ),
-    );
+    try {
+      final data = await UaePassService().signIn();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      if (data != null) {
+        final mappedData = <String, String>{
+          'businessName': (data['fullnameEN'] ?? data['firstnameEN'] ?? '').toString(),
+          'contactNumber': (data['mobile'] ?? '').toString(),
+          'licenseNumber': (data['licenseNumber'] ?? '').toString(),
+          'email': (data['email'] ?? '').toString(),
+          'uaePassUuid': (data['uuid'] ?? '').toString(),
+        };
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => ProfileSetupPage(uaePassData: mappedData),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('UAE Pass browser launched. Complete verification to continue.'),
+          duration: Duration(seconds: 4),
+        ));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('UAE Pass error: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 
   Future<void> _submitEmailSignUp() async {

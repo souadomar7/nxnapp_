@@ -17,6 +17,9 @@ import '../../pages/payment_page.dart';
 import '../../pages/smart_inventory_stage.dart';
 import '../../pages/admin/admin_dashboard.dart';
 import '../../pages/admin/admin_login_page.dart';
+import '../../pages/admin/damage_inspection_page.dart';
+import '../../pages/admin/vendor_approval_page.dart';
+import '../../pages/payment/nxn_cash_payment_page.dart';
 
 import '../../pages/settings/kyc_page.dart';
 import '../../pages/operations/gate_pass_page.dart';
@@ -163,6 +166,25 @@ class AppRouter {
       GoRoute(
         path: '/admin',
         builder: (_, __) => const AdminDashboard(),
+      ),
+      GoRoute(
+        path: '/admin/damage-inspection',
+        builder: (_, __) => const DamageInspectionPage(),
+      ),
+      GoRoute(
+        path: '/admin/vendor-approval',
+        builder: (_, __) => const VendorApprovalPage(),
+      ),
+      GoRoute(
+        path: '/payment/nxn-cash',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return NxnCashPaymentPage(
+            orderId: extra['orderId']?.toString() ?? 'ORD-001',
+            amount: (extra['amount'] as num?)?.toDouble() ?? 0.0,
+            description: extra['description']?.toString() ?? 'NXN Service Payment',
+          );
+        },
       ),
 
       // ── Profile setup (post UAE Pass callback) ────────────────────────────
