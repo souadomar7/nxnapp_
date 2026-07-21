@@ -71,7 +71,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // ─── HEADER ───────────────────────────────────────────────────────
           SliverAppBar(
             pinned: true,
-            expandedHeight: isGuest ? 180 : 220,
+            expandedHeight: isGuest ? 220 : 240,
             backgroundColor: AppColors.bluePrimary,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
@@ -86,7 +86,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 16),
+                        horizontal: 24, vertical: 12),
                     child: isGuest
                         ? _buildGuestHeader(context)
                         : _buildMerchantHeader(l10n),
@@ -119,28 +119,28 @@ class _ProfilePageState extends State<ProfilePage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(3),
           decoration: const BoxDecoration(
             color: Colors.white24,
             shape: BoxShape.circle,
           ),
           child: const CircleAvatar(
-            radius: 36,
+            radius: 30,
             backgroundColor: Colors.white,
             child: Icon(Icons.person_outline_rounded,
-                color: Color(0xFF1E3C72), size: 36),
+                color: Color(0xFF1E3C72), size: 30),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         const Text(
           'Guest User',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -150,9 +150,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: const BorderSide(color: Colors.white54),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Sign In',
                     style: TextStyle(fontWeight: FontWeight.bold)),
@@ -168,9 +168,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFF1E3C72),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Register',
                     style: TextStyle(fontWeight: FontWeight.bold)),
