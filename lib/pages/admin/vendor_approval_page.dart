@@ -212,9 +212,10 @@ class _VendorApprovalPageState extends State<VendorApprovalPage> {
                                 Expanded(
                                   child: OutlinedButton.icon(
                                     onPressed: () => _processVendor(vendor['id'], vendor['user_id'] ?? '', false),
-                                    icon: const Icon(Icons.close_rounded, color: Colors.red),
-                                    label: const Text('Reject', style: TextStyle(color: Colors.red)),
+                                    icon: const Icon(Icons.close_rounded, color: Colors.red, size: 18),
+                                    label: const Text('Reject', style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold)),
                                     style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                                       side: const BorderSide(color: Colors.red),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
@@ -224,9 +225,10 @@ class _VendorApprovalPageState extends State<VendorApprovalPage> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     onPressed: () => _processVendor(vendor['id'], vendor['user_id'] ?? '', true),
-                                    icon: const Icon(Icons.check_rounded, color: Colors.white),
-                                    label: const Text('Approve Vendor', style: TextStyle(color: Colors.white)),
+                                    icon: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                                    label: const Text('Approve', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                                     style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                                       backgroundColor: Colors.green.shade600,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
