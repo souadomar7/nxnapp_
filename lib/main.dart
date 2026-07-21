@@ -30,13 +30,21 @@ void main() async {
   }
 
   await dotenv.load(fileName: ".env");
-  
-  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://hvstjsygmijbvjnyiqli.supabase.co';
-  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2c3Rqc3lnbWlqYnZqbnlpcWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzODExNDMsImV4cCI6MjA4MDk1NzE0M30._9FuRhokLoqX5ndQu13CAm67Y02wBY_Lh7Zow2OVjYo';
+
+  // SECURITY: Never fall back to hardcoded credentials.
+  // If .env is missing or keys are absent the app must not launch silently.
+  final supabaseUrl = dotenv.env['SUPABASE_URL'];
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
+
+  assert(
+    supabaseUrl != null && supabaseAnonKey != null,
+    '\n\n⛔ FATAL: SUPABASE_URL or SUPABASE_ANON_KEY is missing from .env.\n'
+    'Copy .env.example to .env and fill in your Supabase project credentials.\n',
+  );
 
   await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
+    url: supabaseUrl!,
+    anonKey: supabaseAnonKey!,
   );
 
   runApp(const WarehouseApp());

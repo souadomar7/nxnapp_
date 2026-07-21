@@ -870,13 +870,17 @@ class MarketplaceService {
   
   /// Centralized Pricing Logic.
   /// Formula: (Shelves * 100 * Months) + (Workers * 50)
-  double calculateRentalPrice(int shelves, int months, bool addWorkers, int workerCount) {
+  /// Canonical PRD §3 billing function — single source of truth for all modules.
+  /// - Base rate:  100 AED × shelves × months
+  /// - Worker fee: 50 AED flat per request (binary toggle, not per-worker)
+  /// - Does NOT include platform fee or VAT — caller adds those.
+  double calculateRentalPrice(int shelves, int months, bool addWorkers, [int workerCount = 1]) {
     const double pricePerShelf = 100.0;
-    const double workerFee = 50.0;
-    
-    double base = (shelves * pricePerShelf * months);
-    double labor = addWorkers ? (workerCount * workerFee) : 0.0;
-    
+    const double workerFlatFee = 50.0; // PRD §3: flat, one-time per request
+
+    final double base = shelves * pricePerShelf * months;
+    final double labor = addWorkers ? workerFlatFee : 0.0;
+
     return base + labor;
   }
 

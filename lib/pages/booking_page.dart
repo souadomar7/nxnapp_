@@ -62,32 +62,33 @@ class BookingConfig {
   int shelves;
   int durationMonths;
   bool addWorkers;
-  int workerCount;
 
   BookingConfig({
     this.isSelected = false,
     this.shelves = 5,
     this.durationMonths = 1,
     this.addWorkers = false,
-    this.workerCount = 1,
   });
 
+  /// PRD §3 Billing Rules:
+  /// - Base rate:   100 AED × shelves × months
+  /// - Worker fee:  +50 AED flat per request (NOT per worker, NOT per month)
+  /// - Platform 5%: applied on (base + workerFee)
+  /// - VAT 5%:      applied on (base + workerFee + platformFee)
   PriceBreakdown calculateBreakdown() {
-    double baseCost = 100.0 * shelves * durationMonths;
-    if (addWorkers) {
-      baseCost += (workerCount * 500 * durationMonths);
-    }
-    final fee = baseCost * 0.05;
-    final taxable = baseCost + fee;
-    final vat = taxable * 0.05;
-    final total = taxable + vat;
+    final double baseCost = 100.0 * shelves * durationMonths;
+    const double workerFlatFee = 50.0; // PRD §3: flat fee, not per-worker
+    final double workerFee = addWorkers ? workerFlatFee : 0.0;
+    final double subtotal = baseCost + workerFee;
+    final double platformFee = subtotal * 0.05;
+    final double vat = (subtotal + platformFee) * 0.05;
+    final double total = subtotal + platformFee + vat;
 
     return PriceBreakdown(
-        subtotal: baseCost,
-        platformFee: fee,
+        subtotal: subtotal,
+        platformFee: platformFee,
         vat: vat,
-        total: total
-    );
+        total: total);
   }
 }
 
@@ -534,24 +535,27 @@ class _WorkersControl extends StatelessWidget {
           ),
           if (config.addWorkers) ...[
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Workers:", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade300)),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _RoundBtn(icon: Icons.remove, onTap: () { if(config.workerCount > 1) { config.workerCount--; onUpdate(); } }),
-                      SizedBox(width: 24, child: Text('${config.workerCount}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                      _RoundBtn(icon: Icons.add, onTap: () { if(config.workerCount < 10) { config.workerCount++; onUpdate(); } }),
-                    ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline_rounded,
+                      size: 14, color: Colors.orange.shade700),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Warehouse preparation included  +AED 50',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange.shade800,
+                        fontWeight: FontWeight.w600),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ],
@@ -560,22 +564,7 @@ class _WorkersControl extends StatelessWidget {
   }
 }
 
-class _RoundBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _RoundBtn({required this.icon, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(2), // Smaller btn padding
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.grey.shade300)),
-        child: Icon(icon, size: 14),
-      ),
-    );
-  }
-}
+
 
 class _EmptyState extends StatelessWidget {
   final AppLocalizations l10n;

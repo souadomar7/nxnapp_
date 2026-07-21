@@ -19,13 +19,15 @@ class SessionProvider extends InheritedWidget {
   static UserSession of(BuildContext context) {
     final provider =
         context.dependOnInheritedWidgetOfExactType<SessionProvider>();
-    return provider?.session ?? const UserSession(role: UserRole.guest);
+    return provider?.session ?? UserSession.guest;
   }
 
   @override
   bool updateShouldNotify(SessionProvider oldWidget) =>
       session.role != oldWidget.session.role ||
-      session.userId != oldWidget.session.userId;
+      session.userId != oldWidget.session.userId ||
+      session.vendorStatus != oldWidget.session.vendorStatus ||
+      session.isUaePassVerified != oldWidget.session.isUaePassVerified;
 }
 
 /// Wraps [child] and checks that the current session role belongs to

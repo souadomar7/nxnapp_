@@ -9,8 +9,8 @@ import 'package:nxnapp/providers/user_provider.dart';
 import '../theme.dart';
 import '../services/uae_pass_service.dart';
 import 'onboarding/profile_setup_page.dart';
-import 'admin/admin_login_page.dart'; // secret admin portal
 import 'registration_page.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -90,13 +90,6 @@ class _LoginPageState extends State<LoginPage> {
             icon: const Icon(Icons.language, color: AppColors.bluePrimary),
             onPressed: () {
               Provider.of<LocaleProvider>(context, listen: false).toggleLocale();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.admin_panel_settings, color: Colors.grey),
-            tooltip: 'Secret Admin Portal',
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminLoginPage()));
             },
           ),
         ],
