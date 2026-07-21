@@ -29,7 +29,6 @@ class IsarDatabase {
       ],
       directory: dir.path,
       name: 'antigravity_local_db',
-      encryptionKey: encryptionKey,
     );
 
     _instance = IsarDatabase._(isarInstance);
