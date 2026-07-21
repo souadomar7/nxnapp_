@@ -18,6 +18,8 @@ import 'marketplace/seller_hub.dart';
 import '../services/marketplace_service.dart';
 import 'login.dart';
 import 'registration_page.dart';
+import 'admin/admin_login_page.dart';
+import 'demo_menu_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -333,6 +335,34 @@ class _ProfilePageState extends State<ProfilePage> {
 
       const SizedBox(height: 24),
 
+      // Admin & System
+      _SectionHeader(title: 'Admin & System'),
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.admin_panel_settings_outlined,
+          title: 'Admin Staff Portal',
+          subtitle: 'PIN: 8818 — WMS & Approvals',
+          iconColor: Colors.orange.shade700,
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const AdminLoginPage())),
+        ),
+        _Divider(),
+        _ProfileTile(
+          icon: Icons.developer_mode_rounded,
+          title: 'All Features Demo Menu',
+          subtitle: 'Quick access to all app pages',
+          iconColor: AppColors.bluePrimary,
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const DemoMenuPage())),
+        ),
+      ]),
+
+      const SizedBox(height: 24),
+
       // Sign out / back
       _MenuCard(children: [
         _ProfileTile(
@@ -497,6 +527,33 @@ class _ProfilePageState extends State<ProfilePage> {
                 : 'العربية',
             onTap: () => provider.toggleLocale(),
           ),
+        ),
+      ]),
+
+      const SizedBox(height: 24),
+
+      _SectionHeader(title: 'Admin & System'),
+      _MenuCard(children: [
+        _ProfileTile(
+          icon: Icons.admin_panel_settings_outlined,
+          title: 'Admin Staff Portal',
+          subtitle: 'PIN: 8818 — WMS & Approvals',
+          iconColor: Colors.orange.shade700,
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const AdminLoginPage())),
+        ),
+        _Divider(),
+        _ProfileTile(
+          icon: Icons.developer_mode_rounded,
+          title: 'All Features Demo Menu',
+          subtitle: 'Quick access to all app pages',
+          iconColor: AppColors.bluePrimary,
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const DemoMenuPage())),
         ),
       ]),
 
