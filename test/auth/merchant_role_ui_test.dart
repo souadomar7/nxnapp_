@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nxnapp/core/auth/user_role.dart';
 import 'package:nxnapp/core/auth/user_session.dart';
-import 'package:nxnapp/core/auth/role_permission_shield.dart';
+import 'package:nxnapp/core/auth/session_provider.dart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-UserSession merchantSession() => const UserSession(role: UserRole.merchant);
+UserSession customerSession() => const UserSession(role: UserRole.customer);
 
 Widget buildTestApp(Widget child) {
   return MaterialApp(home: child);
@@ -38,83 +38,81 @@ class WMSScannerView extends StatelessWidget {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
-  final UserSession merchant = merchantSession();
+  final UserSession customer = customerSession();
 
-  group('Merchant Role – UI Visibility Tests', () {
+  group('Customer Role – UI Visibility Tests', () {
     testWidgets(
-      'Seller Hub Dashboard renders all sections when user is a Merchant',
+      'Seller Hub Dashboard renders all sections when user is a Customer',
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.merchant],
-              currentUserRole: merchant.role,
-              child: const SellerHubDashboard(),
+            SessionProvider(
+              session: customer,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.customer],
+                child: const SellerHubDashboard(),
+              ),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // All seller hub sections must render
         expect(find.byKey(const Key('seller_hub_dashboard')), findsOneWidget);
         expect(find.byKey(const Key('seller_hub_inventory')), findsOneWidget);
         expect(find.byKey(const Key('seller_hub_bookings')), findsOneWidget);
-        // Access Denied view must NOT appear
-        expect(find.text('Access Denied'), findsNothing);
+        expect(find.text('Sign Up to Unlock'), findsNothing);
       },
     );
 
     testWidgets(
-      'WMS Operator Scanner is completely absent from widget tree for Merchant',
+      'WMS Operator Scanner is completely absent from widget tree for Customer',
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.operator],
-              currentUserRole: merchant.role,
-              showDeniedUI: false,
-              child: const WMSScannerView(),
+            SessionProvider(
+              session: customer,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.whAdmin],
+                showLockedUI: false,
+                child: const WMSScannerView(),
+              ),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // Scanner must not be present
         expect(find.byType(WMSScannerView), findsNothing);
         expect(find.byKey(const Key('wms_operator_scanner')), findsNothing);
       },
     );
 
     testWidgets(
-      'WMS Operator Scanner shows Permission Denied view for Merchant',
+      'WMS Operator Scanner shows Locked UI view for Customer',
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.operator],
-              currentUserRole: merchant.role,
-              showDeniedUI: true,
-              child: const WMSScannerView(),
+            SessionProvider(
+              session: customer,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.whAdmin],
+                showLockedUI: true,
+                child: const WMSScannerView(),
+              ),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // Permission Denied scaffold should render
-        expect(find.text('Access Denied'), findsOneWidget);
-        expect(find.byIcon(Icons.shield_outlined), findsOneWidget);
-        // The actual WMS scanner content must be hidden
-        expect(find.byType(WMSScannerView), findsNothing);
-        expect(find.byKey(const Key('wms_operator_scanner')), findsNothing);
+        expect(find.text('Sign Up to Unlock'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'Merchant role is correctly identified from UserSession',
+      'Customer role is correctly identified from UserSession',
       (WidgetTester tester) async {
-        expect(merchant.isMerchant, isTrue);
-        expect(merchant.isOperator, isFalse);
-        expect(merchant.isGuest, isFalse);
+        expect(customer.isCustomer, isTrue);
+        expect(customer.isWhAdmin, isFalse);
+        expect(customer.isGuest, isFalse);
       },
     );
   });

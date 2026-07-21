@@ -12,8 +12,8 @@ class MockHttpClient extends Mock implements http.Client {}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-UserSession guestSession() => const UserSession(role: UserRole.guest);
-UserSession merchantSession() => const UserSession(role: UserRole.merchant);
+UserSession guestSession() => UserSession.guest;
+UserSession customerSession() => const UserSession(role: UserRole.customer);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -39,13 +39,11 @@ void main() {
           session: guestSession(),
         );
 
-        // Act & Assert: must throw locally without any network call
         expect(
           () async => await chatSource.getAiReply('ما هي تكاليف التخزين؟'),
           throwsA(isA<UnauthorizedRoleException>()),
         );
 
-        // Verify that no HTTP request was ever issued
         verifyNever(
           () => mockHttpClient.post(
             any(),
@@ -75,9 +73,8 @@ void main() {
     );
 
     test(
-      'Merchant calling getAiReply does NOT throw UnauthorizedRoleException and proceeds to HTTP call',
+      'Customer calling getAiReply does NOT throw UnauthorizedRoleException and proceeds to HTTP call',
       () async {
-        // Stub the HTTP client to return a valid response
         when(
           () => mockHttpClient.post(
             any(),
@@ -91,13 +88,11 @@ void main() {
         final chatSource = ChatGatewaySource(
           httpClient: mockHttpClient,
           gatewayUrl: testGatewayUrl,
-          session: merchantSession(),
+          session: customerSession(),
         );
 
-        // Act
         final reply = await chatSource.getAiReply('ما هي ساعات العمل؟');
 
-        // Assert
         expect(reply, equals('المخزن مفتوح 24 ساعة'));
         verify(
           () => mockHttpClient.post(
@@ -110,7 +105,7 @@ void main() {
     );
 
     test(
-      'ChatGatewaySource throws ClientException on non-200 HTTP response for Merchant',
+      'ChatGatewaySource throws ClientException on non-200 HTTP response for Customer',
       () async {
         when(
           () => mockHttpClient.post(
@@ -125,7 +120,7 @@ void main() {
         final chatSource = ChatGatewaySource(
           httpClient: mockHttpClient,
           gatewayUrl: testGatewayUrl,
-          session: merchantSession(),
+          session: customerSession(),
         );
 
         expect(

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:nxnapp/core/auth/user_role.dart';
 import 'package:nxnapp/core/auth/user_session.dart';
-import 'package:nxnapp/core/auth/role_permission_shield.dart';
+import 'package:nxnapp/core/auth/session_provider.dart';
 
 // ─── Mock stubs ───────────────────────────────────────────────────────────────
 
@@ -11,14 +11,15 @@ class FakeUserSession extends Fake implements UserSession {}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-UserSession guestSession() => const UserSession(role: UserRole.guest);
+UserSession guestSession() => UserSession.guest;
 
-/// Wraps a widget with Material so RolePermissionShield can render Scaffolds.
+/// Wraps a widget with Material so RoleViewGuard can render.
 Widget buildTestApp(Widget child) {
   return MaterialApp(home: child);
 }
 
-/// Stub widgets that represent real guarded components.
+// ─── Stub widgets ─────────────────────────────────────────────────────────────
+
 class BarcodeWidget extends StatelessWidget {
   const BarcodeWidget({super.key});
   @override
@@ -55,17 +56,18 @@ void main() {
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.merchant, UserRole.operator],
-              currentUserRole: guest.role,
-              showDeniedUI: false, // collapse entirely for guest
-              child: const BarcodeWidget(),
+            SessionProvider(
+              session: guest,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.customer, UserRole.whAdmin],
+                showLockedUI: false, // collapse entirely for guest
+                child: const BarcodeWidget(),
+              ),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // The scanner should NOT appear in the widget tree
         expect(find.byType(BarcodeWidget), findsNothing);
         expect(find.byKey(const Key('barcode_scanner')), findsNothing);
       },
@@ -76,11 +78,13 @@ void main() {
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.merchant],
-              currentUserRole: guest.role,
-              showDeniedUI: false,
-              child: const StripePaymentSheet(),
+            SessionProvider(
+              session: guest,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.customer],
+                showLockedUI: false,
+                child: const StripePaymentSheet(),
+              ),
             ),
           ),
         );
@@ -96,11 +100,13 @@ void main() {
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.merchant, UserRole.operator],
-              currentUserRole: guest.role,
-              showDeniedUI: false,
-              child: const AICopilotChat(),
+            SessionProvider(
+              session: guest,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.customer, UserRole.vendor],
+                showLockedUI: false,
+                child: const AICopilotChat(),
+              ),
             ),
           ),
         );
@@ -112,47 +118,47 @@ void main() {
     );
 
     testWidgets(
-      'Shield shows a SizedBox.shrink (empty) widget when showDeniedUI is false',
+      'Shield shows a SizedBox.shrink (empty) widget when showLockedUI is false',
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.merchant],
-              currentUserRole: guest.role,
-              showDeniedUI: false,
-              child: const BarcodeWidget(),
+            SessionProvider(
+              session: guest,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.customer],
+                showLockedUI: false,
+                child: const BarcodeWidget(),
+              ),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // The entire protected block collapses
         expect(find.byType(SizedBox), findsWidgets);
         expect(find.byType(BarcodeWidget), findsNothing);
       },
     );
 
     testWidgets(
-      'Shield renders Access Denied view when showDeniedUI is true for Guests',
+      'Shield renders locked placeholder when showLockedUI is true for Guests',
       (WidgetTester tester) async {
         await tester.pumpWidget(
           buildTestApp(
-            RolePermissionShield(
-              allowedRoles: const [UserRole.merchant],
-              currentUserRole: guest.role,
-              showDeniedUI: true,
-              child: const BarcodeWidget(),
+            SessionProvider(
+              session: guest,
+              child: RoleViewGuard(
+                allowedRoles: const [UserRole.customer],
+                showLockedUI: true,
+                child: const BarcodeWidget(),
+              ),
             ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // The Access Denied scaffold should appear
-        expect(find.text('Access Denied'), findsOneWidget);
-        expect(find.byIcon(Icons.shield_outlined), findsOneWidget);
-        expect(find.text('Go Back'), findsOneWidget);
-        // The protected child must NOT be visible
-        expect(find.byType(BarcodeWidget), findsNothing);
+        expect(find.text('Sign Up to Unlock'), findsOneWidget);
+        expect(find.text('Sign Up Free'), findsOneWidget);
+        expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
       },
     );
   });
