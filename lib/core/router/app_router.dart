@@ -15,15 +15,16 @@ import '../../pages/booking_page.dart';
 import '../../pages/request_delivery_page.dart';
 import '../../pages/payment_page.dart';
 import '../../pages/smart_inventory_stage.dart';
-import '../../pages/admin/admin_dashboard.dart';
-import '../../pages/admin/admin_login_page.dart';
-import '../../pages/admin/damage_inspection_page.dart';
-import '../../pages/admin/vendor_approval_page.dart';
-import '../../pages/payment/nxn_cash_payment_page.dart';
 
 import '../../pages/settings/kyc_page.dart';
 import '../../pages/operations/gate_pass_page.dart';
 import '../../pages/operations/tracking_page.dart';
+
+import '../../pages/copilot_page.dart';
+import '../../pages/marketplace/seller_hub.dart';
+import '../../pages/profile/wallet_page.dart';
+import '../../pages/search_page.dart';
+import '../../pages/qr_scanner_page.dart';
 
 /// Central route registry and RBAC redirect engine.
 ///
@@ -34,8 +35,6 @@ import '../../pages/operations/tracking_page.dart';
 /// │ guest         │ /shell, /book, /delivery → /login                │
 /// │ customer      │ /login, /register, /onboarding → /shell          │
 /// │ vendor        │ /login, /register, /onboarding → /shell          │
-/// │ whAdmin       │ /login, /register, /onboarding → /admin          │
-/// │ superAdmin    │ /login, /register, /onboarding → /admin          │
 /// └───────────────┴──────────────────────────────────────────────────┘
 class AppRouter {
   AppRouter._();
@@ -47,9 +46,6 @@ class AppRouter {
       UserSession.fromSupabaseUser(
           Supabase.instance.client.auth.currentUser);
 
-  /// Routes restricted to warehouse admin and super admin only.
-  static const _adminRoutes = {'/admin', '/admin/login'};
-
   /// Routes requiring at minimum a verified customer session.
   static const _authenticatedRoutes = {
     '/shell',
@@ -60,6 +56,10 @@ class AppRouter {
     '/tracking',
     '/kyc',
     '/payments',
+    '/copilot',
+    '/seller-hub',
+    '/wallet',
+    '/qr-scanner',
   };
 
   static final GoRouter router = GoRouter(
@@ -77,23 +77,18 @@ class AppRouter {
         return '/login';
       }
 
-      // 2. Guest or customer attempting admin routes → denied
-      if (_adminRoutes.contains(location) && !session.canAccessWms) {
-        return session.isGuest ? '/login' : '/shell';
-      }
-
-      // 3. Authenticated users don't need to see login/register again
+      // 2. Authenticated users don't need to see login/register again
       if ((location == '/login' || location == '/register') &&
           session.isAuthenticated) {
-        return session.canAccessWms ? '/admin' : '/shell';
+        return '/shell';
       }
 
-      // 4. Customer trying to book without UAE Pass → KYC gate
+      // 3. Customer trying to book without UAE Pass → KYC gate
       if (location == '/book' && !session.canRentShelves) {
         return '/kyc';
       }
 
-      // 5. Vendor portal without approved status → KYC/pending page
+      // 4. Vendor portal without approved status → KYC/pending page
       if (location == '/vendor-portal' && !session.canListProducts) {
         return '/kyc';
       }
@@ -157,34 +152,25 @@ class AppRouter {
         path: '/kyc',
         builder: (_, __) => const KYCPage(),
       ),
-
-      // ── Warehouse Admin (whAdmin + superAdmin) ────────────────────────────
       GoRoute(
-        path: '/admin/login',
-        builder: (_, __) => const AdminLoginPage(),
+        path: '/copilot',
+        builder: (_, __) => const CopilotPage(),
       ),
       GoRoute(
-        path: '/admin',
-        builder: (_, __) => const AdminDashboard(),
+        path: '/seller-hub',
+        builder: (_, __) => const SellerHub(),
       ),
       GoRoute(
-        path: '/admin/damage-inspection',
-        builder: (_, __) => const DamageInspectionPage(),
+        path: '/wallet',
+        builder: (_, __) => const WalletPage(),
       ),
       GoRoute(
-        path: '/admin/vendor-approval',
-        builder: (_, __) => const VendorApprovalPage(),
+        path: '/qr-scanner',
+        builder: (_, __) => const QrScannerPage(),
       ),
       GoRoute(
         path: '/payment/nxn-cash',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
-          return NxnCashPaymentPage(
-            orderId: extra['orderId']?.toString() ?? 'ORD-001',
-            amount: (extra['amount'] as num?)?.toDouble() ?? 0.0,
-            description: extra['description']?.toString() ?? 'NXN Service Payment',
-          );
-        },
+        builder: (_, __) => const PaymentsPage(),
       ),
 
       // ── Profile setup (post UAE Pass callback) ────────────────────────────

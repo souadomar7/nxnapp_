@@ -5,28 +5,10 @@ import '../models/invoice.dart';
 import '../services/marketplace_service.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/brand_logo.dart';
+import '../theme.dart';
 
 // ==============================================================================
-// 1. THEME & CONSTANTS (Compact)
-// ==============================================================================
-
-class BookingTheme {
-  static const Color primary = Color(0xFF1A47B8);
-  static const Color primaryDark = Color(0xFF102A70);
-  static const Color accent = Color(0xFFF4B400);
-  static const Color background = Color(0xFFF5F6FA);
-  static const Color textDark = Color(0xFF2D3436);
-  static const Color textGrey = Color(0xFFA4B0BE);
-  static const Color cardShadow = Color(0x0D000000);
-
-  // Reduced font size for tighter UI
-  static TextStyle get titleStyle => const TextStyle(
-      fontSize: 14, fontWeight: FontWeight.bold, color: primary, letterSpacing: 0.5
-  );
-}
-
-// ==============================================================================
-// 2. DATA MODELS & LOGIC
+// 1. DATA MODELS & LOGIC (unchanged)
 // ==============================================================================
 
 class PrimeWarehouse {
@@ -62,38 +44,35 @@ class BookingConfig {
   int shelves;
   int durationMonths;
   bool addWorkers;
+  int workerCount;
+  String storageType; // 'ambient', 'chilled', 'cold_storage'
 
   BookingConfig({
     this.isSelected = false,
     this.shelves = 5,
     this.durationMonths = 1,
     this.addWorkers = false,
+    this.workerCount = 1,
+    this.storageType = 'ambient',
   });
 
-  /// PRD §3 Billing Rules:
-  /// - Base rate:   100 AED × shelves × months
-  /// - Worker fee:  +50 AED flat per request (NOT per worker, NOT per month)
-  /// - Platform 5%: applied on (base + workerFee)
-  /// - VAT 5%:      applied on (base + workerFee + platformFee)
   PriceBreakdown calculateBreakdown() {
-    final double baseCost = 100.0 * shelves * durationMonths;
-    const double workerFlatFee = 50.0; // PRD §3: flat fee, not per-worker
-    final double workerFee = addWorkers ? workerFlatFee : 0.0;
+    final double multiplier = storageType == 'cold_storage' ? 1.5 : (storageType == 'chilled' ? 1.3 : 1.0);
+    final double baseCost = 100.0 * shelves * durationMonths * multiplier;
+    const double workerRate = 50.0;
+    final double workerFee = addWorkers ? (workerRate * workerCount) : 0.0;
     final double subtotal = baseCost + workerFee;
     final double platformFee = subtotal * 0.05;
     final double vat = (subtotal + platformFee) * 0.05;
     final double total = subtotal + platformFee + vat;
 
     return PriceBreakdown(
-        subtotal: subtotal,
-        platformFee: platformFee,
-        vat: vat,
-        total: total);
+        subtotal: subtotal, platformFee: platformFee, vat: vat, total: total);
   }
 }
 
 // ==============================================================================
-// 3. MAIN PAGE
+// 2. MAIN PAGE
 // ==============================================================================
 
 class BookingPage extends StatefulWidget {
@@ -105,16 +84,33 @@ class BookingPage extends StatefulWidget {
 
 class _BookingPageState extends State<BookingPage> {
   final List<PrimeWarehouse> _warehouses = [
-    const PrimeWarehouse(id: 'dxb', nameEn: 'Dubai', nameAr: 'دبي', icon: Icons.business),
-    const PrimeWarehouse(id: 'auh', nameEn: 'Abu Dhabi', nameAr: 'أبو ظبي', icon: Icons.location_city),
-    const PrimeWarehouse(id: 'shj', nameEn: 'Sharjah', nameAr: 'الشارقة', icon: Icons.mosque),
-    const PrimeWarehouse(id: 'aln', nameEn: 'Al Ain', nameAr: 'العين', icon: Icons.landscape),
+    const PrimeWarehouse(
+        id: 'dxb',
+        nameEn: 'Dubai',
+        nameAr: 'دبي',
+        icon: Icons.business_outlined),
+    const PrimeWarehouse(
+        id: 'auh',
+        nameEn: 'Abu Dhabi',
+        nameAr: 'أبو ظبي',
+        icon: Icons.location_city_outlined),
+    const PrimeWarehouse(
+        id: 'shj',
+        nameEn: 'Sharjah',
+        nameAr: 'الشارقة',
+        icon: Icons.mosque_outlined),
+    const PrimeWarehouse(
+        id: 'aln',
+        nameEn: 'Al Ain',
+        nameAr: 'العين',
+        icon: Icons.landscape_outlined),
   ];
 
   final Map<String, BookingConfig> _configs = {};
 
-  double get _grandTotal => _configs.values.where((c) => c.isSelected)
-      .fold(0, (sum, c) => sum + c.calculateBreakdown().total);
+  double get _grandTotal => _configs.values
+      .where((c) => c.isSelected)
+      .fold<double>(0.0, (sum, c) => sum + c.calculateBreakdown().total);
 
   int get _selectedCount => _configs.values.where((c) => c.isSelected).length;
 
@@ -130,31 +126,25 @@ class _BookingPageState extends State<BookingPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
-    final currencyFormat = NumberFormat.currency(symbol: 'AED ', decimalDigits: 0);
-    // Reduced bottom padding
-    final bottomPadding = _selectedCount > 0 ? 90.0 : 16.0;
+    final currencyFormat =
+        NumberFormat.currency(symbol: 'AED ', decimalDigits: 0);
+    final bottomPadding = _selectedCount > 0 ? 100.0 : 24.0;
 
     return Scaffold(
-      backgroundColor: BookingTheme.background,
+      backgroundColor: AppColors.bg,
       body: Stack(
         children: [
           CustomScrollView(
             slivers: [
               _BookingHeader(l10n: l10n, isAr: isAr),
               SliverToBoxAdapter(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: BookingTheme.background,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)), // Slightly sharper
-                  ),
-                  transform: Matrix4.translationValues(0, -10, 0), // Adjusted overlap
-                  padding: EdgeInsets.fromLTRB(16, 20, 16, bottomPadding), // Increased top padding
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _SectionTitle(title: l10n.step1Title),
-                      const SizedBox(height: 8),
-
+                      const SizedBox(height: 0),
                       _WarehouseGrid(
                         warehouses: _warehouses,
                         configs: _configs,
@@ -163,20 +153,32 @@ class _BookingPageState extends State<BookingPage> {
                           _configs[id]!.isSelected = !_configs[id]!.isSelected;
                         }),
                       ),
-
-                      const SizedBox(height: 16),
-
+                      const SizedBox(height: 12),
                       if (_selectedCount > 0) ...[
                         _SectionTitle(title: l10n.step2CustomizeSpace),
                         const SizedBox(height: 8),
-                        ..._warehouses.where((w) => _configs[w.id]!.isSelected).map(
-                              (w) => _RentalConfigCard(
-                            warehouse: w,
-                            config: _configs[w.id]!,
-                            isAr: isAr,
-                            onUpdate: () => setState(() {}),
-                            onRemove: () => setState(() => _configs[w.id]!.isSelected = false),
-                          ),
+                        StreamBuilder<Map<String, int>>(
+                          stream:
+                              MarketplaceService().getAvailableShelvesStream(),
+                          builder: (context, snapshot) {
+                            final availableMap = snapshot.data ?? {};
+                            return Column(
+                              children: _warehouses
+                                  .where((w) => _configs[w.id]!.isSelected)
+                                  .map((w) {
+                                final int available = availableMap[w.id] ?? 50;
+                                return _RentalConfigCard(
+                                  warehouse: w,
+                                  config: _configs[w.id]!,
+                                  isAr: isAr,
+                                  availableShelves: available,
+                                  onUpdate: () => setState(() {}),
+                                  onRemove: () => setState(
+                                      () => _configs[w.id]!.isSelected = false),
+                                );
+                              }).toList(),
+                            );
+                          },
                         ),
                       ] else
                         _EmptyState(l10n: l10n),
@@ -186,10 +188,11 @@ class _BookingPageState extends State<BookingPage> {
               ),
             ],
           ),
-
           if (_selectedCount > 0)
             Positioned(
-              bottom: 0, left: 0, right: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
               child: _BottomQuoteBar(
                 l10n: l10n,
                 grandTotal: _grandTotal,
@@ -206,7 +209,8 @@ class _BookingPageState extends State<BookingPage> {
     showDialog(
       context: context,
       builder: (ctx) => _QuoteDialog(
-        warehouses: _warehouses.where((w) => _configs[w.id]!.isSelected).toList(),
+        warehouses:
+            _warehouses.where((w) => _configs[w.id]!.isSelected).toList(),
         configs: _configs,
         currencyFormat: fmt,
         isAr: isAr,
@@ -217,7 +221,7 @@ class _BookingPageState extends State<BookingPage> {
 }
 
 // ==============================================================================
-// 4. SUB-WIDGETS (UI COMPONENTS - COMPACT)
+// 3. SUB-WIDGETS
 // ==============================================================================
 
 class _BookingHeader extends StatelessWidget {
@@ -229,41 +233,82 @@ class _BookingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SliverAppBar(
-      expandedHeight: 120, // Further Reduced from 140
+      expandedHeight: 155,
       pinned: true,
-      backgroundColor: BookingTheme.primary,
+      backgroundColor: AppColors.bluePrimary,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_rounded,
+            color: Colors.white, size: 20),
+        onPressed: () => Navigator.pop(context),
+      ),
       flexibleSpace: FlexibleSpaceBar(
-        background: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Tighter padding
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Center(child: BrandLogo(height: 28, isLight: true)), // Smaller Logo
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(l10n.welcomeUser("Suad"), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), // Smaller font
-                        const SizedBox(width: 8),
-                        const Text("👋", style: TextStyle(fontSize: 20)),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    SizedBox(
-                      width: double.infinity,
-                      child: Text(
-                        isAr ? "اعثر على مخزن للإيجار اليوم" : "Find a warehouse to rent today",
-                        style: const TextStyle(color: Colors.white70, fontSize: 12), // Smaller font
+        background: Container(
+          color: AppColors.bluePrimary,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const BrandLogo(height: 28, isLight: true),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warehouse_outlined,
+                                color: Colors.white, size: 13),
+                            const SizedBox(width: 5),
+                            Text(
+                              isAr ? 'حجز المساحة' : 'Book Space',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isAr ? 'اختر مستودعك' : 'Choose Your Warehouse',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isAr
+                            ? 'اعثر على مخزن للإيجار اليوم'
+                            : 'Find a warehouse to rent today',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -272,16 +317,39 @@ class _BookingHeader extends StatelessWidget {
   }
 }
 
+// ── Section Title ──────────────────────────────────────────────────────────────
 class _SectionTitle extends StatelessWidget {
   final String title;
   const _SectionTitle({required this.title});
 
   @override
   Widget build(BuildContext context) {
-    return Text(title, style: BookingTheme.titleStyle);
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.bluePrimary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
   }
 }
 
+// ── Warehouse Grid ─────────────────────────────────────────────────────────────
 class _WarehouseGrid extends StatelessWidget {
   final List<PrimeWarehouse> warehouses;
   final Map<String, BookingConfig> configs;
@@ -303,76 +371,83 @@ class _WarehouseGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      childAspectRatio: 2.2, // Taller boxes for better icon support
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
+      childAspectRatio: 3.2,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
       children: warehouses.map((w) {
         final isSelected = configs[w.id]!.isSelected;
-        return _GridItem(w: w, isSelected: isSelected, isAr: isAr, onTap: () => onToggle(w.id));
+        return _GridItem(
+            w: w,
+            isSelected: isSelected,
+            isAr: isAr,
+            onTap: () => onToggle(w.id));
       }).toList(),
     );
   }
 }
 
+// ── Grid Item ─────────────────────────────────────────────────────────────────
 class _GridItem extends StatelessWidget {
   final PrimeWarehouse w;
   final bool isSelected;
   final bool isAr;
   final VoidCallback onTap;
 
-  const _GridItem({required this.w, required this.isSelected, required this.isAr, required this.onTap});
+  const _GridItem(
+      {required this.w,
+      required this.isSelected,
+      required this.isAr,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected ? BookingTheme.primary : Colors.white,
+      color: isSelected ? AppColors.bluePrimary : Colors.white,
       borderRadius: BorderRadius.circular(14),
-      elevation: isSelected ? 3 : 1,
-      shadowColor: BookingTheme.cardShadow,
+      elevation: 0,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
+        splashColor: AppColors.blueGlow,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected ? BookingTheme.primary : Colors.grey.shade200,
+              color: isSelected ? AppColors.bluePrimary : AppColors.border,
               width: 1.5,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.white.withValues(alpha: 0.2) : BookingTheme.primary.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.18)
+                      : AppColors.blueGlow,
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
                   w.icon,
-                  color: isSelected ? Colors.white : BookingTheme.primary,
-                  size: 18,
+                  color: isSelected ? Colors.white : AppColors.bluePrimary,
+                  size: 17,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   isAr ? w.nameAr : w.nameEn,
                   style: TextStyle(
-                    color: isSelected ? Colors.white : BookingTheme.textDark,
-                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
                 ),
               ),
               if (isSelected)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                const Icon(Icons.check_circle_rounded,
+                    color: Colors.white, size: 16),
             ],
           ),
         ),
@@ -381,10 +456,12 @@ class _GridItem extends StatelessWidget {
   }
 }
 
+// ── Rental Config Card ─────────────────────────────────────────────────────────
 class _RentalConfigCard extends StatelessWidget {
   final PrimeWarehouse warehouse;
   final BookingConfig config;
   final bool isAr;
+  final int availableShelves;
   final VoidCallback onUpdate;
   final VoidCallback onRemove;
 
@@ -392,69 +469,162 @@ class _RentalConfigCard extends StatelessWidget {
     required this.warehouse,
     required this.config,
     required this.isAr,
+    required this.availableShelves,
     required this.onUpdate,
     required this.onRemove,
   });
 
   @override
   Widget build(BuildContext context) {
+    final int maxShelves = availableShelves.clamp(1, 100);
+    if (config.shelves > maxShelves) {
+      config.shelves = maxShelves;
+    }
+    final breakdown = config.calculateBreakdown();
+    final fmt = NumberFormat.currency(symbol: 'AED ', decimalDigits: 0);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8), // Reduced margin
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: BookingTheme.cardShadow, blurRadius: 6, offset: Offset(0, 2))],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF003C8E).withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          // Header
+          // ── Card Header ──────────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Tighter padding
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: BookingTheme.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              color: AppColors.blueGlow,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
               children: [
-                Icon(warehouse.icon, color: BookingTheme.primary, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  isAr ? warehouse.nameAr : warehouse.nameEn,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: BookingTheme.primaryDark),
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppColors.bluePrimary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(warehouse.icon,
+                      color: AppColors.bluePrimary, size: 16),
                 ),
-                const Spacer(),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                  onPressed: onRemove,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isAr ? warehouse.nameAr : warehouse.nameEn,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        isAr
+                            ? 'الرفوف المتاحة: $availableShelves'
+                            : 'Available shelves: $availableShelves',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                // Live price chip
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.bluePrimary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    fmt.format(breakdown.total),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: onRemove,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: const Icon(Icons.close_rounded,
+                        size: 14, color: AppColors.textSecondary),
+                  ),
                 ),
               ],
             ),
           ),
-          // Sliders & Toggles
+
+          // ── Storage Class & Sliders ────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.all(12), // Reduced padding
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
               children: [
+                _StorageCategorySelector(
+                  selectedType: config.storageType,
+                  onSelected: (type) {
+                    config.storageType = type;
+                    onUpdate();
+                  },
+                ),
+                const SizedBox(height: 10),
                 _SliderRow(
                   label: AppLocalizations.of(context)!.shelvesLabelSimple,
                   value: '${config.shelves}',
-                  min: 1, max: 50,
+                  min: 1,
+                  max: maxShelves.toDouble(),
                   current: config.shelves.toDouble(),
-                  activeColor: BookingTheme.primary,
-                  onChanged: (v) { config.shelves = v.toInt(); onUpdate(); },
+                  activeColor: AppColors.bluePrimary,
+                  onChanged: (v) {
+                    config.shelves = v.toInt();
+                    onUpdate();
+                  },
                 ),
-                const SizedBox(height: 8), // Reduced gap
+                const SizedBox(height: 8),
                 _SliderRow(
                   label: AppLocalizations.of(context)!.monthsLabel,
                   value: '${config.durationMonths}',
-                  min: 1, max: 12,
+                  min: 1,
+                  max: 12,
                   current: config.durationMonths.toDouble(),
-                  activeColor: BookingTheme.accent,
-                  onChanged: (v) { config.durationMonths = v.toInt(); onUpdate(); },
+                  activeColor: AppColors.blueMid,
+                  onChanged: (v) {
+                    config.durationMonths = v.toInt();
+                    onUpdate();
+                  },
                 ),
-                const Divider(height: 16), // Thinner divider
+                const SizedBox(height: 10),
+                _OversizedCargoGuardCard(
+                  shelvesCount: config.shelves,
+                  onAutoAdjustShelves: (minShelves) {
+                    config.shelves = minShelves;
+                    onUpdate();
+                  },
+                ),
+                const SizedBox(height: 10),
+                Divider(color: AppColors.border, height: 1),
+                const SizedBox(height: 10),
                 _WorkersControl(config: config, onUpdate: onUpdate),
               ],
             ),
@@ -465,13 +635,209 @@ class _RentalConfigCard extends StatelessWidget {
   }
 }
 
+class _OversizedCargoGuardCard extends StatefulWidget {
+  final int shelvesCount;
+  final ValueChanged<int> onAutoAdjustShelves;
+
+  const _OversizedCargoGuardCard({
+    required this.shelvesCount,
+    required this.onAutoAdjustShelves,
+  });
+
+  @override
+  State<_OversizedCargoGuardCard> createState() => _OversizedCargoGuardCardState();
+}
+
+class _OversizedCargoGuardCardState extends State<_OversizedCargoGuardCard> {
+  final TextEditingController _weightController = TextEditingController(text: '20');
+  final TextEditingController _volumeController = TextEditingController(text: '0.3');
+
+  int get _minShelvesRequired {
+    final weight = double.tryParse(_weightController.text) ?? 20.0;
+    final volume = double.tryParse(_volumeController.text) ?? 0.3;
+
+    final reqW = (weight / 30.0).ceil();
+    final reqV = (volume / 0.5).ceil();
+
+    final maxReq = reqW > reqV ? reqW : reqV;
+    return maxReq < 1 ? 1 : maxReq;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isOversized = _minShelvesRequired > widget.shelvesCount;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isOversized ? Colors.amber.shade50 : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isOversized ? Colors.amber.shade300 : AppColors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isOversized ? Icons.warning_amber_rounded : Icons.fitness_center_rounded,
+                size: 16,
+                color: isOversized ? Colors.amber.shade900 : AppColors.bluePrimary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Cargo Dimensions & Weight Guard (Max 30kg / 0.5m³)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isOversized ? Colors.amber.shade900 : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _weightController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: const InputDecoration(
+                    labelText: 'Total Weight (kg)',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _volumeController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 12),
+                  decoration: const InputDecoration(
+                    labelText: 'Volume (m³)',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+          if (isOversized) ...[
+            const SizedBox(height: 8),
+            Text(
+              '⚠️ Oversized Cargo: Requires minimum $_minShelvesRequired shelves or Bulk Floor Storage.',
+              style: TextStyle(fontSize: 10, color: Colors.amber.shade900, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.bluePrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 14, color: Colors.white),
+                label: Text(
+                  'Auto-allocate $_minShelvesRequired Adjacent Shelves',
+                  style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => widget.onAutoAdjustShelves(_minShelvesRequired),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StorageCategorySelector extends StatelessWidget {
+  final String selectedType;
+  final ValueChanged<String> onSelected;
+
+  const _StorageCategorySelector({required this.selectedType, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      {'key': 'ambient', 'label': 'Ambient (1.0x)', 'icon': Icons.wb_sunny_outlined},
+      {'key': 'chilled', 'label': 'Chilled (+30%)', 'icon': Icons.ac_unit_rounded},
+      {'key': 'cold_storage', 'label': 'Cold (+50%)', 'icon': Icons.kitchen_rounded},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Storage Temperature Class',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: options.map((opt) {
+            final key = opt['key'] as String;
+            final isSelected = selectedType == key;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => onSelected(key),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.bluePrimary : AppColors.bg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isSelected ? AppColors.bluePrimary : AppColors.border),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(opt['icon'] as IconData, size: 12, color: isSelected ? Colors.white : AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          opt['label'] as String,
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.textPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Slider Row ─────────────────────────────────────────────────────────────────
 class _SliderRow extends StatelessWidget {
   final String label, value;
   final double min, max, current;
   final Color activeColor;
   final ValueChanged<double> onChanged;
 
-  const _SliderRow({required this.label, required this.value, required this.min, required this.max, required this.current, required this.activeColor, required this.onChanged});
+  const _SliderRow({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.current,
+    required this.activeColor,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -481,19 +847,46 @@ class _SliderRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
-            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.blueGlow,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: activeColor,
+                ),
+              ),
+            ),
           ],
         ),
-        SizedBox(
-          height: 24, // Reduced slider container height
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10), // Smaller thumb
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
-              trackHeight: 6, // Thinner track
-            ),
-            child: Slider(value: current, min: min, max: max, divisions: (max-min).toInt(), activeColor: activeColor, inactiveColor: Colors.grey[200], onChanged: onChanged),
+        const SizedBox(height: 2),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+            trackHeight: 5,
+          ),
+          child: Slider(
+            value: current,
+            min: min,
+            max: max,
+            divisions: (max - min).toInt(),
+            activeColor: activeColor,
+            inactiveColor: AppColors.border,
+            onChanged: onChanged,
           ),
         ),
       ],
@@ -501,6 +894,7 @@ class _SliderRow extends StatelessWidget {
   }
 }
 
+// ── Workers Control ────────────────────────────────────────────────────────────
 class _WorkersControl extends StatelessWidget {
   final BookingConfig config;
   final VoidCallback onUpdate;
@@ -509,50 +903,121 @@ class _WorkersControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final workerTotal = config.workerCount * 50;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Tighter
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(Icons.people_outline, size: 20, color: BookingTheme.primary), // Smaller icon
-              const SizedBox(width: 10),
-              Expanded(child: Text(AppLocalizations.of(context)!.addWorkersLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
-              Transform.scale(
-                scale: 0.7, // Smaller Switch
-                child: Switch(
-                  value: config.addWorkers,
-                  activeTrackColor: BookingTheme.primary,
-                  onChanged: (v) { config.addWorkers = v; onUpdate(); },
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.blueGlow,
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: const Icon(Icons.people_outline_rounded,
+                    size: 18, color: AppColors.bluePrimary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  AppLocalizations.of(context)!.addWorkersLabel,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary),
+                ),
+              ),
+              Switch(
+                value: config.addWorkers,
+                activeThumbColor: AppColors.bluePrimary,
+                activeTrackColor: AppColors.blueMid,
+                onChanged: (v) {
+                  config.addWorkers = v;
+                  if (v && config.workerCount < 1) {
+                    config.workerCount = 1;
+                  }
+                  onUpdate();
+                },
               ),
             ],
           ),
           if (config.addWorkers) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Number of Workers',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary),
+                ),
+                Row(
+                  children: [
+                    _CounterButton(
+                      icon: Icons.remove,
+                      onPressed: config.workerCount > 1
+                          ? () {
+                              config.workerCount--;
+                              onUpdate();
+                            }
+                          : null,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        '${config.workerCount}',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary),
+                      ),
+                    ),
+                    _CounterButton(
+                      icon: Icons.add,
+                      onPressed: config.workerCount < 20
+                          ? () {
+                              config.workerCount++;
+                              onUpdate();
+                            }
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppColors.warning.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.orange.shade200),
+                border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.person_outline_rounded,
-                      size: 14, color: Colors.orange.shade700),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Warehouse preparation included  +AED 50',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w600),
+                  Icon(Icons.info_outline_rounded,
+                      size: 14, color: AppColors.warning),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Warehouse preparation: ${config.workerCount} worker${config.workerCount > 1 ? "s" : ""}  +AED $workerTotal',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -564,76 +1029,167 @@ class _WorkersControl extends StatelessWidget {
   }
 }
 
+class _CounterButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
 
+  const _CounterButton({required this.icon, required this.onPressed});
 
-class _EmptyState extends StatelessWidget {
-  final AppLocalizations l10n;
-  const _EmptyState({required this.l10n});
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 30),
-        child: Column(
-          children: [
-            Icon(Icons.warehouse_outlined, size: 48, color: Colors.grey.shade300), // Smaller Icon
-            const SizedBox(height: 8),
-            Text(l10n.noEmirateSelected, style: TextStyle(color: Colors.grey.shade500, fontSize: 14)),
-          ],
+    final enabled = onPressed != null;
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.blueGlow : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: enabled
+                ? AppColors.blueMid.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 14,
+          color: enabled ? AppColors.bluePrimary : Colors.grey,
         ),
       ),
     );
   }
 }
 
+// ── Empty State ────────────────────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  final AppLocalizations l10n;
+  const _EmptyState({required this.l10n});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.blueGlow,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(Icons.warehouse_outlined,
+                size: 36, color: AppColors.blueMid),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            l10n.noEmirateSelected,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Tap a location above to get started',
+            style: TextStyle(color: AppColors.blueLight, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Bottom Quote Bar ────────────────────────────────────────────────────────────
 class _BottomQuoteBar extends StatelessWidget {
   final AppLocalizations l10n;
   final double grandTotal;
   final NumberFormat currencyFormat;
   final VoidCallback onBook;
 
-  const _BottomQuoteBar({required this.l10n, required this.grandTotal, required this.currencyFormat, required this.onBook});
+  const _BottomQuoteBar({
+    required this.l10n,
+    required this.grandTotal,
+    required this.currencyFormat,
+    required this.onBook,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), // Reduced Padding
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: const [BoxShadow(color: BookingTheme.cardShadow, blurRadius: 15, offset: Offset(0, -3))],
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF003C8E).withValues(alpha: 0.10),
+            blurRadius: 20,
+            offset: const Offset(0, -6),
+          ),
+        ],
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.grandTotalSimple, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                Text(currencyFormat.format(grandTotal), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: BookingTheme.primary)),
-              ],
-            ),
-            const Spacer(),
-            ElevatedButton(
-              onPressed: onBook,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: BookingTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10), // Smaller Button padding
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.grandTotalSimple,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    currencyFormat.format(grandTotal),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.bluePrimary,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
               ),
-              child: Text(l10n.bookNow, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-            ),
-          ],
+              const Spacer(),
+              ElevatedButton(
+                onPressed: onBook,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.bluePrimary,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: Text(l10n.bookNow,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+// ── Quote Dialog ───────────────────────────────────────────────────────────────
 class _QuoteDialog extends StatelessWidget {
   final List<PrimeWarehouse> warehouses;
   final Map<String, BookingConfig> configs;
@@ -641,44 +1197,123 @@ class _QuoteDialog extends StatelessWidget {
   final bool isAr;
   final double grandTotal;
 
-  const _QuoteDialog({required this.warehouses, required this.configs, required this.currencyFormat, required this.isAr, required this.grandTotal});
+  const _QuoteDialog({
+    required this.warehouses,
+    required this.configs,
+    required this.currencyFormat,
+    required this.isAr,
+    required this.grandTotal,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 0,
+      backgroundColor: Colors.white,
       child: Container(
         padding: const EdgeInsets.all(20),
-        constraints: const BoxConstraints(maxWidth: 360),
+        constraints: BoxConstraints(
+          maxWidth: 380,
+          maxHeight: MediaQuery.of(context).size.height * 0.82,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Combined Quote Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: BookingTheme.textDark)),
-            const SizedBox(height: 12),
+            // Dialog Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.blueGlow,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.receipt_long_outlined,
+                      color: AppColors.bluePrimary, size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    "Quote Summary",
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Per-warehouse breakdowns
             Flexible(
               child: SingleChildScrollView(
                 child: Column(
                   children: warehouses.map((w) {
                     final config = configs[w.id]!;
                     final breakdown = config.calculateBreakdown();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.bg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("${isAr ? w.nameAr : w.nameEn} Central Warehouse", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
-                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(w.icon,
+                                  size: 14, color: AppColors.bluePrimary),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  "${isAr ? w.nameAr : w.nameEn} Central Warehouse",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           _QuoteRow("Shelves", "${config.shelves}"),
-                          _QuoteRow("Subtotal (mo)", currencyFormat.format(breakdown.subtotal)),
-                          _QuoteRow("Platform fee (mo)", currencyFormat.format(breakdown.platformFee)),
-                          _QuoteRow("VAT (mo)", currencyFormat.format(breakdown.vat)),
-                          const Divider(height: 16),
+                          if (config.addWorkers)
+                            _QuoteRow("Workers", "${config.workerCount} (AED ${config.workerCount * 50})"),
+                          _QuoteRow("Subtotal (mo)",
+                              currencyFormat.format(breakdown.subtotal)),
+                          _QuoteRow("Platform fee (mo)",
+                              currencyFormat.format(breakdown.platformFee)),
+                          _QuoteRow(
+                              "VAT (mo)", currencyFormat.format(breakdown.vat)),
+                          Divider(color: AppColors.border, height: 14),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text("Total (mo)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: BookingTheme.textDark)),
-                              Text(currencyFormat.format(breakdown.total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: BookingTheme.textDark)),
+                              const Text(
+                                "Total (mo)",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                currencyFormat.format(breakdown.total),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: AppColors.bluePrimary,
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -688,24 +1323,82 @@ class _QuoteDialog extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(context), child: const Text("Close", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: BookingTheme.textGrey)))),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _handleBooking(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: BookingTheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: BorderSide(color: Colors.grey.shade300, width: 1),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  elevation: 0,
-                ),
-                icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text("Continue to payment", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+
+            const SizedBox(height: 12),
+
+            // Grand Total Row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.blueGlow,
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Grand Total',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    currencyFormat.format(grandTotal),
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.bluePrimary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Actions
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text("Close"),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _handleBooking(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.bluePrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("Continue",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, color: Colors.white)),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -714,18 +1407,21 @@ class _QuoteDialog extends StatelessWidget {
   }
 
   void _handleBooking(BuildContext context) async {
-    final selectedWarehouseIds = configs.keys.where((k) => configs[k]!.isSelected).toList();
+    final selectedWarehouseIds =
+        configs.keys.where((k) => configs[k]!.isSelected).toList();
     final metadataMap = <String, dynamic>{
       'warehouseIds': selectedWarehouseIds,
     };
     for (var wId in selectedWarehouseIds) {
       metadataMap['shelves_$wId'] = configs[wId]!.shelves;
       metadataMap['duration_$wId'] = configs[wId]!.durationMonths;
+      metadataMap['workers_$wId'] = configs[wId]!.addWorkers ? configs[wId]!.workerCount : 0;
     }
 
     final newInvoice = Invoice(
       id: 'INV-${DateTime.now().millisecondsSinceEpoch}',
-      number: 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+      number:
+          'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
       warehouseName: 'Single/Multi Warehouse Booking',
       date: DateTime.now(),
       amount: grandTotal * 0.95,
@@ -743,11 +1439,13 @@ class _QuoteDialog extends StatelessWidget {
 
     if (context.mounted) {
       Navigator.pop(context);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => CheckoutPage(invoice: newInvoice)));
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => CheckoutPage(invoice: newInvoice)));
     }
   }
 }
 
+// ── Quote Row ──────────────────────────────────────────────────────────────────
 class _QuoteRow extends StatelessWidget {
   final String label, value;
   const _QuoteRow(this.label, this.value);
@@ -759,8 +1457,20 @@ class _QuoteRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: BookingTheme.textGrey, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 12, color: BookingTheme.textGrey, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );

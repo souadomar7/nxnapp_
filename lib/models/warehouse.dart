@@ -36,7 +36,7 @@ class Warehouse {
       // For demo purposes, we might not have emirate_ar in DB yet or it's just 'emirate'
       emirateAr: json['emirate_ar'] ?? json['emirate'], 
       shelvesAvailable: json['total_shelves'] ?? 0,
-      pricePerShelf: (json['price_per_shelf'] as num?)?.toDouble() ?? 100.0,
+      pricePerShelf: (json['price_per_month'] as num?)?.toDouble() ?? (json['price_per_shelf'] as num?)?.toDouble() ?? 100.0,
       is24h: true, // Schema doesn't have is24h yet, default true
       amenities: [], // Schema doesn't have amenities yet
       amenitiesAr: [],

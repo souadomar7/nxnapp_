@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../models/invoice.dart';
@@ -9,6 +10,9 @@ import '../pages/receipt_page.dart';
 import '../services/marketplace_service.dart';
 import '../widgets/brand_logo.dart';
 import 'checkout_page.dart';
+import '../providers/user_provider.dart';
+import '../services/pdf_export_service.dart';
+import 'document_preview_page.dart';
 
 
 
@@ -102,7 +106,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
             _kv(AppLocalizations.of(context)!.subtotalLabel, _aed.format(inv.amount)),
             _kv(AppLocalizations.of(context)!.vatLabel, _aed.format(inv.vat)),
             if (inv.workerFee > 0)
-              _kv('Worker Fees', _aed.format(inv.workerFee)),
+              _kv(Localizations.localeOf(context).languageCode == 'ar' ? 'أجور العمال' : 'Worker Fees', _aed.format(inv.workerFee)),
             const Divider(),
             _kv(AppLocalizations.of(context)!.totalLabel, _aed.format(inv.total), bold: true),
           ],
@@ -378,7 +382,7 @@ class _InvoiceCard extends StatelessWidget {
                       invoice.warehouseName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF1A1F36)),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -398,7 +402,7 @@ class _InvoiceCard extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: invoice.paid ? Colors.green.shade700 : const Color(0xFF1A1F36),
+                      color: invoice.paid ? Colors.green.shade700 : AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -422,10 +426,49 @@ class _InvoiceCard extends StatelessWidget {
                       ),
                     )
                   else
-                     Text(
-                      AppLocalizations.of(context)!.paidTag,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.green.shade600),
-                    ),
+                     InkWell(
+                      onTap: () {
+                        final userProvider = Provider.of<UserProvider>(context, listen: false);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DocumentPreviewPage(
+                              title: 'Invoice_${invoice.number}',
+                              buildPdf: () => PdfExportService.generateInvoicePdf(
+                                invoiceNumber: invoice.number,
+                                warehouseName: invoice.warehouseName,
+                                dateStr: invoice.formattedDate,
+                                amount: invoice.amount,
+                                vatAmount: invoice.vat,
+                                isPaid: invoice.paid,
+                                customerName: userProvider.displayName,
+                                customerEmail: userProvider.email,
+                                licenseNumber: userProvider.licenseNumber,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.picture_as_pdf_rounded, size: 12, color: AppColors.bluePrimary),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${AppLocalizations.of(context)!.paidTag} (PDF)',
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.bluePrimary),
+                            ),
+                          ],
+                        ),
+                      ),
+                     ),
                 ],
               ),
             ],

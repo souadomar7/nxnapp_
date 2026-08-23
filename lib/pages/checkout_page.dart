@@ -8,6 +8,7 @@ import '../services/marketplace_service.dart';
 import '../services/payment_service.dart';
 import '../l10n/app_localizations.dart';
 import '../theme.dart';
+import '../services/bilingual_pdf_invoice_service.dart';
 import 'receipt_page.dart';
 
 class CheckoutPage extends StatefulWidget {
@@ -658,27 +659,39 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                 const SizedBox(height: 40),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Navigate to receipt
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ReceiptPage(invoice: widget.invoice),
-                          ),
-                          result: true,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.bluePrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  child: Column(
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ReceiptPage(invoice: widget.invoice),
+                            ),
+                            result: true,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.bluePrimary,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('View Digital Receipt', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                       ),
-                      child: const Text('View Tax Receipt', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                    ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.picture_as_pdf_rounded, color: AppColors.bluePrimary),
+                        label: const Text('Download / Print FTA Tax Invoice (PDF)', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.bluePrimary)),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48),
+                          side: const BorderSide(color: AppColors.bluePrimary, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          BilingualPdfInvoiceService.generateAndPrintTaxInvoice(widget.invoice);
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ],

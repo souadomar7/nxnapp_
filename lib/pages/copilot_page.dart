@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../theme.dart';
+import '../providers/locale_provider.dart';
 import 'payment_page.dart';
 import '../core/services/chatbot_engine.dart';
 
-enum ChatCardType { none, inventoryAlert, bookingQuote, gatePass, deliveryTracker }
+enum ChatCardType { none, inventoryAlert, bookingQuote, gatePass, deliveryTracker, damagedQuarantineAlert }
 
 class ChatMessage {
   final String text;
@@ -36,26 +38,22 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
   final TextEditingController _textController = TextEditingController();
   bool _isTyping = false;
   final ChatbotEngine _chatbotEngine = ChatbotEngine();
-
-  final List<String> _suggestions = [
-    "📊 Check stock alerts",
-    "🏢 Rent 3 shelves in Dubai",
-    "🎫 Generate a Gate Pass",
-    "🚚 Track shipment to Sharjah",
-  ];
+  String? _lastLanguageCode;
 
   @override
   void initState() {
     super.initState();
-    // Add initial greetings
-    _messages.add(
-      ChatMessage(
-        text: "Hello! I am your **NXN Copilot**. 🤖✨\n\nI can help you manage your micro-warehouses, check live inventory, request deliveries, or draft shelf bookings using simple chat.\n\nWhat would you like to do today?",
-        isUser: false,
-        timestamp: DateTime.now(),
-      ),
-    );
   }
+
+  String _getInitialGreeting(bool isAr) {
+    if (isAr) {
+      return "👋 أهلاً بك في **المساعد الذكي لـ NXN**! 🤖✨\n\nأنا مستشارك الذكي لإدارة المستودعات والخدمات اللوجستية على مدار الساعة.\n\nإليك ما يمكنني مساعدتك به اليوم:\n\n📦 **المساحات التخزينية والأرفف**\n• حساب فوري للتكاليف وتوصيات المساحة المناسبة\n\n🌡️ **درجات حرارة التخزين**\n• التخزين العادي (25°م)، المبرد (4°م)، والمجمد (-18°م)\n\n🚚 **الشحنات والتوصيل**\n• تصاريح الدخول (STO) وبوالص الشحن Express (WAY)\n\n📜 **الامتثال والتراخيص**\n• ضريبة القيمة المضافة (5%) وتوثيق KYC\n\n💰 **سحوبات التاجر**\n• فترات الحجز (14 يوماً) وإجراءات السحب\n\nاختر من الأسئلة السريعة أدناه أو اكتب سؤالك مباشرة! 👇";
+    } else {
+      return "👋 Welcome to **NXN Copilot AI Assistant**! 🤖✨\n\nI am your 24/7 intelligent logistics & fulfillment advisor.\n\nHere is how I can assist you today:\n\n📦 **Micro-Warehousing & Space Subscriptions**\n• Instant shelf rental quotes & capacity recommendations\n\n🌡️ **Storage Temperature Classes**\n• Ambient (25°C), Chilled (4°C), Cold (-18°C) specs\n\n🚚 **Inbound & Outbound Logistics**\n• Gate Pass (STO) scheduling & Courier Express (WAY)\n\n📜 **Compliance & Trade License**\n• UAE FTA Tax rules (5% VAT) & KYC verification\n\n💰 **Merchant Financials**\n• 14-day seller hold periods & payout processing\n\nTap any prompt below or type your question! 👇";
+    }
+  }
+
+
 
   @override
   void dispose() {
@@ -92,65 +90,126 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
     });
     _scrollToBottom();
 
-    // Trigger AI response after delay
-    Timer(const Duration(milliseconds: 1500), () {
+    Timer(const Duration(milliseconds: 1000), () {
       if (!mounted) return;
       _generateAiResponse(text);
     });
   }
 
   Future<void> _generateAiResponse(String userQuery) async {
-    String text = "";
-    ChatCardType cardType = ChatCardType.none;
-    dynamic cardData;
-
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final query = userQuery.toLowerCase();
 
-    if (query.contains("stock") || query.contains("inventory") || query.contains("alert") || query.contains("📊")) {
-      text = "Checking stock levels across all branches... 📊\n\nI have found **2 active stock alerts** in your inventory. One is critically low, and another is completely out of stock. Here is the summary:";
-      cardType = ChatCardType.inventoryAlert;
-    } else if (query.contains("rent") || query.contains("shelf") || query.contains("booking") || query.contains("🏢")) {
-      text = "Perfect! Checking available shelf space in **Dubai (Al Quoz)**... 🏢\n\nI have drafted a flexible rental quote for you. You can review the details below and proceed to pay securely with Fintx or Apple Pay:";
-      cardType = ChatCardType.bookingQuote;
-      cardData = {
-        'location': 'Dubai (Al Quoz)',
-        'shelves': 3,
-        'duration': 2, // months
-        'price': 600.0, // AED
-      };
-    } else if (query.contains("gate") || query.contains("pass") || query.contains("entry") || query.contains("🎫")) {
-      text = "Generating entry pass... 🎫\n\nI've generated a secure **Gate Pass QR Code** for your upcoming drop-off at the **Al Ain Branch**. Show this at the warehouse gate for seamless access:";
-      cardType = ChatCardType.gatePass;
-      cardData = {
-        'passId': 'GP-7721',
-        'location': 'Al Ain Branch',
-        'reason': 'Inbound Delivery',
-        'validUntil': 'Valid until: Tomorrow, 6:00 PM',
-      };
-    } else if (query.contains("track") || query.contains("shipment") || query.contains("sharjah") || query.contains("🚚")) {
-      text = "Retrieving shipment status from Wasel Logistics... 🚚\n\nHere is the real-time tracking timeline for your outbound order of **12 Honey Jars** destined for Sharjah:";
-      cardType = ChatCardType.deliveryTracker;
-      cardData = {
-        'orderId': 'DL-3349',
-        'recipient': 'Sarah Ahmad',
-        'address': 'Rolla, Sharjah',
-        'status': 'In Transit via Wasel',
-      };
-    } else {
-      // Use the advanced ChatbotEngine for everything else (Deterministic Matching + LLM Fallback)
-      final engineResponse = await _chatbotEngine.processMessage(userQuery);
-      text = engineResponse.text;
+    // Check for explicit quarantine visual alert card request
+    if (query.contains("quarantine") || query.contains("rtv") || query.contains("تالف") || query.contains("عزل") || query.contains("حجر")) {
+      final text = isAr
+          ? "⚠️ **بروتوكول البضائع التالفة والعزل في مستودعات NXN:**\n\n"
+              "عند حدوث تلف أثناء الفحص الوارد أو داخل المستودع:\n"
+              "1. **العزل في النظام:** تحول حالة المنتجات إلى `quarantine` وتخفى فوراً من نتائج البحث وسلات التجميع بالسوق.\n"
+              "2. **العزل الفعلي:** تُنقل المنتجات إلى منطقة الحجر المخصصة بالمركز.\n"
+              "3. **التعويض المالي:** عند التلف بسبب عمليات المستودع، يتم رصيد القيمة البيعية كاملة بمحفظتك.\n"
+              "4. **خيارات التصرف:** خروج البضائع RTV، الإتلاف المصرح، أو إعادة الإدراج بسعر مخفض."
+          : "⚠️ **Damaged Goods & Quarantine Protocol (NXN Hub):**\n\n"
+              "When inventory is damaged during inbound receiving or hub relocation:\n"
+              "1. **System Lock:** Item status updates to `quarantine` and is immediately hidden from marketplace search & picklists.\n"
+              "2. **Physical Isolation:** Moved to the hub Quarantine Hold Area.\n"
+              "3. **Financial Attribution:** If damaged by warehouse ops, **full retail credit** is issued to your Wallet.\n"
+              "4. **Disposition Paths:** Choose RTV Return, Authorized Disposal, or Refurbished Liquidation.";
+
+      setState(() {
+        _isTyping = false;
+        _messages.add(
+          ChatMessage(
+            text: text,
+            isUser: false,
+            timestamp: DateTime.now(),
+            cardType: ChatCardType.damagedQuarantineAlert,
+            cardData: {
+              'hub': 'DXB Hub (Bay 3)',
+              'sku': 'SKU-DXB-002',
+              'product_name': 'Arabian Coffee Blend',
+              'damaged_qty': 2,
+              'reason': 'Packaging damage during hub forklift relocation',
+              'compensation': 70.0,
+            },
+          ),
+        );
+      });
+      _scrollToBottom();
+      return;
+    }
+
+    // 1. First, check official Excel matrix via ChatbotEngine
+    final engineResponse = await _chatbotEngine.processMessage(userQuery, isAr: isAr);
+    String responseText = engineResponse.text;
+
+    // 2. If the query was broad or triggered fallback, enrich with our detailed domain answers
+    final isFallbackNotice = responseText.contains("لم أجد مطابقة") || responseText.contains("predefined rules");
+
+    if (isFallbackNotice) {
+      if (query.contains("price") || query.contains("pricing") || query.contains("cost") || query.contains("fee") || query.contains("100") ||
+          query.contains("سعر") || query.contains("أسعار") || query.contains("تكلفة") || query.contains("رسوم") || query.contains("إيجار")) {
+        responseText = isAr
+            ? "📌 **هيكل أسعار التخزين الدقيق في NXN:**\n\n"
+                "• **السعر الأساسي للرف:** 100 درهم لكل رف شهرياً في جميع مراكز التجميع الـ4 بالدولة (دبي، أبوظبي، الشارقة، العين).\n"
+                "• **رسوم مساعدة العمال:** +50 درهم لكل عامل مخصص.\n"
+                "• **رسوم المنصة:** 5% من المجموع الفرعي.\n"
+                "• **ضريبة القيمة المضافة:** 5% محتسبة وفقاً لقوانين هيئة الضرائب بالدولة.\n\n"
+                "يمكنك تخصيص مساحتك وحساب التكلفة بدقة في تبويب **حجز مساحة**!"
+            : "📌 **NXN Micro-Warehousing Pricing Structure:**\n\n"
+                "• **Base Shelf Rate:** AED 100 per shelf per month across all 4 UAE fulfillment hubs (Dubai, Abu Dhabi, Sharjah, Al Ain).\n"
+                "• **Worker Assistance Fee:** +50 AED per worker assigned.\n"
+                "• **Platform Fee:** 5% of subtotal.\n"
+                "• **UAE VAT:** 5% value-added tax calculated on the subtotal and platform fee.\n\n"
+                "You can customize your space and calculate exact quotes anytime in the **Book Space** tab!";
+      } else if (query.contains("temp") || query.contains("chilled") || query.contains("cold") || query.contains("ambient") ||
+          query.contains("حرارة") || query.contains("تبريد") || query.contains("تجميد") || query.contains("مبرد") || query.contains("بارد")) {
+        responseText = isAr
+            ? "🌡️ **فئات درجات حرارة التخزين ومضاعفات الأسعار:**\n\n"
+                "1. **التخزين العادي (1.0x الأساسي):** مساحات مجهزة ومكيفة للبضائع العامة غير القابلة للتلف.\n"
+                "2. **التخزين المبرد (+30% زيادة):** حرارة ثابتة بين 2°C – 8°C لمستحضرات التجميل والمشروبات والمنتجات الحساسة.\n"
+                "3. **التخزين المجمد (+50% زيادة):** تخزين تحت الصفر للبضائع القابلة للتلف والأغذية والمواد التخصصية."
+            : "🌡️ **Storage Temperature Classes & Pricing Multipliers:**\n\n"
+                "1. **Ambient Storage (1.0x Base):** Standard climate-controlled warehouse space for non-perishable goods.\n"
+                "2. **Chilled Storage (+30% Rate):** Temperature maintained between 2°C – 8°C for cosmetics, beverages, and sensitive items.\n"
+                "3. **Cold Storage (+50% Rate):** Frozen storage below 0°C for perishables and specialized cargo.";
+      } else if (query.contains("kyc") || query.contains("license") || query.contains("trn") || query.contains("document") ||
+          query.contains("رخصة") || query.contains("ترخيص") || query.contains("تحقق") || query.contains("وثائق") || query.contains("مستندات")) {
+        responseText = isAr
+            ? "📜 **متطلبات التحقق والـ KYC للتجار بالدولة:**\n\n"
+                "لتصبح تاخراً معتمداً في سوق NXN، يجب تقديم:\n"
+                "• **رخصة تجارية إماراتية سارية** أو رخصة اعتماد إلكتروني.\n"
+                "• **الهوية الإماراتية** (الوجهين).\n"
+                "• **الرقم الضريبي TRN (15 رقم)** للالتزام بالفواتير الإلكترونية لـ FTA.\n\n"
+                "يتم مراجعة الطلبات والاعتماد خلال 24–48 ساعة عمل."
+            : "📜 **UAE Merchant Verification & KYC Requirements:**\n\n"
+                "To become a verified seller on the NXN Marketplace, merchants must submit:\n"
+                "• **Valid UAE Trade License** or E-Trader License.\n"
+                "• **Emirates ID** (Front & Back).\n"
+                "• **15-Digit FTA Tax Registration Number (TRN)** for e-invoicing compliance.\n\n"
+                "Once submitted, verification is reviewed within 24–48 business hours.";
+      } else if (query.contains("payout") || query.contains("iban") || query.contains("withdraw") || query.contains("settle") ||
+          query.contains("أرباح") || query.contains("سحب") || query.contains("محفظة") || query.contains("تحويل") || query.contains("رصيد")) {
+        responseText = isAr
+            ? "💰 **محرك سحب أرباح التجار عبر الحساب البنكي (IBAN):**\n\n"
+                "• **فترة تعليق 14 يوماً:** تخضع مبيعاتك لفترة تعليق قياسية مدتها 14 يوماً لضمان انتهاء مهلة الإرجاع.\n"
+                "• **صافي الأرباح:** يتم تحويل 95% من صافي المبيعات مباشرة إلى حسابك البنكي المسجل (5% عمولة المنصة).\n"
+                "• يمكنك طلب سحب الأرباح في أي وقت مباشرة من **صفحة المحفظة**."
+            : "💰 **Seller IBAN Payout Engine:**\n\n"
+                "• **14-Day Clearance Hold:** Sales revenue undergoes a standard 14-day clearance hold to accommodate return windows.\n"
+                "• **Net Payout:** 95% net payout transferred directly to your registered UAE IBAN (5% platform commission).\n"
+                "• You can request payouts anytime directly from your **Wallet Page**.";
+      }
     }
 
     setState(() {
       _isTyping = false;
       _messages.add(
         ChatMessage(
-          text: text,
+          text: responseText,
           isUser: false,
           timestamp: DateTime.now(),
-          cardType: cardType,
-          cardData: cardData,
+          cardType: ChatCardType.none,
         ),
       );
     });
@@ -159,9 +218,35 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final localeProvider = Provider.of<LocaleProvider>(context);
+    final isArCurrent = localeProvider.locale.languageCode == 'ar';
+    final currentLang = isArCurrent ? 'ar' : 'en';
+
+    if (_messages.isEmpty) {
+      _messages.add(
+        ChatMessage(
+          text: _getInitialGreeting(isArCurrent),
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
+      _lastLanguageCode = currentLang;
+    } else if (_lastLanguageCode != currentLang) {
+      _lastLanguageCode = currentLang;
+      if (_messages.isNotEmpty && !_messages[0].isUser) {
+        _messages[0] = ChatMessage(
+          text: _getInitialGreeting(isArCurrent),
+          isUser: false,
+          timestamp: _messages[0].timestamp,
+          cardType: _messages[0].cardType,
+          cardData: _messages[0].cardData,
+        );
+      }
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(isArCurrent),
       body: Column(
         children: [
           Expanded(
@@ -185,7 +270,7 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(bool isArCurrent) {
     return AppBar(
       elevation: 0,
       backgroundColor: Colors.white,
@@ -219,13 +304,13 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "NXN Copilot",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                Text(
+                  isArCurrent ? "المساعد الذكي NXN" : "NXN Copilot",
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  "Online Assistant",
+                  isArCurrent ? "المساعد اللوجستي المباشر" : "Online Assistant",
                   style: TextStyle(fontSize: 12, color: Colors.green.shade600, fontWeight: FontWeight.w500),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -235,14 +320,51 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
         ],
       ),
       actions: [
+        Consumer<LocaleProvider>(
+          builder: (context, localeProvider, _) {
+            final isAr = localeProvider.locale.languageCode == 'ar';
+            return InkWell(
+              onTap: () {
+                localeProvider.toggleLocale();
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.language_rounded, color: AppColors.bluePrimary, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      isAr ? 'EN' : 'العربية',
+                      style: const TextStyle(
+                        color: AppColors.bluePrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(width: 4),
         IconButton(
           icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
           onPressed: () {
+            final isAr = Localizations.localeOf(context).languageCode == 'ar';
             setState(() {
               _messages.clear();
               _messages.add(
                 ChatMessage(
-                  text: "Hello! I am your **NXN Copilot**. 🤖✨\n\nI can help you manage your micro-warehouses, check live inventory, request deliveries, or draft shelf bookings using simple chat.\n\nWhat would you like to do today?",
+                  text: _getInitialGreeting(isAr),
                   isUser: false,
                   timestamp: DateTime.now(),
                 ),
@@ -250,24 +372,40 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
             });
           },
         ),
+        const SizedBox(width: 8),
       ],
     );
   }
 
   Widget _buildSuggestionsBar() {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final suggestions = isAr
+        ? [
+            {"label": "❓ كيف يتم حساب أسعار إيجار الأرفف؟", "query": "كيف يتم حساب أسعار إيجار الأرفف والاشتراك؟"},
+            {"label": "🌡️ ما هي فئات درجات حرارة التخزين؟", "query": "ما هي فئات درجات حرارة التخزين؟"},
+            {"label": "📜 ما المستندات المطلوبة للتحقق (KYC)؟", "query": "ما هي المستندات والبيانات المطلوبة للتحقق (KYC)؟"},
+            {"label": "💰 كيف تعمل سحوبات الأرباح للتاجر (14 يوماً)؟", "query": "كيف تعمل سحوبات الأرباح للتاجر (14 يوماً) للحساب البنكي؟"},
+          ]
+        : [
+            {"label": "❓ How is shelf rental pricing calculated?", "query": "How is shelf rental pricing and subscription calculated?"},
+            {"label": "🌡️ What are the storage temperature classes?", "query": "What are the storage temperature classes?"},
+            {"label": "📜 What documents are required for KYC?", "query": "What documents are required for KYC verification?"},
+            {"label": "💰 How do 14-day seller payouts work?", "query": "How do 14-day seller IBAN payouts work?"},
+          ];
+
     return Container(
       height: 48,
       margin: const EdgeInsets.only(bottom: 4),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _suggestions.length,
+        itemCount: suggestions.length,
         itemBuilder: (context, index) {
-          final suggestion = _suggestions[index];
+          final suggestion = suggestions[index];
           return Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: ActionChip(
-              label: Text(suggestion),
+              label: Text(suggestion["label"]!),
               labelStyle: const TextStyle(
                 color: AppColors.bluePrimary,
                 fontSize: 13,
@@ -277,7 +415,7 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
               side: BorderSide(color: AppColors.bluePrimary.withValues(alpha: 0.15)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               elevation: 0,
-              onPressed: () => _handleSendMessage(suggestion.substring(2)), // Strip icon
+              onPressed: () => _handleSendMessage(suggestion["query"]!),
             ),
           );
         },
@@ -286,6 +424,7 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
   }
 
   Widget _buildInputBar() {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Container(
       padding: const EdgeInsets.only(left: 16, right: 16, bottom: 20, top: 8),
       decoration: BoxDecoration(
@@ -313,13 +452,13 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
                     child: TextField(
                       controller: _textController,
                       style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                      decoration: const InputDecoration(
-                        hintText: "Type a logistics command...",
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: isAr ? "اكتب سؤالك عن الخدمات اللوجستية والتخزين..." : "Type a logistics question or command...",
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
                         filled: false,
                       ),
                       onSubmitted: _handleSendMessage,
@@ -334,6 +473,34 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFormattedText(String text, TextStyle baseStyle) {
+    final List<InlineSpan> spans = [];
+    final RegExp exp = RegExp(r'\*\*(.*?)\*\*');
+    int start = 0;
+
+    for (final Match match in exp.allMatches(text)) {
+      if (match.start > start) {
+        spans.add(TextSpan(text: text.substring(start, match.start)));
+      }
+      spans.add(TextSpan(
+        text: match.group(1),
+        style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+      ));
+      start = match.end;
+    }
+
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start)));
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: spans,
       ),
     );
   }
@@ -377,12 +544,12 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
                         ),
                       ],
                     ),
-                    child: Text(
+                    child: _buildFormattedText(
                       message.text,
-                      style: TextStyle(
+                      TextStyle(
                         fontSize: 14,
                         color: message.isUser ? Colors.white : AppColors.textPrimary,
-                        height: 1.4,
+                        height: 1.45,
                       ),
                     ),
                   ),
@@ -417,9 +584,115 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
         return _buildGatePassCard(data);
       case ChatCardType.deliveryTracker:
         return _buildDeliveryTrackerCard(data);
+      case ChatCardType.damagedQuarantineAlert:
+        return _buildDamagedQuarantineAlertCard(data);
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  // Damaged Quarantine Alert Custom Card
+  Widget _buildDamagedQuarantineAlertCard(dynamic data) {
+    final Map<String, dynamic> info = data is Map<String, dynamic>
+        ? data
+        : {
+            'hub': 'DXB Hub (Bay 3)',
+            'sku': 'SKU-DXB-002',
+            'product_name': 'Arabian Coffee Blend',
+            'damaged_qty': 2,
+            'reason': 'Packaging damage during hub forklift relocation',
+            'compensation': 70.0,
+          };
+
+    return Container(
+      width: 290,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.amber.shade400, width: 1.5),
+        boxShadow: [
+          BoxShadow(color: Colors.amber.shade50.withValues(alpha: 0.6), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: Colors.amber.shade100, shape: BoxShape.circle),
+                child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "⚠️ Quarantine Alert (${info['hub']})",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF78350F)),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 16, thickness: 1),
+          Text(
+            "${info['damaged_qty']} units of ${info['sku']} (${info['product_name']}) were moved to quarantine due to: ${info['reason']}.",
+            style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.35),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.account_balance_wallet_rounded, color: Colors.green, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Credit of AED ${(info['compensation'] as num).toStringAsFixed(2)} issued to your Wallet balance.",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text("Select Final Disposition Path:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _handleSendMessage("Schedule RTV Return for ${info['sku']}"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    side: const BorderSide(color: AppColors.bluePrimary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text("🚚 RTV Return", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _handleSendMessage("Liquidate ${info['sku']} as Refurbished"),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    side: BorderSide(color: Colors.purple.shade300),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: Text("🏷️ Refurbish", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.purple.shade800)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   // 1. Inventory Alert Custom Card
@@ -442,10 +715,28 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.red.shade600, size: 20),
               const SizedBox(width: 8),
-              const Text("Active Stock Alerts", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const Text("Active Stock & Quarantine Alerts", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           ),
-          const Divider(height: 20, thickness: 1),
+          const Divider(height: 16, thickness: 1),
+          // Quarantine Alert (Edge Case Handling)
+          Container(
+            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text("⚠️ Abandoned Cargo Quarantine Alert", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF78350F))),
+                SizedBox(height: 2),
+                Text("45 SKUs remaining on Shelf B-12 past 14-day grace period. Status: QUARANTINE.", style: TextStyle(fontSize: 10, color: Color(0xFF92400E))),
+              ],
+            ),
+          ),
           // Alert 1
           const Text("Organic Coffee Beans", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           Row(

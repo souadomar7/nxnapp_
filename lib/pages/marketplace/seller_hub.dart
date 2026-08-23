@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import '../../core/auth/session_provider.dart';
 import '../../core/auth/user_role.dart';
-import 'product_catalog_page.dart';
+import 'add_product_page.dart';
 import 'public_product_detail_page.dart';
 import '../smart_inventory_stage.dart';
 import '../receive_goods_stage.dart';
 import '../request_delivery_page.dart';
-import 'seller_settings_page.dart';
+import '../settings/notification_settings_page.dart';
 import 'create_shop_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/marketplace_models.dart';
+
 
 /// The Store tab root. Automatically routes to:
 ///   - Guest  → [_GuestMarketplaceView]  (public catalog, no stats)
@@ -48,7 +51,20 @@ class _GuestMarketplaceViewState extends State<_GuestMarketplaceView> {
   @override
   void initState() {
     super.initState();
-    _productsFuture = _service.getPublicMarketplaceProducts();
+    _loadProducts();
+    MarketplaceService.updateNotifier.addListener(_loadProducts);
+  }
+
+  void _loadProducts() {
+    setState(() {
+      _productsFuture = _service.getPublicMarketplaceProducts();
+    });
+  }
+
+  @override
+  void dispose() {
+    MarketplaceService.updateNotifier.removeListener(_loadProducts);
+    super.dispose();
   }
 
   @override
@@ -66,11 +82,7 @@ class _GuestMarketplaceViewState extends State<_GuestMarketplaceView> {
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
-                  ),
+                  color: AppColors.bluePrimary,
                 ),
                 padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
                 child: Column(
@@ -94,7 +106,9 @@ class _GuestMarketplaceViewState extends State<_GuestMarketplaceView> {
                             size: 16),
                         const SizedBox(width: 6),
                         Text(
-                          'Browse verified UAE merchants',
+                          Localizations.localeOf(context).languageCode == 'ar'
+                              ? 'تصفح التجار المعتمدين في الإمارات'
+                              : 'Browse verified UAE merchants',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.8),
                             fontSize: 13,
@@ -119,9 +133,11 @@ class _GuestMarketplaceViewState extends State<_GuestMarketplaceView> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Row(
                 children: [
-                  const Text(
-                    'Featured Products',
-                    style: TextStyle(
+                  Text(
+                    Localizations.localeOf(context).languageCode == 'ar'
+                        ? 'المنتجات المميزة'
+                        : 'Featured Products',
+                    style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -136,9 +152,11 @@ class _GuestMarketplaceViewState extends State<_GuestMarketplaceView> {
                           AppColors.bluePrimary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      'Live catalog',
-                      style: TextStyle(
+                    child: Text(
+                      Localizations.localeOf(context).languageCode == 'ar'
+                          ? 'الكتالوج المباشر'
+                          : 'Live catalog',
+                      style: const TextStyle(
                           color: AppColors.bluePrimary,
                           fontSize: 11,
                           fontWeight: FontWeight.bold),
@@ -201,11 +219,12 @@ class _GuestMarketplaceViewState extends State<_GuestMarketplaceView> {
 class _GuestSellBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final benefits = [
-      (Icons.warehouse_rounded, 'Secure UAE Warehousing'),
-      (Icons.local_shipping_rounded, 'Last-Mile Delivery'),
-      (Icons.analytics_rounded, 'Real-time Inventory'),
-      (Icons.verified_rounded, 'KYC-verified Sellers'),
+      (Icons.warehouse_rounded, isAr ? 'تخزين آمن في الإمارات' : 'Secure UAE Warehousing'),
+      (Icons.local_shipping_rounded, isAr ? 'توصيل الميل الأخير' : 'Last-Mile Delivery'),
+      (Icons.analytics_rounded, isAr ? 'مخزون حقيقي مباشر' : 'Real-time Inventory'),
+      (Icons.verified_rounded, isAr ? 'تجار معتمدون رسمياً' : 'KYC-verified Sellers'),
     ];
 
     return Container(
@@ -246,7 +265,7 @@ class _GuestSellBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Start Selling on NXN',
+                      isAr ? 'ابدأ البيع على NXN' : 'Start Selling on NXN',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
@@ -255,7 +274,7 @@ class _GuestSellBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'UAE\'s #1 logistics marketplace for SMEs',
+                      isAr ? 'السوق اللوجستي الأول في الإمارات' : 'UAE\'s #1 logistics marketplace for SMEs',
                       style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange.shade800),
@@ -317,8 +336,8 @@ class _GuestSellBanner extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Setup Store Now',
-                  style: TextStyle(
+              child: Text(isAr ? 'إعداد المتجر الآن' : 'Setup Store Now',
+                  style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 14)),
             ),
           ),
@@ -331,6 +350,7 @@ class _GuestSellBanner extends StatelessWidget {
 class _EmptyMarketplace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 40),
       child: Column(
@@ -339,7 +359,7 @@ class _EmptyMarketplace extends StatelessWidget {
               size: 72, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           Text(
-            'No products available yet.',
+            isAr ? 'لا تتوفر منتجات حالياً.' : 'No products available yet.',
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontSize: 16,
@@ -348,7 +368,7 @@ class _EmptyMarketplace extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Check back soon as NXN merchants publish their catalogs.',
+            isAr ? 'عد مجدداً قريباً حيث يبدأ تجار NXN في نشر منتجاتهم.' : 'Check back soon as NXN merchants publish their catalogs.',
             textAlign: TextAlign.center,
             style:
                 TextStyle(fontSize: 13, color: Colors.grey.shade400),
@@ -365,6 +385,7 @@ class _ProductGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -429,7 +450,7 @@ class _ProductGridCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'AED ${product.price.toStringAsFixed(2)}',
+                    isAr ? '${product.price.toStringAsFixed(2)} درهم' : 'AED ${product.price.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
@@ -441,7 +462,7 @@ class _ProductGridCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          product.shopName ?? 'NXN Merchant',
+                          product.shopName ?? (isAr ? 'تاجر NXN' : 'NXN Merchant'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -451,7 +472,7 @@ class _ProductGridCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (product.isShopVerified)
+                      if (product.isShopApproved)
                         const Icon(Icons.verified_rounded,
                             size: 13, color: Colors.green),
                     ],
@@ -487,6 +508,7 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
   void initState() {
     super.initState();
     _loadStats();
+    MarketplaceService.updateNotifier.addListener(_loadStats);
   }
 
   void _loadStats() {
@@ -497,8 +519,15 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
   }
 
   @override
+  void dispose() {
+    MarketplaceService.updateNotifier.removeListener(_loadStats);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final bool isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FC),
@@ -520,26 +549,13 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
           int pendingOrders = 0;
           int shelvesThisMonth = 0;
 
-          if (storeActive) {
+          if (hasLoaded) {
             shop = snapshot.data![1] as MarketplaceShop?;
-            // Only trust numbers when shop is verified
-            if (shop != null && shop.isVerified) {
-              final stats =
-                  snapshot.data![0] as Map<String, dynamic>;
-              activeShelves = (stats['shelves'] as num?)?.toInt() ?? 0;
-              totalItems = (stats['items'] as num?)?.toInt() ?? 0;
-              pendingOrders =
-                  (stats['pendingOrders'] as num?)?.toInt() ?? 0;
-              shelvesThisMonth =
-                  (stats['shelvesThisMonth'] as num?)?.toInt() ?? 0;
-            } else if (shop != null) {
-              // Setup pending — explicitly zero everything
-              shop = shop; // keep shop ref for UI
-              activeShelves = 0;
-              totalItems = 0;
-              pendingOrders = 0;
-              shelvesThisMonth = 0;
-            }
+            final stats = snapshot.data![0] as Map<String, dynamic>;
+            activeShelves = (stats['shelves'] as num?)?.toInt() ?? 0;
+            totalItems = (stats['items'] as num?)?.toInt() ?? 0;
+            pendingOrders = (stats['pendingOrders'] as num?)?.toInt() ?? 0;
+            shelvesThisMonth = (stats['shelvesThisMonth'] as num?)?.toInt() ?? 0;
           }
 
           // Capacity — safe, can never leak mock values
@@ -549,117 +565,59 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
 
           // Pending-state flag drives locked UI below setup card
           final bool storeSetupPending =
-              hasLoaded && (shop == null || !shop.isVerified);
+              hasLoaded && (shop == null || !shop.isApproved);
 
           return CustomScrollView(
             slivers: [
               // ─── Header ────────────────────────────────────────────
               SliverAppBar(
-                expandedHeight: 150,
+                expandedHeight: 125,
                 pinned: true,
                 backgroundColor: AppColors.bluePrimary,
                 automaticallyImplyLeading: false,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
-                      ),
-                    ),
-                    padding:
-                        const EdgeInsets.fromLTRB(24, 60, 24, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        const Text(
-                          'Store Dashboard',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(Icons.storefront_rounded,
-                                color: Colors.white
-                                    .withValues(alpha: 0.7),
-                                size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              shop != null
-                                  ? shop.shopName
-                                  : 'Setup pending',
-                              style: TextStyle(
-                                color: Colors.white
-                                    .withValues(alpha: 0.8),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (shop != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: shop.isVerified
-                                      ? Colors.green
-                                          .withValues(alpha: 0.25)
-                                      : Colors.orange
-                                          .withValues(alpha: 0.25),
-                                  borderRadius:
-                                      BorderRadius.circular(30),
-                                  border: Border.all(
-                                    color: shop.isVerified
-                                        ? Colors.greenAccent
-                                            .withValues(alpha: 0.5)
-                                        : Colors.orangeAccent
-                                            .withValues(alpha: 0.5),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      shop.isVerified
-                                          ? Icons.verified_user_rounded
-                                          : Icons
-                                              .hourglass_empty_rounded,
-                                      color: shop.isVerified
-                                          ? Colors.greenAccent
-                                          : Colors.orangeAccent,
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      shop.isVerified
-                                          ? 'VERIFIED'
-                                          : 'PENDING',
-                                      style: TextStyle(
-                                        color: shop.isVerified
-                                            ? Colors.greenAccent
-                                            : Colors.orangeAccent,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
+                title: Text(
+                  isAr ? 'لوحة تحكم المتجر' : 'Store Dashboard',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 actions: [
+                  Consumer<LocaleProvider>(
+                    builder: (context, localeProvider, _) {
+                      final isAr = localeProvider.locale.languageCode == 'ar';
+                      return InkWell(
+                        onTap: () => localeProvider.toggleLocale(),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.language_rounded, color: Colors.white, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                isAr ? 'EN' : 'العربية',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 6),
                   IconButton(
                     icon: const Icon(Icons.settings_outlined,
                         color: Colors.white, size: 26),
@@ -667,8 +625,9 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                         context,
                         MaterialPageRoute(
                             builder: (_) =>
-                                const SellerSettingsPage())),
+                                const NotificationSettingsPage())),
                   ),
+                  const SizedBox(width: 8),
                 ],
               ),
 
@@ -741,42 +700,71 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        _StatCard(
-                          title: l10n.pendingOrdersStat,
-                          value: isLoading ? '–' : '$pendingOrders',
-                          icon: Icons.local_shipping,
-                          color: Colors.redAccent,
-                          isFullWidth: true,
-                          trend: pendingOrders > 0
-                              ? l10n.actionRequired
-                              : 'All Caught Up',
-                          trendColor: pendingOrders > 0
-                              ? Colors.red
-                              : Colors.green,
+                        InkWell(
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const RequestDeliveryPage())),
+                          borderRadius: BorderRadius.circular(24),
+                          child: _StatCard(
+                            title: l10n.pendingOrdersStat,
+                            value: isLoading ? '–' : '$pendingOrders',
+                            icon: Icons.local_shipping,
+                            color: Colors.redAccent,
+                            isFullWidth: true,
+                            trend: pendingOrders > 0
+                                ? l10n.actionRequired
+                                : (Localizations.localeOf(context).languageCode == 'ar' ? 'مكتمل' : 'All Caught Up'),
+                            trendColor: pendingOrders > 0
+                                ? Colors.red
+                                : Colors.green,
+                          ),
                         ),
                         const SizedBox(height: 32),
 
                         // Operations grid
-                        const Text(
-                          'Operations Management',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              isAr ? 'إدارة العمليات والتنفيذ' : 'Operations Management',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                isAr ? 'سير العمل' : 'Live Workflow',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.bluePrimary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         GridView.count(
                           shrinkWrap: true,
-                          physics:
-                              const NeverScrollableScrollPhysics(),
+                          physics: const NeverScrollableScrollPhysics(),
                           crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.1,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                          childAspectRatio: 1.02,
                           children: [
                             _ActionCard(
-                              title: l10n.myInventoryAction,
+                              title: isAr ? 'مخزوني ومواقع الأرفف' : 'My Inventory',
+                              subtitle: isAr ? 'متابعة الأصناف والكميات وحالة التخزين' : 'Live stock audit, shelf positions & SKU breakdown',
+                              badge: '$totalItems ${isAr ? "صنف" : "Units"}',
                               icon: Icons.inventory_2_rounded,
                               color: const Color(0xFF2E86DE),
                               onTap: () => Navigator.push(
@@ -786,20 +774,24 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                           const SmartInventoryStageEN())),
                             ),
                             _ActionCard(
-                              title: l10n.productCatalogAction,
-                              icon: Icons.inventory_rounded,
+                              title: isAr ? 'كتالوج المنتجات والأسعار' : 'Product Catalog',
+                              subtitle: isAr ? 'إضافة منتجات جديدة وتحديث الأسعار' : 'Manage marketplace listings, prices & add new SKUs',
+                              badge: isAr ? 'الكتالوج' : 'Catalog',
+                              icon: Icons.add_business_rounded,
                               color: const Color(0xFF10AC84),
                               onTap: () async {
                                 await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                         builder: (_) =>
-                                            const ProductCatalogPage()));
+                                            const AddProductPage()));
                                 _loadStats();
                               },
                             ),
                             _ActionCard(
-                              title: l10n.bookDropoffAction,
+                              title: isAr ? 'حجز تسليم البضائع' : 'Book Drop-off',
+                              subtitle: isAr ? 'جدولة توريد المرفق والتفريغ وبوابة الدخول' : 'Schedule warehouse intake, unloading bay & worker gate pass',
+                              badge: isAr ? 'التوريد' : 'Inbound',
                               icon: Icons.move_to_inbox_rounded,
                               color: const Color(0xFFFF9F43),
                               onTap: () => Navigator.push(
@@ -809,9 +801,11 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                           const ReceiveGoodsStagePageEN())),
                             ),
                             _ActionCard(
-                              title: l10n.requestDeliveryAction,
-                              icon: Icons.outbox_rounded,
-                              color: const Color(0xFF5F27CD),
+                              title: isAr ? 'طلب شحن وتوصيل' : 'Request Delivery',
+                              subtitle: isAr ? 'تنفيذ طلبات العملاء وحجز شركات الشحن' : 'Dispatch customer orders & book courier pickup',
+                              badge: isAr ? 'التسليم' : 'Outbound',
+                              icon: Icons.local_shipping_rounded,
+                              color: const Color(0xFF8B5CF6),
                               onTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -839,7 +833,7 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
   }
 }
 
-// ─── Capacity Card ────────────────────────────────────────────────────────────
+// ─── Visual High-Tech Capacity Card ──────────────────────────────────────────
 
 class _CapacityCard extends StatelessWidget {
   final double capacityPercentage;
@@ -856,21 +850,23 @@ class _CapacityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool hasShelves = !isLoading && activeShelves > 0;
-    final String capacityLabel = hasShelves
-        ? '$totalItems items stored across $activeShelves active shelves.'
-        : 'No active inventory. Complete your store registration to reserve your first warehouse shelf.';
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final int pctInt = (capacityPercentage * 100).toInt();
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF9DA8C4).withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -880,50 +876,144 @@ class _CapacityCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Warehouse Shelf Capacity',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: AppColors.textPrimary,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.bluePrimary.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.5)),
+                      ),
+                      child: const Icon(Icons.pie_chart_outline_rounded, color: Colors.cyanAccent, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isAr ? 'سعة أرفف التخزين بالمستودع' : 'Warehouse Shelf Capacity',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isAr ? 'مراقبة الرصيد التخزيني المباشر' : 'Live Warehouse Stock Audit',
+                            style: TextStyle(fontSize: 10.5, color: Colors.grey.shade400),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                '${(capacityPercentage * 100).toInt()}% Used',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
                   color: capacityPercentage > 0.85
-                      ? Colors.red
-                      : AppColors.bluePrimary,
+                      ? Colors.red.withValues(alpha: 0.2)
+                      : Colors.cyanAccent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: capacityPercentage > 0.85 ? Colors.redAccent : Colors.cyanAccent.withValues(alpha: 0.6),
+                  ),
+                ),
+                child: Text(
+                  '$pctInt% ${isAr ? "مستخدم" : "Used"}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    color: capacityPercentage > 0.85 ? Colors.redAccent : Colors.cyanAccent,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: capacityPercentage,
-              minHeight: 10,
-              backgroundColor: Colors.grey.shade100,
-              color: capacityPercentage > 0.85
-                  ? Colors.red
-                  : AppColors.bluePrimary,
-            ),
+
+          const SizedBox(height: 18),
+
+          Stack(
+            children: [
+              Container(
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: capacityPercentage.clamp(0.02, 1.0),
+                child: Container(
+                  height: 12,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: capacityPercentage > 0.85
+                          ? [Colors.orange, Colors.redAccent]
+                          : [Colors.cyan, AppColors.bluePrimary],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: capacityPercentage > 0.85
+                            ? Colors.redAccent.withValues(alpha: 0.6)
+                            : Colors.cyan.withValues(alpha: 0.6),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              _capacityChip(
+                isAr ? '$totalItems قطعة مخزنة' : '$totalItems Items Stored',
+                Icons.inventory_2_rounded,
+                Colors.cyanAccent,
+              ),
+              const SizedBox(width: 8),
+              _capacityChip(
+                isAr ? '$activeShelves أرفف نشطة' : '$activeShelves Active Shelves',
+                Icons.grid_view_rounded,
+                Colors.amberAccent,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _capacityChip(String text, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 6),
           Text(
-            capacityLabel,
-            style: TextStyle(
-              fontSize: 12,
-              color: hasShelves
-                  ? AppColors.textSecondary
-                  : Colors.orange.shade700,
-              fontWeight: hasShelves
-                  ? FontWeight.normal
-                  : FontWeight.w500,
-            ),
+            text,
+            style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -939,6 +1029,7 @@ class _SetupPendingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       padding: const EdgeInsets.all(20),
@@ -975,7 +1066,7 @@ class _SetupPendingCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Register Your Store',
+                      isAr ? 'سجّل متجرك الآن' : 'Register Your Store',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
@@ -984,7 +1075,7 @@ class _SetupPendingCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Setup your profile to sell on NXN Marketplace.',
+                      isAr ? 'قم بإنشاء ملفك التجاري للبيع على سوق NXN.' : 'Setup your profile to sell on NXN Marketplace.',
                       style: TextStyle(
                           fontSize: 12, color: Colors.orange.shade800),
                     ),
@@ -1013,8 +1104,8 @@ class _SetupPendingCard extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Setup Store Now',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(isAr ? 'إعداد المتجر الآن' : 'Setup Store Now',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -1028,29 +1119,30 @@ class _SetupPendingCard extends StatelessWidget {
 class _LockedStorePromo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final features = [
       (
         Icons.warehouse_rounded,
-        'Secure Warehousing',
-        'Store inventory in 4 UAE locations with 24/7 monitoring.',
+        isAr ? 'تخزين آمن' : 'Secure Warehousing',
+        isAr ? 'تخزين البضائع في 4 مراكز بالدولة مراقبة 24/7.' : 'Store inventory in 4 UAE locations with 24/7 monitoring.',
         const Color(0xFF2E86DE),
       ),
       (
         Icons.local_shipping_rounded,
-        'Same-Day Delivery',
-        'Last-mile logistics across Dubai, Abu Dhabi, Sharjah & Al Ain.',
+        isAr ? 'توصيل في نفس اليوم' : 'Same-Day Delivery',
+        isAr ? 'خدمات لوجستية للميل الأخير عبر دبي، أبوظبي، الشارقة والعين.' : 'Last-mile logistics across Dubai, Abu Dhabi, Sharjah & Al Ain.',
         const Color(0xFF10AC84),
       ),
       (
         Icons.analytics_rounded,
-        'Real-Time Inventory',
-        'Track stock levels, expiry dates, and item movement live.',
+        isAr ? 'مخزون مباشر' : 'Real-Time Inventory',
+        isAr ? 'متابعة مستويات المخزون، صلاحية المنتجات وتتبع الحركة.' : 'Track stock levels, expiry dates, and item movement live.',
         const Color(0xFF5F27CD),
       ),
       (
         Icons.verified_rounded,
-        'Verified Seller Badge',
-        'Complete KYC to get the NXN Verified badge on your store.',
+        isAr ? 'شارة تاجر معتمد' : 'Verified Seller Badge',
+        isAr ? 'أكمل إجراءات التحقق للحصول على شارة تاجر معتمد.' : 'Complete KYC to get the NXN Verified badge on your store.',
         const Color(0xFFFF9F43),
       ),
     ];
@@ -1072,9 +1164,9 @@ class _LockedStorePromo extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'Why Sell on NXN?',
-                style: TextStyle(
+              Text(
+                isAr ? 'لماذا تبيع على NXN؟' : 'Why Sell on NXN?',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -1096,7 +1188,7 @@ class _LockedStorePromo extends StatelessWidget {
                   BoxShadow(
                     color:
                         const Color(0xFF9DA8C4).withValues(alpha: 0.07),
-                    blurRadius: 12,
+                    blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
                 ],
@@ -1104,12 +1196,12 @@ class _LockedStorePromo extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: f.$4.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(f.$1, color: f.$4, size: 26),
+                    child: Icon(f.$1, color: f.$4, size: 18),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1130,7 +1222,6 @@ class _LockedStorePromo extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
-                            height: 1.4,
                           ),
                         ),
                       ],
@@ -1141,7 +1232,7 @@ class _LockedStorePromo extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 20),
 
           // Stats row
           Container(
@@ -1157,13 +1248,13 @@ class _LockedStorePromo extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _PromoStat(value: '500+', label: 'Merchants'),
+                _PromoStat(value: '500+', label: isAr ? 'التجار' : 'Merchants'),
                 Container(
                     width: 1, height: 36, color: Colors.white24),
-                _PromoStat(value: '4', label: 'Warehouses'),
+                _PromoStat(value: '4', label: isAr ? 'المستودعات' : 'Warehouses'),
                 Container(
                     width: 1, height: 36, color: Colors.white24),
-                _PromoStat(value: 'UAE-wide', label: 'Delivery'),
+                _PromoStat(value: isAr ? 'كافة الإمارات' : 'UAE-wide', label: isAr ? 'التوصيل' : 'Delivery'),
               ],
             ),
           ),
@@ -1222,15 +1313,16 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: color.withValues(alpha: 0.15), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF9DA8C4).withValues(alpha: 0.1),
+            color: color.withValues(alpha: 0.07),
             blurRadius: 16,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1241,12 +1333,12 @@ class _StatCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: color, size: 28),
+                child: Icon(icon, color: color, size: 18),
               ),
               if (isFullWidth && trend != null)
                 Container(
@@ -1305,12 +1397,16 @@ class _StatCard extends StatelessWidget {
 
 class _ActionCard extends StatelessWidget {
   final String title;
+  final String subtitle;
+  final String? badge;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
 
   const _ActionCard({
     required this.title,
+    required this.subtitle,
+    this.badge,
     required this.icon,
     required this.color,
     required this.onTap,
@@ -1318,54 +1414,96 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: color.withValues(alpha: 0.18), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF9DA8C4).withValues(alpha: 0.1),
-              blurRadius: 12,
+              color: color.withValues(alpha: 0.08),
+              blurRadius: 16,
               offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [color.withValues(alpha: 0.8), color],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
-              ),
-              child: Icon(icon, size: 36, color: Colors.white),
+                  child: Icon(icon, size: 18, color: color),
+                ),
+                Row(
+                  children: [
+                    if (badge != null && badge!.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          badge!,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Icon(
+                      isAr ? Icons.arrow_back_ios_new_rounded : Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: color.withValues(alpha: 0.7),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: AppColors.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: AppColors.textPrimary,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                    height: 1.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ],
         ),

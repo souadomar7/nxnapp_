@@ -13,10 +13,13 @@ class Invoice {
   final double vat;    // AED (e.g., 5% of subtotal)
   final double workerFee; // AED (optional assistance fee)
   final bool paid;
-  
-  // Metadata for Activity Logging
   final InvoiceType type;
   final Map<String, dynamic>? metaData;
+  
+  // FTA E-Invoicing Metadata
+  final String? trnNumber;
+  final String bilingualSupplierNameEn;
+  final String bilingualSupplierNameAr;
 
   const Invoice({
     required this.id,
@@ -29,6 +32,9 @@ class Invoice {
     this.paid = false,
     this.type = InvoiceType.generic,
     this.metaData,
+    this.trnNumber = '100492817300003', // FTA 15-digit TRN
+    this.bilingualSupplierNameEn = 'NXN Hub Logistics L.L.C.',
+    this.bilingualSupplierNameAr = 'الشبكة الوطنية للخدمات اللوجستية ش.ذ.م.م',
   });
 
   double get total => amount + vat + workerFee;
@@ -54,10 +60,10 @@ class Invoice {
 
   factory Invoice.fromJson(Map<String, dynamic> json) {
     return Invoice(
-      id: json['id'] as String,
-      number: json['invoice_number'] as String? ?? 'UNKNOWN',
-      warehouseName: json['warehouse_name'] as String? ?? '',
-      date: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      id: (json['id'] as String?) ?? 'INV-${DateTime.now().millisecondsSinceEpoch}',
+      number: (json['invoice_number'] as String?) ?? (json['number'] as String?) ?? 'INV-001',
+      warehouseName: (json['warehouse_name'] as String?) ?? 'DXB Central Hub',
+      date: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       vat: (json['vat'] as num?)?.toDouble() ?? 0.0,
       workerFee: (json['worker_fee'] as num?)?.toDouble() ?? 0.0,

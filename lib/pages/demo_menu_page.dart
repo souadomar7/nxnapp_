@@ -1,82 +1,187 @@
 import 'package:flutter/material.dart';
-import '../../theme.dart';
-import 'admin/admin_login_page.dart';
+import '../theme.dart';
 import 'booking_page.dart';
 import 'marketplace/seller_hub.dart';
+import 'marketplace/public_marketplace_page.dart';
 import 'operations/gate_pass_page.dart';
 import 'operations/tracking_page.dart';
 import 'onboarding/service_overview_page.dart';
+import 'admin_panel_page.dart';
+import 'qr_scanner_page.dart';
+import 'smart_inventory_stage.dart';
+import 'receive_goods_stage.dart';
+import 'request_delivery_page.dart';
+import 'copilot_page.dart';
+import 'profile/my_subscriptions_page.dart';
+import 'profile/wallet_page.dart';
+import 'settings/kyc_page.dart';
+import 'settings/notification_settings_page.dart';
+import 'payment_page.dart';
+import 'terms_and_conditions.dart';
 
 class DemoMenuPage extends StatelessWidget {
   const DemoMenuPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('All Features & Demo'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: Text(isAr ? 'خريطة كافة الشاشات والخصائص' : 'All App Pages & Features'),
+        backgroundColor: const Color(0xFF0F172A),
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       backgroundColor: const Color(0xFFF3F6FB),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         children: [
-          const _Header('Core User Experience'),
+          // ── 1. CORE MARKETPLACE & E-COMMERCE ─────────────────────────────
+          _Header(isAr ? '1. السوق والتجارة الإلكترونية' : '1. Public Marketplace & E-Commerce'),
           _DemoTile(
-            title: 'Customer Dashboard',
-            subtitle: 'Main entry point for users',
-            icon: Icons.dashboard_rounded,
-            // Navigate back to home if user came from there, effectively "switching"
-            onTap: () => Navigator.popUntil(context, (route) => route.isFirst),
-          ),
-          _DemoTile(
-            title: 'Onboarding / Service Overview',
-            subtitle: 'First screen users see',
-            icon: Icons.view_carousel_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServiceOverviewPage())),
-          ),
-          _DemoTile(
-            title: 'Booking Flow',
-            subtitle: 'New storage booking',
-            icon: Icons.add_shopping_cart,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingPage())),
-          ),
-
-          const SizedBox(height: 24),
-          const _Header('New Features'),
-           _DemoTile(
-            title: 'Gate Pass (QR)',
-            subtitle: 'Entry QRCode for warehouse',
-            icon: Icons.qr_code_2_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GatePassPage())),
-          ),
-          _DemoTile(
-            title: 'Shipment Tracking',
-            subtitle: 'Live map tracking simulation',
-            icon: Icons.map_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrackingPage())),
-          ),
-
-          const SizedBox(height: 24),
-          const _Header('Business / Operations'),
-          _DemoTile(
-            title: 'Seller Hub',
-            subtitle: 'Marketplace management',
+            title: isAr ? 'السوق المعتمد العام' : 'Public Verified Marketplace',
+            subtitle: isAr ? 'تصفح المنتجات والشراء المباشر' : 'Browse products, search, filter & buyer checkout',
             icon: Icons.storefront_rounded,
+            color: const Color(0xFF2563EB),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PublicMarketplacePage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'مركز إدارة التاجر' : 'Merchant Seller Hub',
+            subtitle: isAr ? 'إحصائيات المبيعات، المخزون وتوثيق المتجر' : 'Store stats, inventory linked products & approval state',
+            icon: Icons.store_mall_directory_rounded,
+            color: const Color(0xFF7C3AED),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SellerHub())),
           ),
 
-          const SizedBox(height: 24),
-          const _Header('Admin / Warehouse Staff'),
+          const SizedBox(height: 20),
+
+          // ── 2. WAREHOUSE & OPERATIONS ────────────────────────────────────
+          _Header(isAr ? '2. المستودعات والعمليات اللوجستية' : '2. Warehouse Operations & WMS'),
           _DemoTile(
-            title: 'Admin Portal Login',
-            subtitle: 'Switch to Tablet View (Pin: 8818)',
+            title: isAr ? 'لوحة الإدارة العليا' : 'Super Admin & Ops Control Panel',
+            subtitle: isAr ? 'إشراف الشحنات الواردة، التوصيل، التراخيص والسحوبات' : 'Inbound STO, Outbound WAY, KYC approvals & Hub holds',
             icon: Icons.admin_panel_settings_rounded,
-            color: Colors.orange,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminLoginPage())),
+            color: const Color(0xFF1E293B),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPanelPage())),
           ),
+          _DemoTile(
+            title: isAr ? 'ماسح التصاريح والباركوود' : 'QR Gate Pass & Barcode Scanner',
+            subtitle: isAr ? 'فحص الكاميرا لتصاريح STO وبوالص WAY' : 'Camera scanner for STO-XXXXXX & WAY-XXXXXX',
+            icon: Icons.qr_code_scanner_rounded,
+            color: const Color(0xFF059669),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'منصة المخزون الذكي WMS' : 'Smart Inventory Stage WMS',
+            subtitle: isAr ? 'تتبع الأرفف والكميات والرسم البياني' : 'Shelf tracking, SKU breakdown & distribution charts',
+            icon: Icons.inventory_2_rounded,
+            color: const Color(0xFF2563EB),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SmartInventoryStageEN())),
+          ),
+          _DemoTile(
+            title: isAr ? 'جدولة شحنة واردة' : 'Schedule Inbound Drop-off',
+            subtitle: isAr ? 'حجز رصيف التفريغ وإصدار تصريح STO' : '4-step wizard, temp modes & STO Gate Pass',
+            icon: Icons.move_to_inbox_rounded,
+            color: const Color(0xFFD97706),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceiveGoodsStagePageEN())),
+          ),
+          _DemoTile(
+            title: isAr ? 'طلب توصيل وخروج شحنة' : 'Request Outbound Delivery',
+            subtitle: isAr ? 'اختيار شركة الشحن وإصدار بوليصة WAY' : 'Domestic/GCC shipping, couriers & WAY waybill',
+            icon: Icons.local_shipping_rounded,
+            color: const Color(0xFF2563EB),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RequestDeliveryPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'استئجار مساحة رفوف' : 'Rent Warehouse Space',
+            subtitle: isAr ? 'اختيار المستودع والباقة' : 'Browse hubs, temperature tiers & booking',
+            icon: Icons.add_shopping_cart_rounded,
+            color: const Color(0xFF0284C7),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingPage())),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── 3. AI & DIGITAL PASSES ───────────────────────────────────────
+          _Header(isAr ? '3. المساعد الذكي والتتبع الرقمي' : '3. AI Assistant & Digital Passes'),
+          _DemoTile(
+            title: isAr ? 'المساعد الذكي NXN Copilot' : 'AI Logistics Copilot',
+            subtitle: isAr ? 'مساعد التخزين والخدمات اللوجستية' : 'AI Chatbot for warehousing & fulfillment queries',
+            icon: Icons.support_agent_rounded,
+            color: const Color(0xFF7C3AED),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CopilotPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'تتبع الشحنات المباشر' : 'Live Shipment Tracking',
+            subtitle: isAr ? 'تتبع حركة السائق على الخريطة' : 'Real-time GPS delivery tracking simulation',
+            icon: Icons.map_rounded,
+            color: const Color(0xFF059669),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrackingPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'تصريح الدخول الرقمي' : 'Digital Gate Pass QR',
+            subtitle: isAr ? 'رمز QR لدخول المستودع' : 'Digital entry pass for warehouse guards',
+            icon: Icons.qr_code_2_rounded,
+            color: const Color(0xFFD97706),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GatePassPage())),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── 4. ACCOUNT, FINANCIALS & SETTINGS ───────────────────────────
+          _Header(isAr ? '4. الحساب، المالية والإعدادات' : '4. Account, Financials & Settings'),
+          _DemoTile(
+            title: isAr ? 'الاشتراكات النشطة' : 'My Active Subscriptions',
+            subtitle: isAr ? 'عرض المساحات المؤجرة والأرفف' : 'Leased shelf spaces & renewal dates',
+            icon: Icons.subscriptions_rounded,
+            color: const Color(0xFF2563EB),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MySubscriptionsPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'الفواتير والمحفظة' : 'Invoices & Merchant Wallet',
+            subtitle: isAr ? 'رصيد الأرباح وتصدير فواتير PDF' : 'Balances, payouts & PDF invoice exports',
+            icon: Icons.account_balance_wallet_rounded,
+            color: const Color(0xFF059669),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WalletPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'الدفع الإلكتروني' : 'Payments & Invoices',
+            subtitle: isAr ? 'دفع رسوم الشحن والاستئجار' : 'Pay invoices & view PDF receipts',
+            icon: Icons.payment_rounded,
+            color: const Color(0xFF2563EB),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentsPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'توثيق الرخصة التجاري (KYC)' : 'KYC Trade License Upload',
+            subtitle: isAr ? 'رفع مستندات التوثيق للإدارة' : 'Submit trade license for admin approval',
+            icon: Icons.verified_user_rounded,
+            color: const Color(0xFFD97706),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KYCPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'إعدادات الإشعارات' : 'Notification Preferences',
+            subtitle: isAr ? 'تنبيهات الشحنات والطلبات' : 'Push notifications & system alerts settings',
+            icon: Icons.notifications_rounded,
+            color: const Color(0xFF64748B),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'الشروط والأحكام' : 'Terms & Conditions',
+            subtitle: isAr ? 'سياسات التخزين والخدمة' : 'Logistics, warehousing & privacy policies',
+            icon: Icons.gavel_rounded,
+            color: const Color(0xFF64748B),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsAndConditionsPage())),
+          ),
+          _DemoTile(
+            title: isAr ? 'نظرة عامة على الخدمة' : 'Service Overview & Onboarding',
+            subtitle: isAr ? 'الشاشة التعريفية للخدمة' : 'Introduction onboarding carousel',
+            icon: Icons.view_carousel_rounded,
+            color: const Color(0xFF2563EB),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServiceOverviewPage())),
+          ),
+
+          const SizedBox(height: 30),
         ],
       ),
     );
@@ -90,8 +195,11 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 4),
-      child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+      padding: const EdgeInsets.only(bottom: 10, left: 4),
+      child: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF64748B)),
+      ),
     );
   }
 }
@@ -107,34 +215,35 @@ class _DemoTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.color = AppColors.bluePrimary,
+    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: ListTile(
         onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-             color: color.withValues(alpha: 0.1),
-             shape: BoxShape.circle,
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: color),
+          child: Icon(icon, color: color, size: 22),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
       ),
     );
   }

@@ -176,26 +176,26 @@ class _LoginPageState extends State<LoginPage> {
                 },
                 icon: const Icon(Icons.fingerprint, color: Colors.white),
                 label: Text(l10n.loginWithUaePass, style: const TextStyle(color: Colors.white, fontSize: 16)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
+                 style: ElevatedButton.styleFrom(
+                   backgroundColor: AppColors.success,
+                   padding: const EdgeInsets.symmetric(vertical: 16),
+                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                 ),
               ),
               const SizedBox(height: 16),
 
-              const Row(children: [Expanded(child: Divider()), Padding(padding: EdgeInsets.all(8), child: Text("OR")), Expanded(child: Divider())]),
+              Row(children: [const Expanded(child: Divider()), Padding(padding: const EdgeInsets.all(8), child: Text(Localizations.localeOf(context).languageCode == 'ar' ? "أو" : "OR", style: const TextStyle(color: Colors.grey))), const Expanded(child: Divider())]),
               const SizedBox(height: 16),
 
               ElevatedButton(
                 onPressed: _isLoading ? null : _signIn,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.bluePrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
+                 backgroundColor: AppColors.bluePrimary,
+                 padding: const EdgeInsets.symmetric(vertical: 16),
+                 shape: RoundedRectangleBorder(
+                   borderRadius: BorderRadius.circular(12),
+                 ),
+               ),
                 child: _isLoading
                     ? const SizedBox(
                         height: 20,

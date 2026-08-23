@@ -10,6 +10,7 @@ class TrackingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final tId = trackingId ?? 'TRK-99281102';
 
     return Scaffold(
@@ -42,13 +43,13 @@ class TrackingPage extends StatelessWidget {
                         Icon(Icons.map_rounded, size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 8),
                         Text(
-                          "Map View Loading...",
+                          isAr ? 'جاري تحميل الخريطة المباشرة...' : 'Map View Loading...',
                           style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
-                  // Simulated Route Line (Custom Paint could go here, but simple Mock for now)
+                  // Simulated Route Line
                   Positioned(
                     bottom: 40,
                     left: 40,
@@ -72,7 +73,7 @@ class TrackingPage extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(l10n.estimatedDelivery, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                                const Text("Today, 4:30 PM", style: TextStyle(fontWeight: FontWeight.bold)),
+                                Text(isAr ? 'اليوم، 4:30 مساءً' : 'Today, 4:30 PM', style: const TextStyle(fontWeight: FontWeight.bold)),
                               ],
                             ),
                           ),
@@ -115,22 +116,22 @@ class TrackingPage extends StatelessWidget {
                     child: ListView(
                       children: [
                         _TimelineItem(
-                          title: "Out for Delivery",
-                          time: "10:30 AM",
-                          location: "Dubai, UAE",
+                          title: isAr ? 'جاري التوصيل حالياً' : 'Out for Delivery',
+                          time: isAr ? '10:30 صباحاً' : '10:30 AM',
+                          location: isAr ? 'دبي، الإمارات' : 'Dubai, UAE',
                           isCompleted: true,
                           isCurrent: true,
                         ),
                         _TimelineItem(
-                          title: "Arrived at Sort Facility",
-                          time: "06:15 AM",
-                          location: "Al Quoz Hub",
+                          title: isAr ? 'وصل إلى مركز الفرز والتوزيع' : 'Arrived at Sort Facility',
+                          time: isAr ? '06:15 صباحاً' : '06:15 AM',
+                          location: isAr ? 'مركز دبي (القوز)' : 'Al Quoz Hub',
                           isCompleted: true,
                         ),
                         _TimelineItem(
-                          title: "Picked Up",
-                          time: "Yesterday, 4:00 PM",
-                          location: "Merchant Warehouse",
+                          title: isAr ? 'تم استلام الشحنة من التاجر' : 'Picked Up',
+                          time: isAr ? 'أمس، 4:00 مساءً' : 'Yesterday, 4:00 PM',
+                          location: isAr ? 'مستودع التاجر' : 'Merchant Warehouse',
                           isCompleted: true,
                           isLast: true,
                         ),

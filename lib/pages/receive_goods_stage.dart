@@ -1,443 +1,266 @@
 import 'package:flutter/material.dart';
-import '../l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/locale_provider.dart';
+import '../services/marketplace_service.dart';
+import '../data/receive_result.dart';
+import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import '../widgets/brand_logo.dart';
+import 'smart_inventory_stage.dart';
+import '../services/pdf_export_service.dart';
+import 'document_preview_page.dart';
 
-// Match BookingPage colors
 class ReceiveColors {
-  static const primary = AppColors.bluePrimary; // Match App Theme
-  static const background = Color(0xFFF3F6FB); // Light Grey-Blue
-  static const textDark = Color(0xFF1A1F36); // Dark user text
-  static const cardBorder = Color(0xFFE0E6F2);
+  static const primary = AppColors.bluePrimary;
+  static const background = Color(0xFFF8FAFC);
+  static const cardBg = Colors.white;
+  static const textDark = Color(0xFF0F172A);
+  static const textSub = Color(0xFF64748B);
+  static const cardBorder = Color(0xFFE2E8F0);
+  static const accentBlue = Color(0xFF3B82F6);
+  static const accentGreen = Color(0xFF10B981);
 }
 
 class ReceiveGoodsStagePageEN extends StatefulWidget {
   const ReceiveGoodsStagePageEN({super.key});
 
   @override
-  State<ReceiveGoodsStagePageEN> createState() =>
-      _ReceiveGoodsStagePageENState();
+  State<ReceiveGoodsStagePageEN> createState() => _ReceiveGoodsStagePageENState();
 }
 
 class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
-  // 1) Schedule (drop-off only)
+  final MarketplaceService _marketplaceService = MarketplaceService();
+
+  // Current Step (0: Warehouse Hub & Temp, 1: Schedule & Truck, 2: Cargo & Workers, 3: Gate Pass Confirmation)
+  int _currentStep = 0;
+
+  // Step 1: Warehouse & Temp Mode
+  String _selectedWarehouse = 'Dubai Central Warehouse';
+  String _selectedStorageMode = 'Ambient Storage (25°C)';
+
+  // Step 2: Schedule & Freight Info
   DateTime? _scheduledDate;
-  TimeOfDay? _scheduledTime;
+  String _selectedTimeSlot = '09:00 AM - 12:00 PM';
+  final TextEditingController _carrierCtrl = TextEditingController();
+  final TextEditingController _truckPlateCtrl = TextEditingController();
 
-  // 2) Preparation
-  bool _isPrepared = false;
-
-  // 3) Inspection / extra services
-  bool _damagePhotosByAdmin = false; // document damages with photos
-
-
-  // 4) Instant update
-  String? _storageNo;
-  String? _stockStatus;
-  bool _isUpdated = false;
-
+  // Step 3: Cargo Manifest & Workers
+  int _itemCount = 50;
+  int _boxCount = 5;
+  int _workers = 1;
+  final TextEditingController _productNameCtrl = TextEditingController(text: 'Cold Brew Coffee 500ml');
   final TextEditingController _notesCtrl = TextEditingController();
 
-  // ---------- helpers ----------
-  void _toast(String msg, {String? undoLabel, VoidCallback? onUndo}) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        action: (undoLabel != null && onUndo != null)
-            ? SnackBarAction(label: undoLabel, onPressed: onUndo)
-            : null,
-      ),
-    );
-  }
-
-  String _fmtDateTime(DateTime d, TimeOfDay? t) {
-    if (t == null) return "${d.day}/${d.month}/${d.year}";
-    final hh =
-    (t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod).toString().padLeft(2, '0');
-    final mm = t.minute.toString().padLeft(2, '0');
-    final ampm = t.period == DayPeriod.am ? 'AM' : 'PM';
-    return "${d.day}/${d.month}/${d.year}  $hh:$mm $ampm";
-  }
-
-  double _progress() {
-    int done = 0;
-    if (_scheduledDate != null && _scheduledTime != null) done++; // Schedule
-    if (_isPrepared) done++; // Preparation
-    if (_isUpdated) done++; // Update
-    return done / 3.0;
-  }
-
-  // =========================================================
-  // LOGIC METHODS
-  // =========================================================
-  Future<void> _scheduleAppointmentPicker() async {
-    final now = DateTime.now();
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 60)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: ReceiveColors.primary),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (pickedDate == null) return;
-    if (!mounted) return;
-
-    final pickedTime = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 10, minute: 0),
-      helpText: 'Select drop-off time',
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: ReceiveColors.primary),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (pickedTime == null) return;
-
-    _applySchedule(pickedDate, pickedTime);
-  }
-
-  void _quickSchedule(Duration offset, {int hour = 10, int minute = 0}) {
-    final now = DateTime.now();
-    final d = (offset == Duration.zero)
-        ? now.add(const Duration(hours: 2))
-        : now.add(offset);
-    final date = DateTime(d.year, d.month, d.day);
-    final time = (offset == Duration.zero)
-        ? TimeOfDay(hour: d.hour, minute: d.minute)
-        : TimeOfDay(hour: hour, minute: minute);
-    _applySchedule(date, time);
-  }
-
-  void _applySchedule(DateTime date, TimeOfDay time) {
-    final old = (_scheduledDate, _scheduledTime);
-    setState(() {
-      _scheduledDate = date;
-      _scheduledTime = time;
-      // reset following stages
-      _isPrepared = false;
-      _isUpdated = false;
-      _damagePhotosByAdmin = false;
-      _notesCtrl.clear();
-      _storageNo = null;
-      _storageNo = null;
-      _stockStatus = AppLocalizations.of(context)!.statusPending;
-    });
-    if (!mounted) return;
-    _toast(
-      AppLocalizations.of(context)!.scheduleDropoffSubtitleScheduled(_fmtDateTime(date, time)),
-      undoLabel: AppLocalizations.of(context)!.undoAction,
-      onUndo: () {
-        setState(() {
-          _scheduledDate = old.$1;
-          _scheduledTime = old.$2;
-        });
-      },
-    );
-  }
-
-  void _prepareWarehouse() {
-    if (_scheduledDate == null || _scheduledTime == null) {
-      _toast(AppLocalizations.of(context)!.scheduleFirstToast);
-      return;
-    }
-    setState(() => _isPrepared = true);
-
-    _toast(
-      "Warehouse Prepared", // Specific bay logic removed
-      undoLabel: AppLocalizations.of(context)!.undoAction,
-      onUndo: () => setState(() => _isPrepared = false),
-    );
-  }
-
-  Future<void> _updateSystemInstantly() async {
-    if (!_isPrepared) {
-      _toast(AppLocalizations.of(context)!.prepareWarehouseFirst);
-      return;
-    }
-
-    final prev = (_storageNo, _stockStatus, _isUpdated);
-    final stamp = DateTime.now().millisecondsSinceEpoch % 1000000;
-
-    setState(() {
-      _storageNo = "STO-$stamp";
-      _storageNo = "STO-$stamp";
-      _stockStatus = AppLocalizations.of(context)!.statusReceived;
-      _isUpdated = true;
-    });
-
-    _toast(AppLocalizations.of(context)!.updatedStorage(_storageNo!), undoLabel: AppLocalizations.of(context)!.undoAction, onUndo: () {
-      setState(() {
-        _storageNo = prev.$1;
-        _stockStatus = prev.$2 ?? AppLocalizations.of(context)!.statusPending;
-        _isUpdated = prev.$3;
-      });
-    });
-
-    // Navigate to completion
-    if (_storageNo != null && _scheduledDate != null && _scheduledTime != null) {
-      // scheduledAt removed
-
-
-      // Delay slightly for effect
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-      Navigator.pop(context);
-    }
-  }
+  // Step 4: Output Gate Pass / Confirmation Result
+  bool _isSubmitting = false;
+  Map<String, dynamic>? _generatedGatePass;
 
   @override
   void dispose() {
+    _carrierCtrl.dispose();
+    _truckPlateCtrl.dispose();
+    _productNameCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
   }
 
+  String _fmtDate(DateTime dt) {
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
+  Future<void> _submitInboundRequest() async {
+    if (_scheduledDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'ar'
+                ? 'يرجى اختيار تاريخ تسليم البضائع للمستودع'
+                : 'Please select a warehouse drop-off date.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    final res = await _marketplaceService.createInboundReceivingRequest(
+      warehouseName: _selectedWarehouse,
+      storageMode: _selectedStorageMode,
+      scheduledDate: _scheduledDate!,
+      timeSlot: _selectedTimeSlot,
+      itemCount: _itemCount,
+      boxCount: _boxCount,
+      workers: _workers,
+      productName: _productNameCtrl.text.trim(),
+      carrierName: _carrierCtrl.text.trim(),
+      truckPlate: _truckPlateCtrl.text.trim(),
+      notes: _notesCtrl.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+      _generatedGatePass = res;
+      _currentStep = 3; // Advance to confirmation gate pass step
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.green.shade800,
+        content: Text(
+          Localizations.localeOf(context).languageCode == 'ar'
+              ? 'تم إرسال طلب التزويد وإخطار مسؤول المستودع بنجاح! 🔔'
+              : 'Inbound request submitted & Admin notified successfully! 🔔',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Basic context data
-    final pct = _progress();
-    // final isAr = Localizations.localeOf(context).languageCode == 'ar'; // Unused in this snippet but good to have
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: ReceiveColors.background,
       body: CustomScrollView(
         slivers: [
-          // 1. Sliver App Bar (Scrollable Header)
+          // ─── 1. Header ─────────────────────────────────────────────
           SliverAppBar(
-            expandedHeight: 200,
+            expandedHeight: 180,
             pinned: true,
             backgroundColor: ReceiveColors.primary,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+              icon: Icon(
+                isAr ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
-                onPressed: () {},
+              Consumer<LocaleProvider>(
+                builder: (context, localeProvider, _) {
+                  return InkWell(
+                    onTap: () => localeProvider.toggleLocale(),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.language_rounded, color: Colors.white, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            isAr ? 'EN' : 'العربية',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
+              const SizedBox(width: 12),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              background: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: const BrandLogo(height: 32),
-                      ),
-                      const Spacer(),
-                      Text(
-                        AppLocalizations.of(context)!.receiveGoodsTitle,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        AppLocalizations.of(context)!.processInfo,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.bluePrimary, AppColors.blueMid],
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          // 2. Main Content
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: ReceiveColors.background,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              transform: Matrix4.translationValues(0, -20, 0), // Overlap effect
-              padding: const EdgeInsets.fromLTRB(20, 30, 20, 40),
-              child: Column(
-                children: [
-                  // Progress Indicator
-                  _buildProgressCard(pct),
-                  const SizedBox(height: 24),
-
-                  // Step 1: Schedule
-                  _buildSectionHeader("01", AppLocalizations.of(context)!.scheduleDropoffTitle),
-                  const SizedBox(height: 12),
-                  _ActionCard(
-                    isActive: true,
-                    isDone: _scheduledDate != null,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          (_scheduledDate == null)
-                              ? AppLocalizations.of(context)!.scheduleDropoffSubtitle
-                              : AppLocalizations.of(context)!.scheduleDropoffSubtitleScheduled(_fmtDateTime(_scheduledDate!, _scheduledTime)),
-                          style: TextStyle(color: Colors.grey[600], height: 1.4),
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                        Row(
                           children: [
-                            _pillButton(
-                              AppLocalizations.of(context)!.nowPlus2h,
-                              onTap: () => _quickSchedule(Duration.zero),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(Icons.move_to_inbox_rounded, color: Colors.white, size: 26),
                             ),
-                            _pillButton(
-                              AppLocalizations.of(context)!.tomorrow10am,
-                              onTap: () => _quickSchedule(const Duration(days: 1), hour: 10),
-                            ),
-                            _solidButton(
-                              AppLocalizations.of(context)!.chooseDateTime,
-                              color: ReceiveColors.primary,
-                              textColor: Colors.white,
-                              onPressed: _scheduleAppointmentPicker,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isAr ? 'تجهيز واستلام البضائع' : 'Inbound Receiving & Prep',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isAr ? 'طلب رصيد تفريغ وتنبيه مسئول المستودع' : 'Schedule drop-off bay & notify warehouse admin',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.8),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
+              ),
+            ),
+          ),
 
-                  // Step 2: Prepare
-                  _buildSectionHeader("02", AppLocalizations.of(context)!.prepareBayTitle),
-                  const SizedBox(height: 12),
-                  _ActionCard(
-                    isActive: _scheduledDate != null,
-                    isDone: _isPrepared,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_scheduledDate == null)
-                          Text(AppLocalizations.of(context)!.scheduleFirstText, style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic))
-                        else ...[
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: _solidButton(
-                              _isPrepared ? AppLocalizations.of(context)!.preparedButton : AppLocalizations.of(context)!.confirmPreparationButton,
-                              color: _isPrepared ? Colors.green : ReceiveColors.primary,
-                              textColor: Colors.white,
-                              onPressed: _isPrepared ? null : _prepareWarehouse,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Step 3: Inspect & Update
-                  _buildSectionHeader("03", AppLocalizations.of(context)!.inspectionPhotosTitle),
-                  const SizedBox(height: 12),
-                  _ActionCard(
-                    isActive: _isPrepared,
-                    isDone: _isUpdated,
-                    child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.start,
-                       children: [
-                         if (!_isPrepared)
-                            Text(AppLocalizations.of(context)!.prepareWarehouseFirst, style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic))
-                         else ...[
-                            SwitchListTile.adaptive(
-                              contentPadding: EdgeInsets.zero,
-                              activeTrackColor: ReceiveColors.primary,
-                              title: Text(AppLocalizations.of(context)!.adminDocumentPhotos, style: const TextStyle(fontSize: 14)),
-                              value: _damagePhotosByAdmin,
-                              onChanged: (v) => setState(() => _damagePhotosByAdmin = v),
-                            ),
-                            const Divider(),
-                            TextField(
-                              controller: _notesCtrl,
-                              maxLines: 2,
-                              decoration: InputDecoration(
-                                labelText: AppLocalizations.of(context)!.notesAdminLabel,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton(
-                                onPressed: _isUpdated ? null : _updateSystemInstantly,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: ReceiveColors.primary,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: Text(_isUpdated ? AppLocalizations.of(context)!.allDoneButton : AppLocalizations.of(context)!.updateNowButton, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                         ]
-                       ],
-                    ),
-                  ),
+          // ─── 2. Stepper Progress Bar ──────────────────────────────
+          SliverToBoxAdapter(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  _stepIndicator(0, isAr ? 'المستودع' : 'Hub', isAr),
+                  _stepLine(0),
+                  _stepIndicator(1, isAr ? 'الموعد' : 'Schedule', isAr),
+                  _stepLine(1),
+                  _stepIndicator(2, isAr ? 'البضائع' : 'Cargo', isAr),
+                  _stepLine(2),
+                  _stepIndicator(3, isAr ? 'التأكيد' : 'Gate Pass', isAr),
                 ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
 
-  // UI Components matching BookingPage style
-
-  Widget _buildProgressCard(double pct) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                AppLocalizations.of(context)!.progressTitle,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-              Text(
-                "${(pct * 100).toInt()}%",
-                style: const TextStyle(color: ReceiveColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 6,
-              backgroundColor: const Color(0xFFF0F0F0),
-              valueColor: const AlwaysStoppedAnimation(ReceiveColors.primary),
+          // ─── 3. Dynamic Step Content ──────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+              child: _buildCurrentStepContent(isAr),
             ),
           ),
         ],
@@ -445,93 +268,800 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
     );
   }
 
-  Widget _buildSectionHeader(String number, String title) {
-    return Row(
+  // ─── Stepper Indicators ──────────────────────────────────────────────────
+  Widget _stepIndicator(int stepIndex, String title, bool isAr) {
+    final isDone = _currentStep > stepIndex;
+    final isCurrent = _currentStep == stepIndex;
+
+    Color color = Colors.grey.shade300;
+    Color textColor = Colors.grey.shade500;
+    if (isDone || isCurrent) {
+      color = ReceiveColors.primary;
+      textColor = InventoryColors.textDark;
+    }
+
+    return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: ReceiveColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(6),
+            color: isCurrent
+                ? ReceiveColors.primary
+                : isDone
+                    ? Colors.green
+                    : Colors.grey.shade200,
+            shape: BoxShape.circle,
           ),
-          child: Text(
-            number,
-            style: const TextStyle(color: ReceiveColors.primary, fontWeight: FontWeight.bold),
+          child: Center(
+            child: isDone
+                ? const Icon(Icons.check, color: Colors.white, size: 18)
+                : Text(
+                    '${stepIndex + 1}',
+                    style: TextStyle(
+                      color: (isCurrent || isDone) ? Colors.white : Colors.grey.shade600,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(height: 4),
         Text(
           title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ReceiveColors.textDark),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            color: textColor,
+          ),
         ),
       ],
     );
   }
 
-  Widget _pillButton(String text, {required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+  Widget _stepLine(int stepIndex) {
+    final isDone = _currentStep > stepIndex;
+    return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(color: ReceiveColors.primary),
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 16),
+        color: isDone ? Colors.green : Colors.grey.shade200,
+      ),
+    );
+  }
+
+  // ─── Step Router ─────────────────────────────────────────────────────────
+  Widget _buildCurrentStepContent(bool isAr) {
+    switch (_currentStep) {
+      case 0:
+        return _buildStep1WarehouseAndTemp(isAr);
+      case 1:
+        return _buildStep2ScheduleAndFreight(isAr);
+      case 2:
+        return _buildStep3CargoAndWorkers(isAr);
+      case 3:
+        return _buildStep4GatePassConfirmation(isAr);
+      default:
+        return const SizedBox();
+    }
+  }
+
+  // ─── Step 1: Select Warehouse Hub & Storage Mode ─────────────────────────
+  Widget _buildStep1WarehouseAndTemp(bool isAr) {
+    final hubs = [
+      {'name': isAr ? 'مستودع دبي المركزي' : 'Dubai Central Warehouse', 'location': 'Dubai Industrial City', 'icon': Icons.location_city_rounded},
+      {'name': isAr ? 'مستودع أبوظبي المركزي' : 'Abu Dhabi Central Hub', 'location': 'KIZAD Logistics Park', 'icon': Icons.location_on_rounded},
+      {'name': isAr ? 'مستودع الشارقة الإقليمي' : 'Sharjah Regional Hub', 'location': 'Al Saja\'a Industrial Zone', 'icon': Icons.storefront_rounded},
+      {'name': isAr ? 'مركز تجميع العين' : 'Al Ain Fulfillment Center', 'location': 'Niyadat Industrial Area', 'icon': Icons.warehouse_rounded},
+    ];
+
+    final tempModes = [
+      {'title': isAr ? 'تخزين عادي (25°C)' : 'Ambient Storage (25°C)', 'sub': isAr ? 'بضائع عامة غير قابلة للتلف' : 'Standard climate-controlled space', 'icon': Icons.wb_sunny_outlined, 'rate': '1.0x Base'},
+      {'title': isAr ? 'تخزين مبرد (2°C – 8°C)' : 'Chilled Storage (2°C – 8°C)', 'sub': isAr ? 'مشروبات ومستحضرات تجميل (+30%)' : 'Cosmetics & beverages (+30% rate)', 'icon': Icons.ac_unit_rounded, 'rate': '+30% Rate'},
+      {'title': isAr ? 'تخزين مجمد (< 0°C)' : 'Cold Storage (< 0°C)', 'sub': isAr ? 'أغذية مجمدة ومواد تخصصية (+50%)' : 'Frozen items & specialty foods (+50% rate)', 'icon': Icons.kitchen_rounded, 'rate': '+50% Rate'},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isAr ? 'الخطوة 1: اختر مستودع الاستلام وفئة التخزين' : 'Step 1: Select Fulfillment Hub & Temperature Class',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: InventoryColors.textDark),
         ),
-        child: Text(text, style: const TextStyle(color: ReceiveColors.primary, fontWeight: FontWeight.w500)),
-      ),
-    );
-  }
+        const SizedBox(height: 4),
+        Text(
+          isAr ? 'حدد مركز NXN الوارد ونوع درجة الحرارة المطلوبة لشحنتك' : 'Choose destination warehouse and required storage temperature class',
+          style: const TextStyle(fontSize: 12, color: InventoryColors.textSub),
+        ),
+        const SizedBox(height: 20),
 
-  Widget _solidButton(String text, {required Color color, required Color textColor, VoidCallback? onPressed}) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: textColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      ),
-      child: Text(text),
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final Widget child;
-  final bool isActive;
-  final bool isDone;
-
-  const _ActionCard({required this.child, this.isActive = true, this.isDone = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isActive ? Colors.white : Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: isDone
-            ? Border.all(color: Colors.green.withValues(alpha: 0.5), width: 1.5)
-            : Border.all(color: ReceiveColors.cardBorder),
-        boxShadow: isActive
-            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 4))]
-            : [],
-      ),
-      child: Stack(
-        children: [
-          child,
-          if (isDone)
-            const Positioned(
-              top: 0,
-              right: 0,
-              child: Icon(Icons.check_circle, color: Colors.green, size: 24),
+        // Hubs Cards
+        Text(isAr ? 'مستودع الوارد' : 'Destination Warehouse Hub', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 10),
+        ...hubs.map((h) {
+          final name = h['name'] as String;
+          final selected = _selectedWarehouse == name;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: InkWell(
+              onTap: () => setState(() => _selectedWarehouse = name),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: selected ? ReceiveColors.primary : ReceiveColors.cardBorder, width: selected ? 2 : 1),
+                  boxShadow: [
+                    if (selected) BoxShadow(color: ReceiveColors.primary.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(h['icon'] as IconData, color: selected ? ReceiveColors.primary : Colors.grey, size: 24),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: selected ? ReceiveColors.primary : InventoryColors.textDark)),
+                          Text(h['location'] as String, style: const TextStyle(fontSize: 11, color: InventoryColors.textSub)),
+                        ],
+                      ),
+                    ),
+                    if (selected) const Icon(Icons.check_circle_rounded, color: ReceiveColors.primary, size: 20),
+                  ],
+                ),
+              ),
             ),
-        ],
-      ),
+          );
+        }),
+
+        const SizedBox(height: 20),
+
+        // Storage Temperature Mode
+        Text(isAr ? 'فئة درجة الحرارة' : 'Storage Temperature Class', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 10),
+        ...tempModes.map((t) {
+          final title = t['title'] as String;
+          final selected = _selectedStorageMode == title;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: InkWell(
+              onTap: () => setState(() => _selectedStorageMode = title),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: selected ? ReceiveColors.primary : ReceiveColors.cardBorder, width: selected ? 2 : 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(t['icon'] as IconData, color: selected ? ReceiveColors.primary : Colors.grey, size: 22),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: selected ? ReceiveColors.primary : InventoryColors.textDark)),
+                          Text(t['sub'] as String, style: const TextStyle(fontSize: 11, color: InventoryColors.textSub)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: selected ? ReceiveColors.primary.withValues(alpha: 0.1) : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        t['rate'] as String,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: selected ? ReceiveColors.primary : Colors.grey.shade600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+
+        const SizedBox(height: 30),
+
+        // Next Button
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: () => setState(() => _currentStep = 1),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ReceiveColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  isAr ? 'المتابعة لتحديد الموعد والشاحنة' : 'Continue to Schedule & Carrier',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                Icon(isAr ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
+
+  // ─── Step 2: Schedule & Delivery Truck Info ──────────────────────────────
+  Widget _buildStep2ScheduleAndFreight(bool isAr) {
+    final slots = [
+      '08:00 AM - 11:00 AM',
+      '11:00 AM - 02:00 PM',
+      '02:00 PM - 05:00 PM',
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isAr ? 'الخطوة 2: تحديد موعد وصول شاحنة التوريد' : 'Step 2: Schedule Inbound Drop-Off & Delivery Truck',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: InventoryColors.textDark),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          isAr ? 'اختر تاريخ ووقت التنزيل وأدخل بيانات الناقل' : 'Select drop-off arrival date, time slot, and delivery vehicle info',
+          style: const TextStyle(fontSize: 12, color: InventoryColors.textSub),
+        ),
+        const SizedBox(height: 20),
+
+        // Date Picker Button
+        Text(isAr ? 'تاريخ التوصيل والوصول' : 'Delivery Date *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 10),
+        InkWell(
+          onTap: () async {
+            final now = DateTime.now();
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: now.add(const Duration(days: 1)),
+              firstDate: now,
+              lastDate: now.add(const Duration(days: 60)),
+            );
+            if (picked != null) setState(() => _scheduledDate = picked);
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _scheduledDate != null ? ReceiveColors.primary : ReceiveColors.cardBorder),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_rounded, color: ReceiveColors.primary, size: 22),
+                const SizedBox(width: 14),
+                Text(
+                  _scheduledDate != null ? _fmtDate(_scheduledDate!) : (isAr ? 'انقر لاختيار تاريخ التوصيل...' : 'Click to select drop-off date...'),
+                  style: TextStyle(
+                    fontWeight: _scheduledDate != null ? FontWeight.bold : FontWeight.normal,
+                    color: _scheduledDate != null ? InventoryColors.textDark : Colors.grey.shade500,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.arrow_drop_down_rounded, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Time Slot Picker
+        Text(isAr ? 'نافذة الوقت المتاحة' : 'Arrival Time Window', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 10),
+        Row(
+          children: slots.map((s) {
+            final selected = _selectedTimeSlot == s;
+            return Expanded(
+              child: Container(
+                margin: const EdgeInsets.only(right: 6),
+                child: ChoiceChip(
+                  label: Text(s, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  selected: selected,
+                  selectedColor: ReceiveColors.primary,
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(color: selected ? Colors.white : InventoryColors.textDark),
+                  onSelected: (_) => setState(() => _selectedTimeSlot = s),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Carrier & Vehicle Details
+        Text(isAr ? 'بيانات الشاحنة والشركة الناقلة' : 'Delivery Truck & Carrier Info', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _carrierCtrl,
+          decoration: InputDecoration(
+            labelText: isAr ? 'اسم شركة الشحن (مثال: أرامكس / شحنة خاصة)' : 'Carrier Company (e.g. Aramex / Private Truck)',
+            prefixIcon: const Icon(Icons.local_shipping_outlined),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _truckPlateCtrl,
+          decoration: InputDecoration(
+            labelText: isAr ? 'رقم لوحة الشاحنة (مثال: دبي 92810)' : 'Delivery Truck Plate (e.g. UAE-DXB-92810)',
+            prefixIcon: const Icon(Icons.pin_outlined),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+
+        const SizedBox(height: 30),
+
+        // Buttons
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => setState(() => _currentStep = 0),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text(isAr ? 'السابق' : 'Back'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (_scheduledDate == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isAr ? 'يرجى اختيار تاريخ التوصيل أولاً' : 'Please select delivery date first.')),
+                    );
+                    return;
+                  }
+                  setState(() => _currentStep = 2);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ReceiveColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text(isAr ? 'التالي: تفاصيل البضائع' : 'Next: Cargo Manifest', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ─── Step 3: Cargo Manifest & Workers Request ─────────────────────────────
+  Widget _buildStep3CargoAndWorkers(bool isAr) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isAr ? 'الخطوة 3: بيان المنتجات وطلب عمال التنزيل' : 'Step 3: Cargo Manifest & Offloading Workers Request',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: InventoryColors.textDark),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          isAr ? 'حدد كمية المنتجات والكراتين المطلوبة للتفريغ' : 'Specify item counts, box quantities, and required offloading workers',
+          style: const TextStyle(fontSize: 12, color: InventoryColors.textSub),
+        ),
+        const SizedBox(height: 20),
+
+        // Product Name Input
+        Text(
+          isAr ? 'اسم المنتج الوارد *' : 'Product / Commodity Name *',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _productNameCtrl,
+          decoration: InputDecoration(
+            hintText: isAr ? 'أدخل اسم المنتج (مثال: قهوة باردة 500مل، زيت زيتون...)' : 'Enter product name (e.g. Cold Brew Coffee 500ml, Organic Honey Jar)',
+            prefixIcon: const Icon(Icons.inventory_2_outlined, color: ReceiveColors.primary),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Items & Boxes Counters
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: ReceiveColors.cardBorder),
+          ),
+          child: Column(
+            children: [
+              _counterRow(
+                title: isAr ? 'عدد القطع/المنتجات' : 'Estimated Item Units',
+                subtitle: isAr ? 'إجمالي القطع الواردة للتخزين' : 'Total individual items for inventory',
+                value: _itemCount,
+                onAdd: () => setState(() => _itemCount += 10),
+                onMin: () => setState(() => _itemCount = (_itemCount - 10).clamp(10, 5000)),
+              ),
+              const Divider(height: 24),
+              _counterRow(
+                title: isAr ? 'عدد الكراتين / المنصات' : 'Boxes / Pallets Count',
+                subtitle: isAr ? 'عدد الطرود الكبيرة المسلمة' : 'Total outer boxes or shipping pallets',
+                value: _boxCount,
+                onAdd: () => setState(() => _boxCount += 1),
+                onMin: () => setState(() => _boxCount = (_boxCount - 1).clamp(1, 500)),
+              ),
+              const Divider(height: 24),
+              _counterRow(
+                title: isAr ? 'طلب عمال للتفريغ (+50 درهم/عامل)' : 'Request Offloading Workers (+50 AED/worker)',
+                subtitle: isAr ? 'عمال مخصصون لمساعدة السائق عند الرصيف' : 'Dedicated warehouse labor at the unloading bay',
+                value: _workers,
+                onAdd: () => setState(() => _workers += 1),
+                onMin: () => setState(() => _workers = (_workers - 1).clamp(0, 10)),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Notes
+        Text(isAr ? 'تعليمات خاصة لمسئول المستودع' : 'Special Handling Notes for Warehouse Admin', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _notesCtrl,
+          maxLines: 2,
+          decoration: InputDecoration(
+            hintText: isAr ? 'مثال: زجاج قابل للكسر، يتطلب رافعة شوكية...' : 'e.g. Fragile glass bottles, requires forklift...',
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+
+        const SizedBox(height: 30),
+
+        // Buttons
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => setState(() => _currentStep = 1),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text(isAr ? 'السابق' : 'Back'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: _isSubmitting ? null : _submitInboundRequest,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ReceiveColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: _isSubmitting
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                        isAr ? 'إرسال وإخطار المستودع' : 'Submit & Notify Admin',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ─── Step 4: Digital Inbound Gate Pass / Confirmation ─────────────────────
+  Widget _buildStep4GatePassConfirmation(bool isAr) {
+    final pass = _generatedGatePass ?? {};
+    final storageNo = pass['storage_no'] ?? 'STO-992817';
+    final bay = pass['bay'] ?? 'BAY-3';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Success Notice Banner
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isAr ? 'تم إرسال طلب التزويد وإخطار المستودع!' : 'Inbound Request Confirmed & Admin Notified!',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.green.shade900),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isAr ? 'تم حجز رصيد التفريغ وإرسال التنبيه الفوري لمسئول النظام.' : 'Unloading bay reserved & instant system alert pushed to admin.',
+                      style: TextStyle(fontSize: 12, color: Colors.green.shade800),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Digital Inbound Gate Pass Card
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: ReceiveColors.primary.withValues(alpha: 0.3), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: ReceiveColors.primary.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Gate Pass Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isAr ? 'تصريح دخول شاحنة التوريد' : 'INBOUND GATE PASS',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ReceiveColors.primary, letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        storageNo,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: InventoryColors.textDark),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.blueGlow,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.qr_code_2_rounded, size: 36, color: ReceiveColors.primary),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+
+              // Details
+              _infoRow(isAr ? 'رصيد التفريغ المحجوز' : 'Reserved Unloading Bay', bay, isHighlight: true),
+              _infoRow(isAr ? 'المستودع' : 'Warehouse Hub', _selectedWarehouse),
+              _infoRow(isAr ? 'تاريخ ووقت الوصول' : 'Scheduled Arrival', '${_scheduledDate != null ? _fmtDate(_scheduledDate!) : ""} ($_selectedTimeSlot)'),
+              _infoRow(isAr ? 'فئة درجة الحرارة' : 'Storage Mode', _selectedStorageMode),
+              _infoRow(isAr ? 'إجمالي الشحنة' : 'Total Shipment', '$_itemCount ${isAr ? "قطع" : "Units"} ($_boxCount ${isAr ? "كراتين" : "Boxes"})'),
+              _infoRow(isAr ? 'عمال التنزيل المخصصون' : 'Assigned Workers', '$_workers (${isAr ? "عمال" : "Workers"})'),
+              _infoRow(isAr ? 'بيانات الشاحنة والناقل' : 'Truck & Carrier', '${pass['carrier_name'] ?? _carrierCtrl.text} (${pass['truck_plate'] ?? _truckPlateCtrl.text})'),
+
+              const SizedBox(height: 20),
+
+              // Barcode Representation
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.line_weight_rounded, size: 40, color: InventoryColors.textDark),
+                    const SizedBox(height: 4),
+                    Text(
+                      '*$storageNo*$bay*',
+                      style: const TextStyle(fontFamily: 'Monospace', fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 30),
+
+        // Action Buttons
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DocumentPreviewPage(
+                    title: 'Gate_Pass_$storageNo',
+                    buildPdf: () => PdfExportService.generateGatePassPdf(
+                      gatePassCode: storageNo,
+                      warehouseName: _selectedWarehouse,
+                      dateStr: _scheduledDate != null
+                          ? '${_scheduledDate!.day}/${_scheduledDate!.month}/${_scheduledDate!.year}'
+                          : 'Today',
+                      itemCount: _itemCount,
+                      laborCount: _workers,
+                      tempMode: _selectedStorageMode,
+                      truckPlate: _truckPlateCtrl.text,
+                      notes: _notesCtrl.text,
+                    ),
+                  ),
+                ),
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: ReceiveColors.primary, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: ReceiveColors.primary),
+            label: Text(
+              isAr ? '📄 طباعة / تصدير تصريح الدخول (PDF)' : '📄 Export PDF Gate Pass',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ReceiveColors.primary),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              final resultObj = ReceiveResult(
+                storageNo: storageNo,
+                bay: bay,
+                scheduledAt: _scheduledDate ?? DateTime.now(),
+                storageMode: _selectedStorageMode,
+                workers: _workers,
+                damagePhotosByAdmin: false,
+                listingPhotosService: false,
+                notes: _notesCtrl.text,
+              );
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SmartInventoryStageEN(result: resultObj),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ReceiveColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            icon: const Icon(Icons.analytics_rounded, color: Colors.white),
+            label: Text(
+              isAr ? 'عرض في المخزون الذكي' : 'View in Smart Inventory',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isAr ? 'العودة للوحة التحكم' : 'Return to Store Dashboard'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Helper Counter Row ──────────────────────────────────────────────────
+  Widget _counterRow({
+    required String title,
+    required String subtitle,
+    required int value,
+    required VoidCallback onAdd,
+    required VoidCallback onMin,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: InventoryColors.textDark)),
+              const SizedBox(height: 2),
+              Text(subtitle, style: const TextStyle(fontSize: 11, color: InventoryColors.textSub)),
+            ],
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: ReceiveColors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: ReceiveColors.cardBorder),
+          ),
+          child: Row(
+            children: [
+              IconButton(icon: const Icon(Icons.remove, size: 18), onPressed: onMin),
+              Text('$value', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              IconButton(icon: const Icon(Icons.add, size: 18), onPressed: onAdd),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoRow(String k, String v, {bool isHighlight = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: Text(
+                k,
+                style: const TextStyle(color: InventoryColors.textSub, fontSize: 12),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: Text(
+                v,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: isHighlight ? ReceiveColors.primary : InventoryColors.textDark,
+                  fontWeight: isHighlight ? FontWeight.w900 : FontWeight.w600,
+                  fontSize: isHighlight ? 15 : 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }

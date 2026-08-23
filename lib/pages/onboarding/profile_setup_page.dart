@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../theme.dart';
-import '../booking/booking_map_page.dart';
+import '../home_shell.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nxnapp/l10n/app_localizations.dart';
 
@@ -28,13 +28,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   Future<void> _pickDocument() async {
     final ImagePicker picker = ImagePicker();
-    // In a real app we might allow pdf too, but for image_picker we stick to gallery
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
         _documentFile = image;
         _showDocError = false;
       });
+      if (mounted) {
+        Provider.of<UserProvider>(context, listen: false).setDocumentUploaded(image.name);
+      }
     }
   }
 
@@ -55,39 +57,38 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   }
 
   Future<void> _saveProfile() async {
-    setState(() => _showDocError = _documentFile == null);
-    if (!_formKey.currentState!.validate() || _documentFile == null) return;
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final bool hasDoc = _documentFile != null || userProvider.isDocumentUploaded;
+    setState(() => _showDocError = !hasDoc);
+    if (!_formKey.currentState!.validate() || !hasDoc) return;
 
     setState(() => _isLoading = true);
 
     try {
       final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) throw 'No authenticated user found.';
+      if (user != null) {
+        await Supabase.instance.client.from('sme_sellers').upsert({
+          'id': user.id,
+          'business_name': _businessNameController.text.trim(),
+          'contact_number': _contactController.text.trim(),
+        });
+      }
 
-      // Upsert seller profile
-      await Supabase.instance.client.from('sme_sellers').upsert({
-        'id': user.id,
-        'business_name': _businessNameController.text.trim(),
-        'contact_number': _contactController.text.trim(),
-        'is_verified': true, // Auto-verify if pseudo-UAE PASS
-      });
-
-      // Update Global State
       if (mounted) {
-        Provider.of<UserProvider>(context, listen: false).setUser(
+        userProvider.setUser(
           businessName: _businessNameController.text.trim(),
           contactNumber: _contactController.text.trim(),
           licenseNumber: _licenseController.text.trim(),
         );
+        userProvider.setDocumentUploaded(_documentFile?.name ?? userProvider.documentFileName ?? 'Trade_License_CN2891048.pdf');
       }
 
-        if (mounted) {
-          // Navigate to BookingMapPage directly for the flow
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const BookingMapPage()), 
-            (route) => false,
-          );
-        }
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeShell()), 
+          (route) => false,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -181,36 +182,42 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               Text(AppLocalizations.of(context)!.requiredDocumentsTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               
-              InkWell(
-                onTap: _pickDocument,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  height: 120,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    border: Border.all(color: _documentFile != null ? Colors.green : Colors.grey[300]!, width: 2),
+              Consumer<UserProvider>(
+                builder: (context, userProvider, _) {
+                  final isUploaded = _documentFile != null || userProvider.isDocumentUploaded;
+                  final docName = _documentFile?.name ?? userProvider.documentFileName ?? 'Trade_License_CN2891048.pdf';
+                  return InkWell(
+                    onTap: _pickDocument,
                     borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: _documentFile != null 
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.check_circle, color: Colors.green, size: 32),
-                          const SizedBox(height: 8),
-                          Text('${AppLocalizations.of(context)!.uploadedLabel}: ${_documentFile!.name}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                          TextButton(onPressed: _pickDocument, child: Text(AppLocalizations.of(context)!.changeButton))
-                        ],
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.cloud_upload_outlined, size: 32, color: Colors.grey),
-                          SizedBox(height: 8),
-                          Text(AppLocalizations.of(context)!.tapToUploadDoc, style: TextStyle(color: Colors.grey)),
-                        ],
+                    child: Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: isUploaded ? Colors.green.withValues(alpha: 0.05) : Colors.grey[50],
+                        border: Border.all(color: isUploaded ? Colors.green : Colors.grey[300]!, width: 2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                ),
+                      child: isUploaded 
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                              const SizedBox(height: 8),
+                              Text('${AppLocalizations.of(context)!.uploadedLabel}: $docName', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                              TextButton(onPressed: _pickDocument, child: Text(AppLocalizations.of(context)!.changeButton))
+                            ],
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.cloud_upload_outlined, size: 32, color: Colors.grey),
+                              const SizedBox(height: 8),
+                              Text(AppLocalizations.of(context)!.tapToUploadDoc, style: const TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                    ),
+                  );
+                },
               ),
               if (_showDocError)
                 Padding(

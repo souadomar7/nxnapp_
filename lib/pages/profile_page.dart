@@ -18,8 +18,8 @@ import 'marketplace/seller_hub.dart';
 import '../services/marketplace_service.dart';
 import 'login.dart';
 import 'registration_page.dart';
-import 'admin/admin_login_page.dart';
 import 'demo_menu_page.dart';
+import 'admin_panel_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -79,11 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
-                  ),
+                  color: AppColors.bluePrimary,
                 ),
                 child: SafeArea(
                   child: Padding(
@@ -117,6 +113,7 @@ class _ProfilePageState extends State<ProfilePage> {
   // ─── GUEST HEADER ─────────────────────────────────────────────────────────
 
   Widget _buildGuestHeader(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -130,13 +127,13 @@ class _ProfilePageState extends State<ProfilePage> {
             radius: 30,
             backgroundColor: Colors.white,
             child: Icon(Icons.person_outline_rounded,
-                color: Color(0xFF1E3C72), size: 30),
+                color: AppColors.bluePrimary, size: 30),
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Guest User',
-          style: TextStyle(
+        Text(
+          isAr ? 'زائر' : 'Guest User',
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w900,
@@ -156,8 +153,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Sign In',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(isAr ? 'تسجيل الدخول' : 'Sign In',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(width: 12),
@@ -169,13 +166,13 @@ class _ProfilePageState extends State<ProfilePage> {
                         builder: (_) => const RegistrationPage())),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF1E3C72),
+                  foregroundColor: AppColors.bluePrimary,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Register',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(isAr ? 'إنشاء حساب' : 'Register',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -209,7 +206,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     return Text(
                       initial,
                       style: const TextStyle(
-                        color: Color(0xFF1E3C72),
+                        color: AppColors.bluePrimary,
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                       ),
@@ -272,21 +269,26 @@ class _ProfilePageState extends State<ProfilePage> {
             border: Border.all(
                 color: Colors.white.withValues(alpha: 0.1), width: 1),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _HeaderStat(
-                  label: 'Pending Bills',
-                  value: _isLoading ? '...' : '$_pendingInvoices'),
-              Container(width: 1, height: 24, color: Colors.white12),
-              _HeaderStat(
-                  label: 'Catalog Items',
-                  value: _isLoading ? '...' : '$_catalogCount'),
-              Container(width: 1, height: 24, color: Colors.white12),
-              _HeaderStat(
-                  label: 'Active Shelves',
-                  value: _isLoading ? '...' : '$_activeShelves'),
-            ],
+          child: Builder(
+            builder: (ctx) {
+              final isAr = Localizations.localeOf(ctx).languageCode == 'ar';
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _HeaderStat(
+                      label: isAr ? 'فواتير معلقة' : 'Pending Bills',
+                      value: _isLoading ? '...' : '$_pendingInvoices'),
+                  Container(width: 1, height: 24, color: Colors.white12),
+                  _HeaderStat(
+                      label: isAr ? 'المنتجات' : 'Catalog Items',
+                      value: _isLoading ? '...' : '$_catalogCount'),
+                  Container(width: 1, height: 24, color: Colors.white12),
+                  _HeaderStat(
+                      label: isAr ? 'أرفف نشطة' : 'Active Shelves',
+                      value: _isLoading ? '...' : '$_activeShelves'),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -297,13 +299,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<Widget> _buildGuestSections(
       BuildContext context, AppLocalizations l10n) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return [
       // Locked account section with CTA
       _buildGuestLockedCard(
+        context: context,
         icon: Icons.lock_outline_rounded,
-        title: 'Account Features Locked',
-        body:
-            'Sign in or register to access your subscriptions, invoices, wallet, and KYC documents.',
+        title: isAr ? 'خصائص الحساب مقفلة' : 'Account Features Locked',
+        body: isAr
+            ? 'قم بتسجيل الدخول أو إنشاء حساب للوصول إلى اشتراكاتك، الفواتير، المحفظة، ومستندات التحقق (KYC).'
+            : 'Sign in or register to access your subscriptions, invoices, wallet, and KYC documents.',
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const RegistrationPage())),
       ),
@@ -335,39 +340,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
       const SizedBox(height: 24),
 
-      // Admin & System
-      _SectionHeader(title: 'Admin & System'),
-      _MenuCard(children: [
-        _ProfileTile(
-          icon: Icons.admin_panel_settings_outlined,
-          title: 'Admin Staff Portal',
-          subtitle: 'PIN: 8818 — WMS & Approvals',
-          iconColor: Colors.orange.shade700,
-          onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AdminLoginPage())),
-        ),
-        _Divider(),
-        _ProfileTile(
-          icon: Icons.developer_mode_rounded,
-          title: 'All Features Demo Menu',
-          subtitle: 'Quick access to all app pages',
-          iconColor: AppColors.bluePrimary,
-          onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const DemoMenuPage())),
-        ),
-      ]),
-
-      const SizedBox(height: 24),
-
       // Sign out / back
       _MenuCard(children: [
         _ProfileTile(
           icon: Icons.exit_to_app_rounded,
-          title: 'Exit Guest Mode',
+          title: isAr ? 'الخروج من وضع الزائر' : 'Exit Guest Mode',
           iconColor: Colors.redAccent,
           textColor: Colors.redAccent,
           showTrailing: false,
@@ -396,11 +373,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildGuestLockedCard({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required String body,
     required VoidCallback onTap,
   }) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -462,9 +441,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     borderRadius: BorderRadius.circular(14)),
                 padding: const EdgeInsets.symmetric(vertical: 13),
               ),
-              child: const Text(
-                'Create Free Merchant Account',
-                style: TextStyle(
+              child: Text(
+                isAr ? 'إنشاء حساب تاجر مجاني' : 'Create Free Merchant Account',
+                style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 14),
@@ -532,17 +511,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
       const SizedBox(height: 24),
 
-      _SectionHeader(title: 'Admin & System'),
+      _SectionHeader(title: 'System & Tools'),
       _MenuCard(children: [
         _ProfileTile(
-          icon: Icons.admin_panel_settings_outlined,
-          title: 'Admin Staff Portal',
-          subtitle: 'PIN: 8818 — WMS & Approvals',
-          iconColor: Colors.orange.shade700,
+          icon: Icons.admin_panel_settings_rounded,
+          title: Localizations.localeOf(context).languageCode == 'ar' ? 'لوحة تحكم الإدارة والمستودع' : 'Super Admin & Ops Control Panel',
+          subtitle: Localizations.localeOf(context).languageCode == 'ar' ? 'إشراف الشحنات والاعتمادات والسحوبات' : 'Inbound, Outbound, KYC & Payouts control',
+          iconColor: Colors.amber.shade800,
           onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (_) => const AdminLoginPage())),
+                  builder: (_) => const AdminPanelPage())),
         ),
         _Divider(),
         _ProfileTile(

@@ -23,26 +23,28 @@ class ChatbotEngine {
     }
   }
 
-  Future<ChatMessage> processMessage(String userMessage) async {
+  Future<ChatMessage> processMessage(String userMessage, {bool isAr = false}) async {
     if (!_isInitialized) {
       await initialize();
     }
 
+    final isArabicQuery = isAr || RegExp(r'[\u0600-\u06FF]').hasMatch(userMessage);
+
     // 1. Handle pending intent (waiting for required data)
     if (_pendingIntent != null) {
-      return _handlePendingIntent(userMessage);
+      return _handlePendingIntent(userMessage, isAr: isArabicQuery);
     }
 
     // 2. Deterministic Matching
     final intent = _findBestMatch(userMessage);
     
     if (intent != null) {
-      return _handleIntent(intent);
+      return _handleIntent(intent, isAr: isArabicQuery);
     }
 
     // 3. Fallback to LLM if no deterministic match found
     try {
-      final llmResponse = await _llmService.processFallback(userMessage, _intents);
+      final llmResponse = await _llmService.processFallback(userMessage, _intents, isAr: isArabicQuery);
       return ChatMessage(
         text: llmResponse,
         sender: MessageSender.bot,
@@ -50,7 +52,9 @@ class ChatbotEngine {
       );
     } catch (e) {
       return ChatMessage(
-        text: "I'm sorry, I'm having trouble understanding right now. Please try again or contact support.",
+        text: isArabicQuery
+            ? "عذراً، أواجه صعوبة في فهم الطلب حالياً. يرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني."
+            : "I'm sorry, I'm having trouble understanding right now. Please try again or contact support.",
         sender: MessageSender.bot,
         timestamp: DateTime.now(),
       );
@@ -58,56 +62,68 @@ class ChatbotEngine {
   }
 
   ChatbotIntent? _findBestMatch(String message) {
-    message = message.toLowerCase().trim();
-    message = _normalizeSynonyms(message);
-    final msgClean = message.replaceAll(RegExp(r'[?؟.,!]'), '');
-    
-    int maxMatches = 0;
+    final cleanMsg = _normalizeAr(message);
+    if (cleanMsg.isEmpty) return null;
+    final msgWords = cleanMsg.split(' ').where((w) => w.isNotEmpty).toSet();
+
+    double maxScore = 0;
     ChatbotIntent? bestIntent;
 
     for (var intent in _intents) {
-      int matches = 0;
+      final qArClean = _normalizeAr(intent.questionAr);
+      final qEnClean = _normalizeAr(intent.questionEn);
 
-      // 1. Exact or partial Question match (Highest Priority)
-      final qEnClean = intent.questionEn.toLowerCase().replaceAll(RegExp(r'[?؟.,!]'), '').trim();
-      final qArClean = intent.questionAr.toLowerCase().replaceAll(RegExp(r'[?؟.,!]'), '').trim();
+      double score = 0;
 
-      if (qEnClean.isNotEmpty && (msgClean == qEnClean || msgClean.contains(qEnClean) || qEnClean.contains(msgClean))) {
-        matches += 50;
-      }
-      if (qArClean.isNotEmpty && (msgClean == qArClean || msgClean.contains(qArClean) || qArClean.contains(msgClean))) {
-        matches += 50;
+      // 1. Exact Question Match (Highest Weight: 1000 points)
+      if (cleanMsg == qArClean || cleanMsg == qEnClean) {
+        score += 1000;
       }
 
-      // 2. Keyword matching
-      for (var kw in intent.keywordsEn) {
-        if (kw.isNotEmpty && message.contains(kw.toLowerCase())) {
-          matches++;
-        }
+      // 2. High partial match on questions
+      final arWords = qArClean.split(' ').where((w) => w.isNotEmpty).toSet();
+      final enWords = qEnClean.split(' ').where((w) => w.isNotEmpty).toSet();
+
+      final overlapAr = msgWords.intersection(arWords).length;
+      final overlapEn = msgWords.intersection(enWords).length;
+
+      if (arWords.isNotEmpty) {
+        score += (overlapAr / arWords.length) * 300;
       }
-      // Match Arabic keywords
+      if (enWords.isNotEmpty) {
+        score += (overlapEn / enWords.length) * 300;
+      }
+
+      // 3. Keyword matches
       for (var kw in intent.keywordsAr) {
-        if (kw.isNotEmpty && message.contains(kw)) {
-          matches++;
+        final cleanKw = _normalizeAr(kw);
+        if (cleanKw.isNotEmpty && cleanMsg.contains(cleanKw)) {
+          score += 40;
+        }
+      }
+      for (var kw in intent.keywordsEn) {
+        final cleanKw = _normalizeAr(kw);
+        if (cleanKw.isNotEmpty && cleanMsg.contains(cleanKw)) {
+          score += 40;
         }
       }
 
-      // 3. Word matching from the question to catch variations
-      final words = msgClean.split(' ').where((w) => w.length > 3).toList();
-      for (var word in words) {
-        if (qEnClean.contains(word) || qArClean.contains(word)) {
-          matches++;
-        }
-      }
-
-      if (matches > maxMatches) {
-        maxMatches = matches;
+      if (score > maxScore) {
+        maxScore = score;
         bestIntent = intent;
       }
     }
 
-    // Require a reasonable threshold if it's just word matching, or >0 if it's keywords/exact
-    return maxMatches > 0 ? bestIntent : null;
+    return maxScore >= 40 ? bestIntent : null;
+  }
+
+  String _normalizeAr(String text) {
+    text = text.toLowerCase().trim();
+    text = text.replaceAll(RegExp(r'[\u064B-\u065F]'), ''); // remove tashkeel
+    text = text.replaceAll(RegExp(r'[أإآ]'), 'ا');
+    text = text.replaceAll(RegExp(r'[ة]'), 'ه');
+    text = text.replaceAll(RegExp(r'[?؟.,!_]'), '');
+    return text.trim();
   }
 
   String _normalizeSynonyms(String message) {
@@ -242,11 +258,13 @@ class ChatbotEngine {
     return message;
   }
 
-  ChatMessage _handleIntent(ChatbotIntent intent) {
+  ChatMessage _handleIntent(ChatbotIntent intent, {bool isAr = false}) {
     if (intent.botActionEn == 'Collect data then proceed') {
       _pendingIntent = intent;
       return ChatMessage(
-        text: "Please provide your ${intent.requiredDataEn.toLowerCase()}: \n(يرجى تزويدنا بـ ${intent.requiredDataAr})",
+        text: isAr
+            ? "📌 **[${intent.categoryAr}]**\n\n${intent.answerAr}\n\n📝 **مطلوب لتنفيذ الطلب:**\nيرجى تزويدنا بـ **${intent.requiredDataAr}** لمتابعة إجراءات الخدمة."
+            : "📌 **[${intent.categoryEn}]**\n\n${intent.answerEn}\n\n📝 **Action Required:**\nPlease provide your **${intent.requiredDataEn}** to proceed with your request.",
         sender: MessageSender.bot,
         timestamp: DateTime.now(),
       );
@@ -254,34 +272,80 @@ class ChatbotEngine {
 
     if (intent.escalate) {
       return ChatMessage(
-        text: "This requires human support. Escalation reason: ${intent.escalationReasonEn}. \n\nI will escalate this ticket now.",
+        text: isAr
+            ? "📌 **[${intent.categoryAr}]**\n\n${intent.answerAr}\n\n🎧 **تنويه الدعم المباشر:**\nيتطلب هذا الاستفسار تواصل موظف خدمة العملاء.\n• **سبب التحويل:** ${intent.escalationReasonAr.isNotEmpty ? intent.escalationReasonAr : intent.escalationReasonEn}.\n\nتم رفع تذكرة الدعم وسيتم التواصل معك فوراً."
+            : "📌 **[${intent.categoryEn}]**\n\n${intent.answerEn}\n\n🎧 **Support Escalation:**\nThis request requires human assistance.\n• **Reason:** ${intent.escalationReasonEn}.\n\nA support ticket has been opened for you.",
         sender: MessageSender.bot,
         timestamp: DateTime.now(),
       );
     }
 
+    final categoryHeader = isAr
+        ? (intent.categoryAr.isNotEmpty ? "📌 **[${intent.categoryAr}]**\n\n" : "")
+        : (intent.categoryEn.isNotEmpty ? "📌 **[${intent.categoryEn}]**\n\n" : "");
+
+    final mainAnswer = isAr ? intent.answerAr : intent.answerEn;
+    final hint = _getAppHint(intent.categoryEn, isAr: isAr);
+
     return ChatMessage(
-      text: "${intent.answerEn}\n\n${intent.answerAr}",
+      text: "$categoryHeader$mainAnswer$hint",
       sender: MessageSender.bot,
       timestamp: DateTime.now(),
     );
   }
 
-  ChatMessage _handlePendingIntent(String data) {
+  String _getAppHint(String categoryEn, {required bool isAr}) {
+    final cat = categoryEn.toLowerCase();
+    if (cat.contains('package') || cat.contains('price') || cat.contains('pricing') || cat.contains('fee')) {
+      return isAr
+          ? "\n\n💡 *ملاحظة:* يمكنك حساب التكلفة الدقيقة واختيار الباقة تحت تبويب **حجز مساحة** بالتطبيق."
+          : "\n\n💡 *Note:* You can calculate exact quotes & select packages in the **Book Space** tab.";
+    } else if (cat.contains('warehous') || cat.contains('storage') || cat.contains('inventory')) {
+      return isAr
+          ? "\n\n💡 *ملاحظة:* يمكنك متابعة مواقع الأرفف ومستويات المخزون تحت تبويب **المخزون الذكي**."
+          : "\n\n💡 *Note:* You can monitor shelf allocations & SKU stock in the **Smart Inventory** tab.";
+    } else if (cat.contains('inbound') || cat.contains('receiv') || cat.contains('intake')) {
+      return isAr
+          ? "\n\n💡 *ملاحظة:* يمكنك جدولة توريد الشحنات وحجز تصريح دخول العمال (STO) عبر **حجز تسليم البضائع**."
+          : "\n\n💡 *Note:* Schedule intake drop-offs & gate passes via **Book Drop-off (STO)**.";
+    } else if (cat.contains('outbound') || cat.contains('order') || cat.contains('ship') || cat.contains('deliver')) {
+      return isAr
+          ? "\n\n💡 *ملاحظة:* يمكنك إنشاء طلبات التوصيل وتتبع شركات الشحن من خلال **طلب شحن وتوصيل (WAY)**."
+          : "\n\n💡 *Note:* Dispatch customer orders & track couriers in **Request Delivery (WAY)**.";
+    } else if (cat.contains('pay') || cat.contains('bill') || cat.contains('wallet') || cat.contains('account')) {
+      return isAr
+          ? "\n\n💡 *ملاحظة:* يمكنك الاطلاع على الرصيد وطلب سحب الأرباح البنكية (IBAN) من **صفحة المحفظة**."
+          : "\n\n💡 *Note:* Review cleared revenue & request IBAN payouts anytime on your **Wallet Page**.";
+    } else if (cat.contains('return') || cat.contains('exchange') || cat.contains('quarantine')) {
+      return isAr
+          ? "\n\n💡 *ملاحظة:* تخضع المنتجات المرتجعة للفحص مع توثيق حالات التعويض والعزل التلقائي بالمستودع."
+          : "\n\n💡 *Note:* Returned items undergo inspection with auto-credit compensation for hub damages.";
+    } else if (cat.contains('report') || cat.contains('analytic')) {
+      return isAr
+          ? "\n\n💡 *ملاحظة:* يمكنك تصدير تقارير التخزين والمبيعات بصيغة Excel أو PDF من لوحة التحليلات."
+          : "\n\n💡 *Note:* Export fulfillment & sales reports anytime in Excel or PDF format.";
+    }
+    return "";
+  }
+
+  ChatMessage _handlePendingIntent(String data, {bool isAr = false}) {
     final intent = _pendingIntent!;
     _pendingIntent = null; // Clear pending state
     
-    // In a real app, you would send this data to your backend/ticketing system here.
     if (intent.escalate) {
       return ChatMessage(
-        text: "Thank you for providing the details. A support agent will contact you shortly regarding: ${intent.escalationReasonEn}.",
+        text: isAr
+            ? "شكراً لك على تزويدنا بالتفاصيل. سيتواصل معك أحد ممثلي الدعم الفني قريباً بشأن: ${intent.escalationReasonAr.isNotEmpty ? intent.escalationReasonAr : intent.escalationReasonEn}."
+            : "Thank you for providing the details. A support agent will contact you shortly regarding: ${intent.escalationReasonEn}.",
         sender: MessageSender.bot,
         timestamp: DateTime.now(),
       );
     }
 
     return ChatMessage(
-      text: "Thank you. We have received your data and are processing your request.",
+      text: isAr
+          ? "شكراً لك. لقد استلمنا بياناتك وجاري معالجة طلبك."
+          : "Thank you. We have received your data and are processing your request.",
       sender: MessageSender.bot,
       timestamp: DateTime.now(),
     );

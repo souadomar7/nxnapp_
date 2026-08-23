@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/locale_provider.dart';
 import '../terms_and_conditions.dart';
 import '../../theme.dart';
 import '../../l10n/app_localizations.dart';
@@ -18,8 +20,46 @@ class ServiceOverviewPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Logo & Hero
-              Center(child: Image.asset('assets/images/nxn_logo.jpg', height: 60)), // Increased from 48
+              // 1. Logo & Language Switcher
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 60), // balance center logo
+                  Image.asset('assets/images/nxn_logo.jpg', height: 60),
+                  Consumer<LocaleProvider>(
+                    builder: (context, localeProvider, _) {
+                      final isAr = localeProvider.locale.languageCode == 'ar';
+                      return InkWell(
+                        onTap: () => localeProvider.toggleLocale(),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.language_rounded, color: AppColors.bluePrimary, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                isAr ? 'EN' : 'العربية',
+                                style: const TextStyle(
+                                  color: AppColors.bluePrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               Text(
                 l10n.soHeroTitle,
@@ -56,55 +96,72 @@ class ServiceOverviewPage extends StatelessWidget {
               const SizedBox(height: 24), // Increased from 20
 
               // 3. Branches List
-              Text(
-                l10n.soAvailableHubs,
-                textAlign: TextAlign.left,
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold), // Increased from 15
-              ),
-              const SizedBox(height: 12),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 2.6, // Taller boxes (was 3)
-                padding: EdgeInsets.zero,
-                children: [
-                  _buildGridBranchItem(Icons.location_on_outlined, 'Abu Dhabi'),
-                  _buildGridBranchItem(Icons.location_on_outlined, 'Al Ain'),
-                  _buildGridBranchItem(Icons.location_on_outlined, 'Dubai'),
-                  _buildGridBranchItem(Icons.location_on_outlined, 'Sharjah'),
-                ],
+              Builder(
+                builder: (context) {
+                  final isAr = Localizations.localeOf(context).languageCode == 'ar';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          l10n.soAvailableHubs,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 2.6,
+                        padding: EdgeInsets.zero,
+                        children: [
+                          _buildGridBranchItem(Icons.location_on_outlined, isAr ? 'أبو ظبي' : 'Abu Dhabi'),
+                          _buildGridBranchItem(Icons.location_on_outlined, isAr ? 'العين' : 'Al Ain'),
+                          _buildGridBranchItem(Icons.location_on_outlined, isAr ? 'دبي' : 'Dubai'),
+                          _buildGridBranchItem(Icons.location_on_outlined, isAr ? 'الشارقة' : 'Sharjah'),
+                        ],
+                      ),
+                    ],
+                  );
+                },
               ),
 
-              const SizedBox(height: 24), // Increased from 12
+              const SizedBox(height: 24),
 
               // 4. Pricing
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20), // Increased padding
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                 decoration: BoxDecoration(
                   color: AppColors.bluePrimary.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.1)),
                 ),
-                child: Column(
-                  children: [
-                    Text(l10n.soSimplePricing, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.bluePrimary)), // Increased from 12
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+                child: Builder(
+                  builder: (context) {
+                    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+                    return Column(
                       children: [
-                        const Text('AED', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), // Increased from 16
-                        const SizedBox(width: 4),
-                        const Text('100', style: TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: AppColors.textPrimary)), // Increased from 36
-                        Text(l10n.soPerShelf, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)), // Increased from 12
+                        Text(l10n.soSimplePricing, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.bluePrimary)),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(isAr ? 'درهم' : 'AED', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 4),
+                            const Text('100', style: TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                            Text(l10n.soPerShelf, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                        Text(l10n.soFlatRate, style: const TextStyle(color: Colors.grey, fontSize: 13)),
                       ],
-                    ),
-                    Text(l10n.soFlatRate, style: const TextStyle(color: Colors.grey, fontSize: 13)), // Increased from 11
-                  ],
+                    );
+                  },
                 ),
               ),
 

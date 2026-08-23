@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/locale_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme.dart';
 import '../core/auth/session_provider.dart';
@@ -15,6 +16,7 @@ import 'request_delivery_page.dart';
 import 'receive_goods_stage.dart';
 import 'operations/gate_pass_page.dart';
 import 'copilot_page.dart';
+import 'smart_inventory_stage.dart';
 import 'login.dart';
 import 'registration_page.dart';
 
@@ -70,7 +72,7 @@ class _HomePageState extends State<HomePage> {
     final isGuest = session.role == UserRole.guest;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: AppColors.bg,
       floatingActionButton: isGuest
           ? null
           : FloatingActionButton(
@@ -80,7 +82,8 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (_) => const CopilotPage()),
               ),
               backgroundColor: AppColors.bluePrimary,
-              child: const Icon(Icons.smart_toy_rounded, size: 28, color: Colors.white),
+              elevation: 3,
+              child: const Icon(Icons.support_agent_outlined, size: 26, color: Colors.white),
             ),
       body: RefreshIndicator(
         onRefresh: _loadData,
@@ -96,11 +99,11 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (isGuest) ...[
-                      _buildGuestStatsPlaceholder(),
+                      _buildGuestStatsPlaceholder(context),
                       const SizedBox(height: 16),
                       _buildGuestPromoBanner(context),
                       const SizedBox(height: 16),
-                      _buildGuestPublicStats(),
+                      _buildGuestPublicStats(context),
                       const SizedBox(height: 16),
                       _buildGuestCTA(context),
                     ] else ...[
@@ -131,12 +134,12 @@ class _HomePageState extends State<HomePage> {
   Widget _buildHeader(AppLocalizations l10n, bool isGuest) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(24, 60, 24, isGuest ? 24 : 50),
+      padding: EdgeInsets.fromLTRB(24, 60, 24, isGuest ? 28 : 54),
       decoration: const BoxDecoration(
         color: AppColors.bluePrimary,
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
       ),
       child: Column(
@@ -146,59 +149,105 @@ class _HomePageState extends State<HomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const BrandLogo(height: 36, isLight: true),
-              if (!isGuest)
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined,
-                      color: Colors.white, size: 28),
-                  onPressed: () {},
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (isGuest)
-            _buildGuestHeaderContent()
-          else
-            Consumer<UserProvider>(
-              builder: (context, user, _) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  Text(
-                    l10n.helloUser(user.displayName),
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
+                  Consumer<LocaleProvider>(
+                    builder: (context, localeProvider, _) {
+                      final isAr = localeProvider.locale.languageCode == 'ar';
+                      return InkWell(
+                        onTap: () => localeProvider.toggleLocale(),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.language_rounded, color: Colors.white, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                isAr ? 'EN' : 'العربية',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Here's what's happening today.",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.8),
+                  if (!isGuest) ...[
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () {},
+                      child: Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        ),
+                        child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          if (isGuest)
+            _buildGuestHeaderContent(context)
+          else
+            Consumer<UserProvider>(
+              builder: (context, user, _) {
+                final isArHeader = Localizations.localeOf(context).languageCode == 'ar';
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isArHeader ? 'أهلاً بك، ${user.displayName}' : 'Hello, ${user.displayName}!',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isArHeader
+                          ? 'إليك ملخص النشاط لهذا اليوم.'
+                          : "Here's what's happening today.",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
         ],
       ),
     );
   }
 
-  Widget _buildGuestHeaderContent() {
+  Widget _buildGuestHeaderContent(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Welcome to NXN',
-          style: TextStyle(
+        Text(
+          isAr ? 'مرحباً بك في NXN' : 'Welcome to NXN',
+          style: const TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -207,7 +256,7 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 4),
         Text(
-          'UAE\'s leading logistics & warehousing platform.',
+          isAr ? 'المنصة الأولى للخدمات اللوجستية والتخزين في الإمارات.' : 'UAE\'s leading logistics & warehousing platform.',
           style: TextStyle(
             fontSize: 14,
             color: Colors.white.withValues(alpha: 0.8),
@@ -227,8 +276,8 @@ class _HomePageState extends State<HomePage> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
-                child: const Text('Sign In',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(isAr ? 'تسجيل الدخول' : 'Sign In',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(width: 12),
@@ -245,8 +294,8 @@ class _HomePageState extends State<HomePage> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
-                child: const Text('Register',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(isAr ? 'إنشاء حساب' : 'Register',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -257,19 +306,20 @@ class _HomePageState extends State<HomePage> {
 
   // ─── GUEST-ONLY SECTIONS ─────────────────────────────────────────────────────
 
-  Widget _buildGuestStatsPlaceholder() {
+  Widget _buildGuestStatsPlaceholder(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Transform.translate(
       offset: const Offset(0, -20),
       child: Row(
         children: [
           _buildLockedStatCard(
-            title: 'Total Shelves',
+            title: isAr ? 'إجمالي الأرفف' : 'Total Shelves',
             icon: Icons.shelves,
             color: AppColors.bluePrimary,
           ),
           const SizedBox(width: 16),
           _buildLockedStatCard(
-            title: 'Stock Value',
+            title: isAr ? 'قيمة المخزون' : 'Stock Value',
             icon: Icons.monetization_on_rounded,
             color: Colors.green,
           ),
@@ -285,12 +335,13 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1A1F3D).withValues(alpha: 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: const Color(0xFF003C8E).withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -303,20 +354,20 @@ class _HomePageState extends State<HomePage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
+                    color: AppColors.blueGlow,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: AppColors.blueMid, size: 18),
                 ),
-                const Icon(Icons.lock_rounded, size: 14, color: Colors.grey),
+                const Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.blueLight),
               ],
             ),
             const SizedBox(height: 12),
             Container(
-              height: 18,
-              width: 50,
+              height: 16,
+              width: 48,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: AppColors.blueGlow,
                 borderRadius: BorderRadius.circular(6),
               ),
             ),
@@ -336,60 +387,70 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildGuestPromoBanner(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0038A8), Color(0xFF2E63FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.bluePrimary,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2E63FF).withValues(alpha: 0.25),
+            color: const Color(0xFF003C8E).withValues(alpha: 0.18),
             blurRadius: 16,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.warehouse_rounded, color: Colors.white, size: 40),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.warehouse_outlined, color: Colors.white, size: 28),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Get Started with NXN Logistics',
-                  style: TextStyle(
+                Text(
+                  isAr ? 'ابدأ الآن مع NXN اللوجستية' : 'Get Started with NXN Logistics',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Store, manage, and ship products across the UAE.',
+                  isAr ? 'تخزين وإدارة وشحن المنتجات عبر الإمارات.' : 'Store, manage, and ship products across the UAE.',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 13,
                   ),
                 ),
               ],
             ),
+          ),
+          Icon(
+            isAr ? Icons.arrow_back_ios_rounded : Icons.arrow_forward_ios_rounded,
+            color: Colors.white,
+            size: 16,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGuestPublicStats() {
+  Widget _buildGuestPublicStats(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final stats = [
-      {'label': 'Warehouses', 'value': '4', 'icon': Icons.warehouse_outlined},
-      {'label': 'Cities', 'value': 'UAE-wide', 'icon': Icons.location_on_outlined},
-      {'label': 'Merchants', 'value': '500+', 'icon': Icons.storefront_outlined},
+      {'label': isAr ? 'المستودعات' : 'Warehouses', 'value': '4', 'icon': Icons.warehouse_outlined},
+      {'label': isAr ? 'المدن' : 'Cities', 'value': isAr ? 'كافة الإمارات' : 'UAE-wide', 'icon': Icons.location_on_outlined},
+      {'label': isAr ? 'التجار' : 'Merchants', 'value': '500+', 'icon': Icons.storefront_outlined},
     ];
 
     return Container(
@@ -402,9 +463,9 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Platform at a Glance',
-            style: TextStyle(
+          Text(
+            isAr ? 'لمحة عن المنصة' : 'Platform at a Glance',
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
@@ -444,6 +505,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildGuestCTA(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
@@ -460,9 +522,9 @@ class _HomePageState extends State<HomePage> {
         ),
         icon: const Icon(Icons.person_add_alt_1_rounded,
             color: Colors.white, size: 20),
-        label: const Text(
-          'Create a Free Merchant Account',
-          style: TextStyle(
+        label: Text(
+          isAr ? 'إنشاء حساب تاجر مجاني' : 'Create a Free Merchant Account',
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 15,
@@ -513,12 +575,13 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1A1F3D).withValues(alpha: 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: const Color(0xFF003C8E).withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -528,26 +591,28 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+                color: AppColors.blueGlow,
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: color, size: 20),
+              child: Icon(icon, color: AppColors.bluePrimary, size: 18),
             ),
             const SizedBox(height: 12),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
+                letterSpacing: -0.3,
               ),
             ),
+            const SizedBox(height: 2),
             Text(
               title,
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],
@@ -620,26 +685,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildWarehousePrep(BuildContext context, AppLocalizations l10n) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return InkWell(
       onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
               builder: (_) => const ReceiveGoodsStagePageEN())),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2E63FF), Color(0xFF0038A8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
+          color: AppColors.bluePrimary,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2E63FF).withValues(alpha: 0.3),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
+              color: const Color(0xFF003C8E).withValues(alpha: 0.20),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -648,11 +710,11 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.fact_check_rounded,
-                  color: Colors.white, size: 28),
+              child: const Icon(Icons.fact_check_outlined,
+                  color: Colors.white, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -669,7 +731,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Manage incoming goods',
+                    isAr ? 'إدارة واستلام الشحنات الواردة' : 'Manage incoming goods',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.white.withValues(alpha: 0.8),
@@ -687,6 +749,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildQuickActions(BuildContext context, AppLocalizations l10n) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -735,11 +798,14 @@ class _HomePageState extends State<HomePage> {
                 title: l10n.myInventoryAction,
                 icon: Icons.inventory_2_rounded,
                 color: Colors.orange,
-                onTap: () => Navigator.pushNamed(context, '/stage6'),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SmartInventoryStageEN())),
               ),
               const SizedBox(width: 16),
               _buildActionCard(
-                title: 'Marketplace',
+                title: isAr ? 'المتجر' : 'Marketplace',
                 icon: Icons.storefront,
                 color: Colors.green,
                 onTap: () => Navigator.push(
@@ -770,29 +836,31 @@ class _HomePageState extends State<HomePage> {
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       elevation: 0,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
+        splashColor: AppColors.blueGlow,
+        highlightColor: AppColors.blueGlow.withValues(alpha: 0.5),
         child: Container(
           width: 90,
-          padding:
-              const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade100),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.grey.shade200,
-                  blurRadius: 10,
-                  offset: const Offset(0, 4)),
-            ],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 32),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.blueGlow,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: AppColors.bluePrimary, size: 22),
+              ),
               const SizedBox(height: 10),
               Text(
                 title,
@@ -814,38 +882,75 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildActiveRentals(AppLocalizations l10n) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final List<dynamic> rentals =
         _stats['activeRentals'] as List<dynamic>? ?? [];
-    if (rentals.isEmpty) {
+
+    // Aggregate active shelves per unique warehouse branch name
+    final Map<String, int> aggregatedWarehouses = {};
+    for (var rental in rentals) {
+      final String rawName = rental['warehouse'] ?? 'Unknown Branch';
+      final int count = (rental['shelves'] is num) ? (rental['shelves'] as num).toInt() : 0;
+      if (count <= 0) continue; // Skip 0 shelf entries
+
+      String branchName = rawName;
+      if (isAr) {
+        if (branchName == 'aln' || branchName.toLowerCase().contains('al ain') || branchName.contains('العين')) {
+          branchName = 'مستودع العين المركزي';
+        } else if (branchName == 'dxb' || branchName.toLowerCase().contains('dubai') || branchName.contains('دبي')) {
+          branchName = 'مستودع دبي المركزي';
+        } else if (branchName == 'auh' || branchName.toLowerCase().contains('abu dhabi') || branchName.contains('أبوظبي')) {
+          branchName = 'مستودع أبوظبي المركزي';
+        } else if (branchName == 'shj' || branchName.toLowerCase().contains('sharjah') || branchName.contains('الشارقة')) {
+          branchName = 'مستودع الشارقة الإقليمي';
+        }
+      } else {
+        if (branchName == 'aln' || branchName.contains('العين')) {
+          branchName = 'Al Ain Central Warehouse';
+        } else if (branchName == 'dxb' || branchName.contains('دبي')) {
+          branchName = 'Dubai Central Warehouse';
+        } else if (branchName == 'auh' || branchName.contains('أبوظبي')) {
+          branchName = 'Abu Dhabi Central Warehouse';
+        } else if (branchName == 'shj' || branchName.contains('الشارقة')) {
+          branchName = 'Sharjah Regional Hub';
+        }
+      }
+
+      aggregatedWarehouses[branchName] = (aggregatedWarehouses[branchName] ?? 0) + count;
+    }
+
+    if (aggregatedWarehouses.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           children: [
-            Icon(Icons.warehouse_outlined,
-                size: 40, color: Colors.grey.shade300),
-            const SizedBox(height: 10),
-            const Text(
-              'No active space rentals.',
-              style: TextStyle(
-                  color: Colors.grey, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => BookingPage())),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.bluePrimary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.blueGlow,
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Text(l10n.bookSpace,
-                  style: const TextStyle(color: Colors.white)),
+              child: const Icon(Icons.warehouse_outlined, size: 32, color: AppColors.blueMid),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isAr ? 'لا توجد تأجيرات مساحة نشطة.' : 'No active space rentals.',
+              style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w500, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const BookingPage())),
+                child: Text(l10n.bookSpace),
+              ),
             ),
           ],
         ),
@@ -855,61 +960,59 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...rentals.map((rental) {
-          final String warehouse = rental['warehouse'] ?? 'Unknown Branch';
-          final int shelves = rental['shelves'] ?? 0;
-          String branchName = warehouse;
-          if (branchName == 'aln') branchName = 'Al Ain Central Warehouse';
-          if (branchName == 'dxb') branchName = 'Dubai Central Warehouse';
-          if (branchName == 'auh') branchName = 'Abu Dhabi Central Warehouse';
-          if (branchName == 'shj') branchName = 'Sharjah Central Warehouse';
+        ...aggregatedWarehouses.entries.map((entry) {
+          final String branchName = entry.key;
+          final int totalShelves = entry.value;
           return Container(
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.grey.shade100),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
+                    color: AppColors.blueGlow,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.warehouse_rounded,
-                      color: Colors.green, size: 24),
+                  child: const Icon(Icons.warehouse_outlined,
+                      color: AppColors.bluePrimary, size: 22),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(branchName,
                           style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold)),
-                      Text(l10n.activeShelves(shelves),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary)),
+                      const SizedBox(height: 2),
+                      Text(l10n.activeShelves(totalShelves),
                           style: const TextStyle(
-                              fontSize: 12, color: Colors.grey)),
+                              fontSize: 12, color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                      horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                    color: AppColors.blueGlow,
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.blueLight.withValues(alpha: 0.5)),
                   ),
                   child: Text(
                     l10n.managingTag,
                     style: const TextStyle(
                         color: AppColors.bluePrimary,
                         fontSize: 11,
-                        fontWeight: FontWeight.bold),
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -921,6 +1024,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildRecentActivitySection(AppLocalizations l10n) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -934,7 +1038,10 @@ class _HomePageState extends State<HomePage> {
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary),
             ),
-            TextButton(onPressed: () {}, child: const Text('View All')),
+            TextButton(
+              onPressed: () {},
+              child: Text(isAr ? 'عرض الكل' : 'View All'),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -988,11 +1095,9 @@ class _HomePageState extends State<HomePage> {
               itemBuilder: (context, index) {
                 final activity = activities[index];
                 return _buildActivityItem(
-                  title: activity.title,
-                  subtitle: activity.subtitle,
+                  context: context,
+                  activity: activity,
                   time: _formatDate(activity.date, l10n),
-                  icon: activity.icon,
-                  color: activity.color,
                 );
               },
             );
@@ -1005,60 +1110,61 @@ class _HomePageState extends State<HomePage> {
   String _formatDate(DateTime date, AppLocalizations l10n) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    if (diff.inDays == 0) {
-      if (diff.inHours == 0) return l10n.minutesAgo(diff.inMinutes);
-      return l10n.hoursAgo(diff.inHours);
+    final hours = diff.inHours.abs();
+    final minutes = diff.inMinutes.abs();
+    final days = diff.inDays.abs();
+
+    if (days == 0) {
+      if (hours == 0) return l10n.minutesAgo(minutes);
+      return l10n.hoursAgo(hours);
     }
-    if (diff.inDays == 1) return l10n.yesterday;
-    if (diff.inDays < 7) return l10n.daysAgo(diff.inDays);
-    return DateFormat('MMM d', l10n.localeName).format(date);
+    if (days == 1) return l10n.yesterday;
+    if (days < 7) return l10n.daysAgo(days);
+    return DateFormat('d MMMM', l10n.localeName).format(date);
   }
 
   Widget _buildActivityItem({
-    required String title,
-    required String subtitle,
+    required BuildContext context,
+    required DashboardActivity activity,
     required String time,
-    required IconData icon,
-    required Color color,
   }) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final displayTitle = activity.getDisplayTitle(isAr);
+    final displaySubtitle = activity.getDisplaySubtitle(isAr);
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.grey.shade100,
-              blurRadius: 4,
-              offset: const Offset(0, 2))
-        ],
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+              color: AppColors.blueGlow,
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 18),
+            child: Icon(activity.icon, color: AppColors.blueMid, size: 18),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  displayTitle,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  subtitle,
+                  displaySubtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -1073,8 +1179,8 @@ class _HomePageState extends State<HomePage> {
             time,
             style: const TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey,
+              fontWeight: FontWeight.w400,
+              color: AppColors.blueLight,
             ),
           ),
         ],

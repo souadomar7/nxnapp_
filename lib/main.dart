@@ -15,13 +15,15 @@ import 'pages/smart_inventory_stage.dart';
 
 import 'data/inventory_controller.dart';
 import 'data/supabase_inventory_service.dart';
-import 'data/receive_result.dart'; 
+import 'data/receive_result.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'providers/theme_provider.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await Firebase.initializeApp();
     await NotificationService().initialize();
@@ -59,16 +61,19 @@ class WarehouseApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(
           create: (_) => InventoryController(SupabaseInventoryService()),
         ),
       ],
-      child: Consumer<LocaleProvider>(
-        builder: (context, localeProvider, child) {
+      child: Consumer2<LocaleProvider, ThemeProvider>(
+        builder: (context, localeProvider, themeProvider, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'NXN Warehouses',
             theme: appTheme,
+            darkTheme: darkAppTheme,
+            themeMode: themeProvider.themeMode,
             locale: localeProvider.locale,
             localizationsDelegates: const [
               AppLocalizations.delegate,

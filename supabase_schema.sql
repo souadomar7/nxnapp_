@@ -232,3 +232,30 @@ CREATE POLICY "Sellers manage their own shop"
 -- Dashboard activity log
 CREATE POLICY "Sellers view their own activity"
   ON dashboard_activities FOR ALL USING (auth.uid() = seller_id);
+
+-- Drop existing trigger if any
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  BEGIN
+    INSERT INTO public.sme_sellers (id, business_name, is_verified)
+    VALUES (
+      new.id,
+      COALESCE(new.raw_user_meta_data->>'full_name', 'New Merchant'),
+      false
+    )
+    ON CONFLICT (id) DO NOTHING;
+  EXCEPTION WHEN OTHERS THEN
+    -- Silence errors to ensure auth signup transaction never breaks
+    NULL;
+  END;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Bind trigger
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

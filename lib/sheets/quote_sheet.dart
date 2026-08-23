@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
 import '../models/warehouse.dart';
+import '../models/invoice.dart';
+import '../pages/payment_page.dart';
 
 import '../l10n/app_localizations.dart';
 
-void showQuoteSheet(BuildContext context, Warehouse w) {
-  // Default: 1 unit (room / rack / space)
+void showQuoteSheet(BuildContext context, [Warehouse? warehouse]) {
+  final isAr = Localizations.localeOf(context).languageCode == 'ar';
+  final w = warehouse ?? Warehouse(
+    id: 'WH-DXB-MAIN',
+    name: isAr ? 'مستودع دبي المركزي' : 'Dubai Central Warehouse',
+    nameAr: 'مستودع دبي المركزي',
+    emirate: 'Dubai',
+    emirateAr: 'دبي',
+    pricePerShelf: 100.0,
+    shelvesAvailable: 45,
+    is24h: true,
+    amenities: const ['25°C Ambient', '24/7 Security', 'CCTV'],
+    amenitiesAr: const ['تخزين عادي 25°م', 'حراسة 24/7'],
+  );
+
   final unitsController = TextEditingController(text: '1');
 
   showModalBottomSheet(
@@ -89,7 +104,22 @@ void showQuoteSheet(BuildContext context, Warehouse w) {
                       ),
                       ElevatedButton(
                         onPressed: () {
-                          // TODO: connect this to your Payments / Next step
+                          Navigator.pop(context); // Close dialog
+                          Navigator.pop(context); // Close bottom sheet
+                          final invoice = Invoice(
+                            id: 'INV-QUOTE-${DateTime.now().millisecondsSinceEpoch}',
+                            number: 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+                            warehouseName: '${w.name} ($units Units)',
+                            date: DateTime.now(),
+                            amount: subtotal + platformFee,
+                            vat: vat,
+                            paid: false,
+                            type: InvoiceType.rental,
+                          );
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => PaymentsPage(initialInvoice: invoice)),
+                          );
                         },
                         child: Text(AppLocalizations.of(context)!.continueButton),
                       ),

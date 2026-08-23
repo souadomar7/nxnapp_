@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/warehouse.dart';
 import '../theme.dart';
-import '../pages/warehouse_detail_page.dart';
+import '../pages/booking_page.dart';
 import '../l10n/app_localizations.dart';
 import 'common.dart';
 
@@ -17,7 +17,7 @@ class WarehouseCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => WarehouseDetailPage(w: w)),
+          MaterialPageRoute(builder: (_) => const BookingPage()),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),

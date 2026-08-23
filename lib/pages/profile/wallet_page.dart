@@ -15,11 +15,16 @@ class WalletPage extends StatelessWidget {
     ];
 
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Wallet'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        title: const Text('Wallet & Payouts', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: AppColors.bluePrimary,
+        foregroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Column(
         children: [
@@ -33,15 +38,73 @@ class WalletPage extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Text('AED 0.00', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.bluePrimary)),
                 const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.add),
-                  label: const Text('Top Up (Coming Soon)'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.bluePrimary,
-                    foregroundColor: Colors.white,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Request IBAN Payout'),
+                            content: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextField(decoration: InputDecoration(labelText: 'UAE IBAN (AE...)')),
+                                SizedBox(height: 12),
+                                TextField(decoration: InputDecoration(labelText: 'Bank Name')),
+                                SizedBox(height: 12),
+                                TextField(decoration: InputDecoration(labelText: 'Amount (AED)')),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('IBAN Payout requested! 14-day clearance countdown initiated.'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                },
+                                child: const Text('Submit Payout'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      label: const Text('Request IBAN Payout'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.bluePrimary,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade200),
                   ),
-                )
+                  child: Row(
+                    children: [
+                      Icon(Icons.schedule, size: 16, color: Colors.orange.shade800),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Settlement Policy: 14-day clearance hold applies before funds transfer to UAE IBAN.',
+                          style: TextStyle(fontSize: 11, color: Colors.orange.shade900, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
