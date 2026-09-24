@@ -56,8 +56,12 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on AuthException catch (e) {
       if (mounted) {
+        String msg = e.message;
+        if (msg.contains('Bad Gateway')) {
+          msg = 'Backend service is unavailable (502 Bad Gateway). Please check if your Supabase project is paused in the dashboard.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -139,6 +143,7 @@ class _LoginPageState extends State<LoginPage> {
               // UAE PASS Button
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : () async {
+                   // T&C already accepted on first launch — proceed directly with UAE PASS
                    setState(() => _isLoading = true);
                    
                    try {
@@ -155,6 +160,8 @@ class _LoginPageState extends State<LoginPage> {
                           'businessName': (uaePassData['fullnameEN'] ?? '').toString(),
                           'contactNumber': (uaePassData['mobile'] ?? '').toString(),
                           'licenseNumber': (uaePassData['licenseNumber'] ?? '').toString(),
+                          'email': (uaePassData['email'] ?? '').toString(),
+                          'licenseOwnerName': (uaePassData['licenseOwnerName'] ?? '').toString(),
                         };
 
                         Navigator.push(

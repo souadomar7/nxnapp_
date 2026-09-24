@@ -56,14 +56,24 @@ class BookingConfig {
     this.storageType = 'ambient',
   });
 
-  PriceBreakdown calculateBreakdown() {
-    final double multiplier = storageType == 'cold_storage' ? 1.5 : (storageType == 'chilled' ? 1.3 : 1.0);
-    final double baseCost = 100.0 * shelves * durationMonths * multiplier;
-    const double workerRate = 50.0;
-    final double workerFee = addWorkers ? (workerRate * workerCount) : 0.0;
+  /// Calculate price breakdown using configurable platform rates.
+  /// Defaults mirror the legacy hardcoded values so existing call-sites
+  /// continue to work without changes. Pass values from
+  /// PlatformSettingsProvider for live server-driven pricing.
+  PriceBreakdown calculateBreakdown({
+    double shelfBasePriceAed = 100.0,
+    double workerFeePerUnit = 50.0,
+    double platformFeeRate = 0.05,
+    double vatRate = 0.05,
+  }) {
+    final double multiplier = storageType == 'cold_storage'
+        ? 1.5
+        : (storageType == 'chilled' ? 1.3 : 1.0);
+    final double baseCost = shelfBasePriceAed * shelves * durationMonths * multiplier;
+    final double workerFee = addWorkers ? (workerFeePerUnit * workerCount) : 0.0;
     final double subtotal = baseCost + workerFee;
-    final double platformFee = subtotal * 0.05;
-    final double vat = (subtotal + platformFee) * 0.05;
+    final double platformFee = subtotal * platformFeeRate;
+    final double vat = (subtotal + platformFee) * vatRate;
     final double total = subtotal + platformFee + vat;
 
     return PriceBreakdown(
@@ -589,6 +599,14 @@ class _RentalConfigCard extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 10),
+                _QuickPresetChips(
+                  currentShelves: config.shelves,
+                  onSelect: (val) {
+                    config.shelves = val;
+                    onUpdate();
+                  },
+                ),
+                const SizedBox(height: 6),
                 _SliderRow(
                   label: AppLocalizations.of(context)!.shelvesLabelSimple,
                   value: '${config.shelves}',
@@ -818,6 +836,55 @@ class _StorageCategorySelector extends StatelessWidget {
           }).toList(),
         ),
       ],
+    );
+  }
+}
+
+// ── Quick Preset Chips ──────────────────────────────────────────────────────────
+class _QuickPresetChips extends StatelessWidget {
+  final int currentShelves;
+  final ValueChanged<int> onSelect;
+
+  const _QuickPresetChips({required this.currentShelves, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final presets = [
+      {'label': '5 Shelves (SME)', 'count': 5},
+      {'label': '15 Shelves (Growth)', 'count': 15},
+      {'label': '50 Shelves (Full Bay)', 'count': 50},
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: presets.map((p) {
+          final count = p['count'] as int;
+          final isSelected = currentShelves == count;
+          return Padding(
+            padding: const EdgeInsets.only(right: 6, bottom: 4),
+            child: ChoiceChip(
+              label: Text(
+                p['label'] as String,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.white : AppColors.bluePrimary,
+                ),
+              ),
+              selected: isSelected,
+              selectedColor: AppColors.bluePrimary,
+              backgroundColor: AppColors.blueGlow,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              side: BorderSide(
+                color: isSelected ? AppColors.bluePrimary : AppColors.border,
+              ),
+              onSelected: (_) => onSelect(count),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -1357,7 +1424,19 @@ class _QuoteDialog extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 6),
+            const Center(
+              child: Text(
+                "TRN: 100492819200003 • Inclusive of 5% UAE VAT (FTA Compliant)",
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 10),
 
             // Actions
             Row(

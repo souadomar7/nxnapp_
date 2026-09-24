@@ -19,6 +19,8 @@ import 'copilot_page.dart';
 import 'smart_inventory_stage.dart';
 import 'login.dart';
 import 'registration_page.dart';
+import 'notifications_page.dart';
+import 'operations/driver_orders_page.dart';
 
 import '../services/marketplace_service.dart';
 import '../models/history_models.dart';
@@ -186,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                   if (!isGuest) ...[
                     const SizedBox(width: 10),
                     GestureDetector(
-                      onTap: () {},
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
                       child: Container(
                         padding: const EdgeInsets.all(9),
                         decoration: BoxDecoration(
@@ -194,7 +196,18 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                         ),
-                        child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+                        child: Stack(
+                          children: [
+                            const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+                            Positioned(
+                              right: 0, top: 0,
+                              child: Container(
+                                width: 8, height: 8,
+                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -782,6 +795,16 @@ class _HomePageState extends State<HomePage> {
                 color: AppColors.bluePrimary,
                 onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => BookingPage())),
+              ),
+              const SizedBox(width: 16),
+              _buildActionCard(
+                title: isAr ? 'طلبات التوصيل' : 'Driver Orders',
+                icon: Icons.delivery_dining_rounded,
+                color: Colors.red,
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const DriverOrdersPage())),
               ),
               const SizedBox(width: 16),
               _buildActionCard(

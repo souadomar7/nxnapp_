@@ -17,13 +17,18 @@ class PaymentException implements Exception {
 
 class PaymentService {
   // -----------------------------------------------------------------------
-  // Server URL — update this to your deployed server URL when live.
-  // For local testing, run `npm run dev` inside /server and use localhost.
+  // Server URL — points to Supabase Edge Functions in production.
+  // For local development: run `supabase functions serve` and use the local URL.
+  // Set PAYMENT_SERVER_URL in your .env to the Supabase project functions URL:
+  //   https://<project-ref>.supabase.co/functions/v1
   // -----------------------------------------------------------------------
   static const String _serverBaseUrl = String.fromEnvironment(
     'PAYMENT_SERVER_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'http://localhost:54321/functions/v1',
   );
+
+  // Path for the create-payment-intent Edge Function
+  static const String _createIntentPath = '/create-payment-intent';
 
   /// Helper: Convert AED to fils (Stripe requires the smallest currency unit).
   static int toFils(double amountAED) => (amountAED * 100).round();
@@ -65,9 +70,9 @@ class PaymentService {
         );
       }
 
-      // 2. Request a PaymentIntent from our Node.js backend
+      // 2. Request a PaymentIntent from the Supabase Edge Function
       final response = await http.post(
-        Uri.parse('$_serverBaseUrl/api/payments/create-intent'),
+        Uri.parse('$_serverBaseUrl$_createIntentPath'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -78,7 +83,7 @@ class PaymentService {
           'invoiceId': invoice.id,
           'invoiceNumber': invoice.number,
         }),
-      );
+      ).timeout(const Duration(seconds: 4));
 
       if (response.statusCode != 200) {
         final body = jsonDecode(response.body);

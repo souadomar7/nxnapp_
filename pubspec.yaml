@@ -44,12 +44,17 @@ dependencies:
   http: ^1.2.2
   supabase_flutter: ^2.5.0
   qr_flutter: ^4.1.0 # Add this
+  geolocator: ^13.0.4
+  google_fonts: ^6.2.1
     # Optional: state management or routing (add if you use them)
   provider: ^6.0.5
   go_router: ^14.0.0
   image_picker: ^1.2.1
   url_launcher: ^6.3.2
+  app_links: ^6.3.2
   shared_preferences: ^2.3.2 # Add persistence
+  connectivity_plus: ^6.1.0
+  hive_flutter: ^1.1.0
   fl_chart: ^1.1.1
   google_generative_ai: ^0.4.7
   flutter_dotenv: ^6.0.1

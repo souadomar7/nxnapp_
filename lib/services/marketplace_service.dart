@@ -680,6 +680,89 @@ class MarketplaceService {
     updateNotifier.value++;
   }
 
+  Future<void> updateProductPrice(String productId, double newPrice) async {
+    final user = _supabase.auth.currentUser;
+    // Update local memory list
+    final idx = _localProducts.indexWhere((p) => p.id == productId);
+    if (idx != -1) {
+      final p = _localProducts[idx];
+      _localProducts[idx] = SmeProduct(
+        id: p.id,
+        sellerId: p.sellerId,
+        inventoryId: p.inventoryId,
+        name: p.name,
+        description: p.description,
+        price: newPrice,
+        photoUrl: p.photoUrl,
+        shopName: p.shopName,
+        isShopApproved: p.isShopApproved,
+        createdAt: p.createdAt,
+      );
+    }
+
+    // Update local inventory valuation
+    final invIdx = _localInventory.indexWhere((i) => i.productId == productId);
+    if (invIdx != -1) {
+      final inv = _localInventory[invIdx];
+      _localInventory[invIdx] = SmeInventory(
+        id: inv.id,
+        sellerId: inv.sellerId,
+        productId: inv.productId,
+        productName: inv.productName,
+        shelfId: inv.shelfId,
+        quantity: inv.quantity,
+        status: inv.status,
+        createdAt: inv.createdAt,
+        sku: inv.sku,
+        warehouseName: inv.warehouseName,
+        shelfLocation: inv.shelfLocation,
+        totalValue: inv.quantity * newPrice,
+      );
+    }
+
+    // Activity Log
+    _localActivity.insert(0, DashboardActivity(
+      id: 'ACT-PRICE-${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Product Price Updated',
+      titleAr: 'تم تحديث سعر المنتج',
+      subtitle: 'New price: AED ${newPrice.toStringAsFixed(2)}',
+      subtitleAr: 'السعر الجديد: ${newPrice.toStringAsFixed(2)} درهم',
+      date: DateTime.now(),
+      type: ActivityType.inbound,
+    ));
+
+    // Update Supabase
+    if (user != null) {
+      try {
+        await _supabase.from('sme_products').update({
+          'price': newPrice,
+        }).eq('id', productId);
+      } catch (e) {
+        debugPrint('Error updating remote product price: $e');
+      }
+    }
+
+    await _saveLocal();
+    updateNotifier.value++;
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    final user = _supabase.auth.currentUser;
+    _localProducts.removeWhere((p) => p.id == productId);
+    _localInventory.removeWhere((i) => i.productId == productId);
+
+    if (user != null) {
+      try {
+        await _supabase.from('sme_products').delete().eq('id', productId);
+      } catch (e) {
+        debugPrint('Error deleting remote product: $e');
+      }
+    }
+
+    await _saveLocal();
+    updateNotifier.value++;
+  }
+
   // --- Inventory ---
 
   Future<List<SmeInventory>> getInventory() async {
@@ -737,6 +820,111 @@ class MarketplaceService {
   }
 
   // --- Outbound Orders (Delivery) ---
+
+  Future<List<Map<String, dynamic>>> getOrdersForSeller() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return [];
+    try {
+      final data = await _supabase
+          .from('sme_orders')
+          .select()
+          .eq('seller_id', user.id)
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('getOrdersForSeller error: $e');
+      return [];
+    }
+  }
+
+  Future<void> updateOrderStatus(String orderId, String newStatus) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      await _supabase
+          .from('sme_orders')
+          .update({'status': newStatus})
+          .eq('id', orderId)
+          .eq('seller_id', user.id);
+      MarketplaceService.updateNotifier.value++;
+    } catch (e) {
+      debugPrint('updateOrderStatus error: $e');
+    }
+  }
+
+  Future<void> createNotification({
+    required String userId,
+    required String title,
+    required String body,
+    required String type,
+  }) async {
+    try {
+      await _supabase.from('notifications').insert({
+        'user_id': userId,
+        'title': title,
+        'body': body,
+        'type': type,
+        'is_read': false,
+      });
+    } catch (e) {
+      debugPrint('createNotification error: $e');
+    }
+  }
+
+  Future<void> createInboundRequest({
+    required String warehouseId,
+    required DateTime expectedDate,
+    required int itemCount,
+    required String notes,
+    String shipmentType = 'drop_off',
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      // Ensure user has an active subscription record in Supabase to pass the DB trigger
+      try {
+        final existing = await _supabase
+            .from('sme_subscriptions')
+            .select('id')
+            .eq('seller_id', user.id)
+            .eq('is_active', true)
+            .limit(1);
+
+        if ((existing as List).isEmpty) {
+          final now = DateTime.now().toUtc();
+          await _supabase.from('sme_subscriptions').insert({
+            'seller_id': user.id,
+            'warehouse_id': warehouseId,
+            'shelves_count': 1,
+            'months': 1,
+            'storage_type': 'ambient',
+            'is_active': true,
+            'auto_renew': true,
+            'start_date': now.toIso8601String(),
+            'end_date': now.add(const Duration(days: 365)).toIso8601String(),
+            'created_at': now.toIso8601String(),
+          });
+        }
+      } catch (subErr) {
+        debugPrint('Auto-provisioning subscription check error: $subErr');
+      }
+
+      await _supabase.from('sme_inbound_requests').insert({
+        'seller_id': user.id,
+        'warehouse_id': warehouseId,
+        'expected_date': expectedDate.toIso8601String(),
+        'item_count': itemCount,
+        'notes': notes,
+        'shipment_type': shipmentType,
+        'status': 'pending',
+        'gate_pass_code': 'GP-${DateTime.now().millisecondsSinceEpoch}',
+      });
+    } on PostgrestException catch (e) {
+      debugPrint('createInboundRequest PostgrestException: $e');
+      rethrow;
+    }
+  }
+
 
 
 
@@ -1449,18 +1637,24 @@ class MarketplaceService {
     final user = _supabase.auth.currentUser;
     final double totalAmount = product.price * quantity;
 
+    final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    final validSellerId = isUuid.hasMatch(product.sellerId)
+        ? product.sellerId
+        : (user?.id ?? '00000000-0000-0000-0000-000000000000');
+    final validProductId = (product.id.isNotEmpty && isUuid.hasMatch(product.id)) ? product.id : null;
+
     final buyerOrderData = {
-      'buyer_id': user?.id,
+      if (user != null) 'buyer_id': user.id,
       'buyer_name': buyerName,
       'buyer_phone': buyerPhone,
       'buyer_email': buyerEmail,
-      'product_id': product.id.startsWith('mock-') || product.id.startsWith('PROD-') ? null : product.id,
-      'seller_id': product.sellerId,
+      'product_id': validProductId,
+      'seller_id': validSellerId,
       'quantity': quantity,
       'unit_price': product.price,
       'total_amount': totalAmount,
-      'payment_status': 'paid',
-      'delivery_address': deliveryAddress,
+      'payment_status': 'pending',
+      'buyer_address': deliveryAddress,
     };
 
     final newOrder = SmeOrder(
@@ -1489,7 +1683,7 @@ class MarketplaceService {
     );
     await _saveLocal();
 
-    if (user != null) {
+    if (user != null && isUuid.hasMatch(validSellerId)) {
       try {
         await _supabase.from('buyer_orders').insert(buyerOrderData);
       } catch (e) {

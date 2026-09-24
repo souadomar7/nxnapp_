@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UaePassService {
   // Singleton instance
@@ -27,12 +28,15 @@ class UaePassService {
 
   /// Initiates the UAE Pass login flow.
   /// 
-  /// In [isSimulationMode], returns mock data after a delay.
+  /// In [isSimulationMode], returns mock data after a delay and establishes a Supabase session.
   /// In real mode, launches the OAuth URL.
   Future<Map<String, dynamic>?> signIn() async {
     if (isSimulationMode) {
       // Simulate network delay
       await Future.delayed(const Duration(seconds: 2));
+
+      // Ensure Supabase Auth session is active
+      await _ensureSupabaseSession('contact@alfalak.ae', 'Al Falak Logistics LLC');
       
       // Return mock user profile
       return {
@@ -47,6 +51,10 @@ class UaePassService {
         'email': 'contact@alfalak.ae',
         'licenseNumber': 'CN-123456', // Custom field often mapped from SP attributes
         'userType': 'BUSINESS',
+        'licenseName': 'Al Falak General Trading LLC',
+        'licenseOwnerName': 'Ahmed Mohammed Al Falak',
+        'licenseImageUrl': '',
+        'tradeLicenseExpiry': '2025-12-31',
       };
     } else {
       // Real OAuth2 Flow
@@ -121,23 +129,23 @@ class UaePassService {
   /// Verifies the Trade License via "Waslah" (Government Database).
   /// 
   /// In a real scenario, this calls the DED/Waslah API endpoint configured in .env.
-  Future<bool> verifyTradeLicense(String licenseNo) async {
+  Future<Map<String, dynamic>> verifyTradeLicense(String licenseNo) async {
     if (isSimulationMode) {
       // Simulate API network call
       await Future.delayed(const Duration(seconds: 1));
       // Mock Logic: Accept any license starting with "CN-"
       // Reject others to demonstrate validation failure
       if (licenseNo.toUpperCase().startsWith("CN-")) {
-        return true;
+        return {'status': 'active'};
       }
-      return false; 
+      return {'status': 'expired'}; 
     } else {
       // Real API validation using Waslah endpoint
       final url = dotenv.env['WASLAH_API_URL'];
       final apiKey = dotenv.env['WASLAH_API_KEY'];
       if (url == null || url.isEmpty) {
         // Fallback or stub success if URL not yet set up
-        return true;
+        return {'status': 'active'};
       }
 
       try {
@@ -153,13 +161,49 @@ class UaePassService {
         );
         if (response.statusCode == 200) {
           final resData = jsonDecode(response.body);
-          return resData['is_valid'] == true;
+          if (resData['is_valid'] == true) {
+            return {'status': 'active'};
+          } else {
+            return {'status': 'expired'};
+          }
         }
-        return false;
+        return {'status': 'expired'};
       } catch (e) {
         debugPrint('Waslah API verification error: $e');
-        return false;
+        return {'status': 'expired'};
       }
+    }
+  }
+
+  /// Ensures an active Supabase Auth session exists for UAE PASS user.
+  Future<void> _ensureSupabaseSession(String email, String fullName) async {
+    try {
+      final client = Supabase.instance.client;
+      if (client.auth.currentUser != null) return;
+
+      const defaultPassword = 'UaePass_Temporary_2026!';
+      try {
+        await client.auth.signInWithPassword(
+          email: email,
+          password: defaultPassword,
+        );
+      } catch (signInErr) {
+        // If account does not exist yet, sign up
+        try {
+          await client.auth.signUp(
+            email: email,
+            password: defaultPassword,
+            data: {
+              'full_name': fullName,
+              'role': 'merchant',
+            },
+          );
+        } catch (signUpErr) {
+          debugPrint('Supabase UAE Pass auto-signup error: $signUpErr');
+        }
+      }
+    } catch (e) {
+      debugPrint('Supabase session init note: $e');
     }
   }
 }

@@ -7,12 +7,23 @@ class SmeProduct {
   final String? nameAr;
   final String? description;
   final double price;
+  final int quantity;
   final String? photoUrl;
   final String? shopName;
   final bool isShopApproved; // renamed from isShopVerified — matches is_approved column
   final bool isHidden; // Content moderation flag
   final String? hiddenReason;
+  final String? _category;
   final DateTime createdAt;
+
+  String? get category {
+    if (_category != null && _category!.isNotEmpty) return _category;
+    final lower = name.toLowerCase();
+    if (lower.contains('coffee') || lower.contains('espresso') || lower.contains('bean') || lower.contains('milk') || lower.contains('honey') || lower.contains('berry') || lower.contains('olive')) return 'Food & Beverage';
+    if (lower.contains('earbuds') || lower.contains('wireless') || lower.contains('phone') || lower.contains('electronic')) return 'Electronics';
+    if (lower.contains('flower') || lower.contains('rose')) return 'Flowers & Gifts';
+    return 'General';
+  }
 
   String getLocalizedName(bool isAr) {
     if (isAr) {
@@ -52,13 +63,15 @@ class SmeProduct {
     this.nameAr,
     this.description,
     required this.price,
+    this.quantity = 0,
     this.photoUrl,
     this.shopName,
     this.isShopApproved = false,
     this.isHidden = false,
     this.hiddenReason,
+    String? category,
     required this.createdAt,
-  });
+  }) : _category = category;
 
   factory SmeProduct.fromJson(Map<String, dynamic> json) {
     return SmeProduct(
@@ -69,11 +82,13 @@ class SmeProduct {
       nameAr: json['name_ar'],
       description: json['description'],
       price: (json['price'] as num).toDouble(),
+      quantity: json['quantity'] != null ? (json['quantity'] as num).toInt() : 0,
       photoUrl: json['photo_url'],
       shopName: json['shop_name'],
       isShopApproved: json['is_shop_approved'] ?? json['is_shop_verified'] ?? false,
       isHidden: json['is_hidden'] ?? false,
       hiddenReason: json['hidden_reason'],
+      category: json['category'],
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
     );
   }
@@ -86,9 +101,11 @@ class SmeProduct {
       'name': name,
       'description': description,
       'price': price,
+      'quantity': quantity,
       'photo_url': photoUrl,
       'is_hidden': isHidden,
       if (hiddenReason != null) 'hidden_reason': hiddenReason,
+      if (_category != null) 'category': _category,
     };
   }
 }
@@ -449,6 +466,32 @@ class CartItem {
   CartItem({required this.product, this.quantity = 1});
 
   double get total => product.price * quantity;
+  double get totalPrice => product.price * quantity;
+
+  CartItem copyWith({
+    SmeProduct? product,
+    int? quantity,
+  }) {
+    return CartItem(
+      product: product ?? this.product,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'productId': product.id,
+      'product': product.toJson(),
+      'quantity': quantity,
+    };
+  }
+
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      product: SmeProduct.fromJson(Map<String, dynamic>.from(json['product'] as Map)),
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+    );
+  }
 }
 
 /// Model for buyer marketplace purchases.

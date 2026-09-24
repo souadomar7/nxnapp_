@@ -14,6 +14,9 @@ import '../settings/notification_settings_page.dart';
 import 'create_shop_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/marketplace_models.dart';
+import 'seller_orders_page.dart';
+import 'seller_products_page.dart';
+import '../operations/pick_pack_screen.dart';
 
 
 /// The Store tab root. Automatically routes to:
@@ -774,8 +777,8 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                           const SmartInventoryStageEN())),
                             ),
                             _ActionCard(
-                              title: isAr ? 'كتالوج المنتجات والأسعار' : 'Product Catalog',
-                              subtitle: isAr ? 'إضافة منتجات جديدة وتحديث الأسعار' : 'Manage marketplace listings, prices & add new SKUs',
+                              title: isAr ? 'كتالوج المنتجات والأسعار' : 'Product Catalog & Pricing',
+                              subtitle: isAr ? 'إدارة القائمة وتحديث الأسعار وإضافة منتجات' : 'Manage marketplace listings, prices & add new SKUs',
                               badge: isAr ? 'الكتالوج' : 'Catalog',
                               icon: Icons.add_business_rounded,
                               color: const Color(0xFF10AC84),
@@ -784,7 +787,7 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                     context,
                                     MaterialPageRoute(
                                         builder: (_) =>
-                                            const AddProductPage()));
+                                            const SellerProductsPage()));
                                 _loadStats();
                               },
                             ),
@@ -801,6 +804,17 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                           const ReceiveGoodsStagePageEN())),
                             ),
                             _ActionCard(
+                              title: isAr ? 'الطلبات الواردة' : 'Incoming Orders',
+                              subtitle: isAr ? 'تتبع وإدارة طلبات المشترين ومراحل التجهيز' : 'Track buyer orders, update status & manage fulfillment',
+                              badge: isAr ? 'الطلبات' : 'Orders',
+                              icon: Icons.receipt_long_rounded,
+                              color: const Color(0xFF9B59B6),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const SellerOrdersPage()),
+                              ),
+                            ),
+                            _ActionCard(
                               title: isAr ? 'طلب شحن وتوصيل' : 'Request Delivery',
                               subtitle: isAr ? 'تنفيذ طلبات العملاء وحجز شركات الشحن' : 'Dispatch customer orders & book courier pickup',
                               badge: isAr ? 'التسليم' : 'Outbound',
@@ -811,6 +825,18 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                   MaterialPageRoute(
                                       builder: (_) =>
                                           const RequestDeliveryPage())),
+                            ),
+                            _ActionCard(
+                              title: isAr ? 'سحب وتغليف' : 'Pick & Pack',
+                              subtitle: isAr ? 'سحب الأصناف من الأرفف وتجهيز الطلبات' : 'Pick items from shelves & pack orders',
+                              badge: isAr ? 'العمليات' : 'Operations',
+                              icon: Icons.route_rounded,
+                              color: const Color(0xFF8E44AD),
+                              onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const PickPackScreen(warehouseId: 'dxb'))),
                             ),
                           ],
                         ),

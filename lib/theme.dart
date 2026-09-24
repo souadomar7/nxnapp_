@@ -1,30 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-/// NXN Hub Design System — Minimalist Navy Blue Palette
+/// NXN Hub Design System Tokens
+class NXNColors {
+  static const deepNavy    = Color(0xFF003C8E); // Primary dark / header
+  static const cobalt      = Color(0xFF1E50FF); // Active action / interactive
+  static const skyBlue     = Color(0xFF38BDF8); // Glow / accents
+  static const paleBlue    = Color(0xFFA6BFE2); // Inactive / chips
+  static const blueGlow    = Color(0xFFDEEAF8); // Soft surface tint
+  static const slateBg     = Color(0xFFF4F6FA); // Scaffold bg
+  static const cardSurface = Colors.white;
+  static const border      = Color(0xFFE4EAF4);
+  
+  // Status tokens
+  static const success     = Color(0xFF1A9E6C);
+  static const warning     = Color(0xFFD97706);
+  static const error       = Color(0xFFC0392B);
+  
+  // Text tokens
+  static const textPrimary   = Color(0xFF0D1B36);
+  static const textSecondary = Color(0xFF6B7C99);
+}
+
+class NXNSpacing {
+  static const double xs = 4.0;
+  static const double sm = 8.0;
+  static const double md = 16.0;
+  static const double lg = 24.0;
+  static const double xl = 32.0;
+  static const double xxl = 48.0;
+}
+
+class NXNShadows {
+  static final soft = [
+    BoxShadow(
+      color: const Color(0xFF003C8E).withValues(alpha: 0.06),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
+    ),
+  ];
+  static final elevated = [
+    BoxShadow(
+      color: const Color(0xFF003C8E).withValues(alpha: 0.12),
+      blurRadius: 20,
+      offset: const Offset(0, 8),
+    ),
+  ];
+}
+
+/// AppColors compatibility layer
 class AppColors {
   // Primary palette
-  static const bluePrimary  = Color(0xFF003C8E); // Deep navy — buttons, active states
-  static const blueMid      = Color(0xFF3D73BC); // Mid navy — icons, borders, accents
-  static const blueLight    = Color(0xFFA6BFE2); // Pale blue — chips, inactive, muted
-  static const blueGlow     = Color(0xFFDEEAF8); // Lightest blue — hover tints, backgrounds
+  static const bluePrimary  = NXNColors.deepNavy;
+  static const blueMid      = Color(0xFF3D73BC);
+  static const blueLight    = NXNColors.paleBlue;
+  static const blueGlow     = NXNColors.blueGlow;
 
   // Surface & background
-  static const bg           = Color(0xFFF4F6FA); // Scaffold background
-  static const surface      = Colors.white;       // Card surfaces
+  static const bg           = NXNColors.slateBg;
+  static const surface      = NXNColors.cardSurface;
 
   // Text
-  static const textPrimary  = Color(0xFF0D1B36); // Headings
-  static const textSecondary= Color(0xFF6B7C99); // Subtitles / captions
+  static const textPrimary  = NXNColors.textPrimary;
+  static const textSecondary= NXNColors.textSecondary;
 
   // Borders & dividers
-  static const border       = Color(0xFFE4EAF4);
+  static const border       = NXNColors.border;
 
-  // Status — used sparingly
-  static const success      = Color(0xFF1A9E6C); // Paid / Verified
-  static const error        = Color(0xFFC0392B); // Failed / Error
-  static const warning      = Color(0xFFD97706); // Pending / Warning
+  // Status
+  static const success      = NXNColors.success;
+  static const error        = NXNColors.error;
+  static const warning      = NXNColors.warning;
 
-  // Legacy aliases kept for backward compat
+  // Legacy aliases
   static const bluePrimaryLegacy = bluePrimary;
   static const blueSecondary     = blueMid;
   static const orangeAccent      = warning;
@@ -53,15 +101,17 @@ final ThemeData appTheme = ThemeData(
       fontWeight: FontWeight.w700,
       color: Colors.white,
       letterSpacing: -0.2,
+      height: 1.3,
     ),
   ),
 
-  textTheme: const TextTheme(
-    titleLarge : TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.4),
-    titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary, letterSpacing: -0.2),
-    bodyMedium : TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
-    bodySmall  : TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
-    labelLarge : TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+  textTheme: GoogleFonts.cairoTextTheme(ThemeData.light().textTheme).copyWith(
+    titleLarge : const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.4, height: 1.4),
+    titleMedium: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary, letterSpacing: -0.2, height: 1.35),
+    bodyLarge  : const TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: AppColors.textPrimary, height: 1.45),
+    bodyMedium : const TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary, height: 1.4),
+    bodySmall  : const TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary, height: 1.35),
+    labelLarge : const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary, height: 1.3),
   ),
 
   cardTheme: CardThemeData(

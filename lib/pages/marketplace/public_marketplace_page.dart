@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/locale_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import '../../models/marketplace_models.dart';
 import 'public_product_detail_page.dart';
+import 'cart_page.dart';
 import '../../sheets/quote_sheet.dart';
 
 class PublicMarketplacePage extends StatefulWidget {
@@ -58,16 +60,29 @@ class _PublicMarketplacePageState extends State<PublicMarketplacePage>
     super.dispose();
   }
 
+  String _normalizeArabic(String input) {
+    return input
+      .toLowerCase()
+      .replaceAll(RegExp(r'[أإآا]'), 'ا')   // normalize alef variants
+      .replaceAll(RegExp(r'[ةه]'), 'ه')       // normalize taa marbuta
+      .replaceAll(RegExp(r'[يى]'), 'ي')       // normalize ya
+      .replaceAll(RegExp(r'[ًٌٍَُِّْ]'), '') // remove diacritics (tashkeel)
+      .trim();
+  }
+
   List<SmeProduct> _filterAndSort(List<SmeProduct> products) {
-    var filtered = products.where((p) {
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final nameMatch = p.name.toLowerCase().contains(q);
-        final descMatch = (p.description ?? '').toLowerCase().contains(q);
-        final shopMatch = (p.shopName ?? '').toLowerCase().contains(q);
-        if (!nameMatch && !descMatch && !shopMatch) return false;
-      }
-      return true;
+    final query = _normalizeArabic(_searchQuery);
+    var filtered = products.where((product) {
+      final nameMatch = _normalizeArabic(product.name).contains(query) ||
+          _normalizeArabic(product.nameAr ?? '').contains(query) ||
+          _normalizeArabic(product.description ?? '').contains(query) ||
+          _normalizeArabic(product.shopName ?? '').contains(query);
+      
+      final categoryMatch = _selectedCategory == 'All' ||
+          _selectedCategory == 'الكل' ||
+          (product.category ?? '').toLowerCase() == _selectedCategory.toLowerCase();
+      
+      return (query.isEmpty || nameMatch) && categoryMatch;
     }).toList();
 
     switch (_sortBy) {
@@ -111,6 +126,51 @@ class _PublicMarketplacePageState extends State<PublicMarketplacePage>
               onPressed: () => Navigator.of(context).pop(),
             ),
             actions: [
+              // Cart Button with Badge
+              Consumer<CartProvider>(
+                builder: (context, cart, _) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 24),
+                        tooltip: isAr ? 'سلة المشتريات' : 'Cart',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const CartPage()),
+                          );
+                        },
+                      ),
+                      if (cart.isNotEmpty)
+                        Positioned(
+                          top: 6,
+                          right: isAr ? null : 6,
+                          left: isAr ? 6 : null,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                            child: Center(
+                              child: Text(
+                                '${cart.totalItemCount}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(width: 4),
               // Language Toggle
               Consumer<LocaleProvider>(
                 builder: (context, localeProvider, _) {
@@ -728,6 +788,57 @@ class _ProductCardState extends State<_ProductCard>
                             ),
                           ),
                         ),
+
+                      // Quick Add to Cart Button
+                      Positioned(
+                        bottom: 8,
+                        right: isAr ? null : 8,
+                        left: isAr ? 8 : null,
+                        child: GestureDetector(
+                          onTap: () {
+                            final nav = Navigator.of(context);
+                            final cart = Provider.of<CartProvider>(context, listen: false);
+                            cart.addItem(product, quantity: 1);
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                duration: const Duration(seconds: 2),
+                                backgroundColor: const Color(0xFF1E293B),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                content: Text(
+                                  isAr ? 'تمت إضافة المنتج إلى السلة 🛒' : 'Added to Cart 🛒',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                action: SnackBarAction(
+                                  label: isAr ? 'السلة' : 'Cart',
+                                  textColor: const Color(0xFF60A5FA),
+                                  onPressed: () {
+                                    nav.push(
+                                      MaterialPageRoute(builder: (_) => const CartPage()),
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.bluePrimary,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.bluePrimary.withValues(alpha: 0.35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

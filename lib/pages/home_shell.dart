@@ -112,7 +112,7 @@ class HomeShellState extends State<HomeShell> {
                   BottomNavigationBarItem(
                     icon: const Icon(Icons.smart_toy_outlined, size: 24),
                     activeIcon: const Icon(Icons.smart_toy_rounded, size: 24),
-                    label: Localizations.localeOf(context).languageCode == 'ar' ? 'المساعد' : 'Copilot',
+                    label: Localizations.localeOf(context).languageCode == 'ar' ? 'المساعد' : 'AI Agent',
                   ),
                   BottomNavigationBarItem(
                     icon: const Icon(Icons.person_outline_rounded, size: 24),

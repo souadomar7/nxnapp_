@@ -8,6 +8,7 @@ class UserProvider extends ChangeNotifier {
   String? _email;
   bool _isDocumentUploaded = true; // Default true so document is uploaded once
   String? _documentFileName;
+  bool _termsAccepted = false; // Tracks whether T&C have been accepted on this device
 
   UserProvider() {
     _loadUser();
@@ -20,6 +21,7 @@ class UserProvider extends ChangeNotifier {
   String get email => _email ?? 'souadomar774@gmail.com';
   String get licenseNumber => _licenseNumber ?? 'CN-2891048';
   String get contactNumber => _contactNumber ?? '+971501234567';
+  bool get termsAccepted => _termsAccepted;
 
   Future<void> _loadUser() async {
     try {
@@ -30,8 +32,20 @@ class UserProvider extends ChangeNotifier {
       _email = prefs.getString('user_email');
       _isDocumentUploaded = prefs.getBool('user_doc_uploaded') ?? true;
       _documentFileName = prefs.getString('user_doc_filename');
+      _termsAccepted = prefs.getBool('terms_accepted') ?? false;
       notifyListeners();
     } catch (_) {}
+  }
+
+  /// Call this when the user accepts the Terms & Conditions.
+  /// Persists the flag so T&C are never shown again on this device.
+  Future<void> acceptTerms() async {
+    _termsAccepted = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('terms_accepted', true);
+    } catch (_) {}
+    notifyListeners();
   }
 
   Future<void> setDocumentUploaded(String fileName) async {
@@ -74,6 +88,8 @@ class UserProvider extends ChangeNotifier {
     _email = null;
     _isDocumentUploaded = false;
     _documentFileName = null;
+    // Note: we intentionally keep _termsAccepted = true on logout
+    // so the user doesn't need to re-accept T&C after re-login on same device.
 
     try {
       final prefs = await SharedPreferences.getInstance();

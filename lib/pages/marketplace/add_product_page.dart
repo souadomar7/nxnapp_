@@ -7,9 +7,11 @@ import '../../providers/locale_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/marketplace_models.dart';
 
 class AddProductPage extends StatefulWidget {
-  const AddProductPage({super.key});
+  final SmeProduct? product;
+  const AddProductPage({super.key, this.product});
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -18,19 +20,43 @@ class AddProductPage extends StatefulWidget {
 class _AddProductPageState extends State<AddProductPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _nameArController = TextEditingController();
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
-  
+  final _qtyController = TextEditingController(text: '50');
+
+  String _selectedCategory = 'General';
   bool _isLoading = false;
   bool _hasWarehouseSub = false;
-  final TextEditingController _qtyController = TextEditingController(text: '50');
-  final MarketplaceService _service = MarketplaceService();
+  bool _showPreview = true;
   File? _imageFile;
+  String? _existingPhotoUrl;
   final ImagePicker _picker = ImagePicker();
+  final MarketplaceService _service = MarketplaceService();
+
+  final List<Map<String, dynamic>> _categories = [
+    {'id': 'Food & Beverage', 'nameEn': 'Food & Beverage', 'nameAr': 'أغذية ومشروبات', 'icon': Icons.coffee_rounded, 'color': Color(0xFFD97706)},
+    {'id': 'Electronics', 'nameEn': 'Electronics', 'nameAr': 'إلكترونيات', 'icon': Icons.devices_rounded, 'color': Color(0xFF2563EB)},
+    {'id': 'Flowers & Gifts', 'nameEn': 'Flowers & Gifts', 'nameAr': 'زهور وهدايا', 'icon': Icons.card_giftcard_rounded, 'color': Color(0xFFDB2777)},
+    {'id': 'Health & Beauty', 'nameEn': 'Health & Beauty', 'nameAr': 'صحة وجمال', 'icon': Icons.spa_rounded, 'color': Color(0xFF059669)},
+    {'id': 'Fashion', 'nameEn': 'Fashion', 'nameAr': 'أزياء', 'icon': Icons.checkroom_rounded, 'color': Color(0xFF7C3AED)},
+    {'id': 'General', 'nameEn': 'General', 'nameAr': 'عام', 'icon': Icons.inventory_2_rounded, 'color': Color(0xFF4B5563)},
+  ];
+
+  bool get _isEditMode => widget.product != null;
 
   @override
   void initState() {
     super.initState();
+    if (widget.product != null) {
+      _nameController.text = widget.product!.name;
+      _nameArController.text = widget.product!.nameAr ?? '';
+      _descController.text = widget.product!.description ?? '';
+      _priceController.text = widget.product!.price.toStringAsFixed(2);
+      _qtyController.text = widget.product!.quantity.toString();
+      _existingPhotoUrl = widget.product!.photoUrl;
+      _selectedCategory = widget.product!.category ?? 'General';
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final sub = await _service.hasActiveSubscription();
       if (mounted) setState(() => _hasWarehouseSub = sub);
@@ -40,17 +66,117 @@ class _AddProductPageState extends State<AddProductPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _nameArController.dispose();
     _descController.dispose();
     _priceController.dispose();
     _qtyController.dispose();
     super.dispose();
   }
 
+  void _adjustQuantity(int delta) {
+    final current = int.tryParse(_qtyController.text) ?? 0;
+    final next = (current + delta).clamp(1, 99999);
+    setState(() => _qtyController.text = next.toString());
+  }
+
   Future<void> _pickImage() async {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isAr ? 'إضافة صورة المنتج' : 'Select Product Photo',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      decoration: BoxDecoration(
+                        color: AppColors.bluePrimary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.2)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.camera_alt_rounded, color: AppColors.bluePrimary, size: 32),
+                          const SizedBox(height: 8),
+                          Text(
+                            isAr ? 'الكاميرا' : 'Camera',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.bluePrimary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10AC84).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF10AC84).withValues(alpha: 0.2)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.photo_library_rounded, color: Color(0xFF10AC84), size: 32),
+                          const SizedBox(height: 8),
+                          Text(
+                            isAr ? 'المعرض' : 'Gallery',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10AC84)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     try {
-      final XFile? picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final XFile? picked = await _picker.pickImage(source: source, imageQuality: 75);
       if (picked != null) {
-        setState(() => _imageFile = File(picked.path));
+        setState(() {
+          _imageFile = File(picked.path);
+        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -60,90 +186,77 @@ class _AddProductPageState extends State<AddProductPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
 
     try {
-      final shop = await _service.getMyShop();
-      final products = await _service.getProducts();
-      // Cap is bypassed by Featured status, NOT by approval status.
-      // An approved-but-not-featured shop is still subject to the 5-product limit.
-      final bool featuredActive = shop?.featuredActive ?? false;
+      final price = double.tryParse(_priceController.text) ?? 0.0;
+      final qty = int.tryParse(_qtyController.text) ?? 1;
+      String photoUrl = _existingPhotoUrl ?? '';
 
-      if (!featuredActive && products.length >= 5) {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Free Tier Limit Reached'),
-              content: const Text(
-                'Free shops can list a maximum of 5 products.\n\n'
-                'Upgrade to a Featured shop to enjoy unlimited product listings '
-                'plus top placement in the buyer marketplace!'
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.bluePrimary),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.pop(context); // Exit Add Product screen
-                  },
-                  child: const Text('Go Featured ⭐'),
-                )
-              ],
-            ),
-          );
-        }
-        return;
-      }
-
-      final price = double.parse(_priceController.text);
-      String photoUrl = '';
       if (_imageFile != null) {
-        final url = await _service.uploadImage(_imageFile!);
-        if (url != null) photoUrl = url;
-      }
-
-      final qty = int.tryParse(_qtyController.text) ?? 50;
-      await _service.addProduct(
-        _nameController.text,
-        _descController.text,
-        price,
-        photoUrl,
-        quantity: qty,
-      );
-
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
-    } on PostgrestException catch (e) {
-      // DB trigger enforced the product limit (authenticated users)
-      if (e.message.contains('product_limit_reached')) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Free Tier Limit Reached'),
-              content: Text(e.message.replaceFirst('product_limit_reached: ', '')),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-              ],
-            ),
-          );
+        final uploaded = await _service.uploadImage(_imageFile!);
+        if (uploaded != null && uploaded.isNotEmpty) {
+          photoUrl = uploaded;
         }
-        return;
       }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
+
+      final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
+      if (_isEditMode) {
+        final supabase = Supabase.instance.client;
+        await supabase.from('sme_products').update({
+          'name': _nameController.text.trim(),
+          'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
+          'description': _descController.text.trim(),
+          'price': price,
+          'quantity': qty,
+          'category': _selectedCategory,
+          if (photoUrl.isNotEmpty) 'photo_url': photoUrl,
+        }).eq('id', widget.product!.id);
+
+        MarketplaceService.updateNotifier.value++;
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            backgroundColor: Colors.green.shade700,
+            content: Text(isAr ? '✅ تم تحديث المنتج بنجاح!' : '✅ Product updated successfully!'),
+          ));
+          Navigator.pop(context, true);
+        }
+      } else {
+        await _service.addProduct(
+          _nameController.text.trim(),
+          _descController.text.trim(),
+          price,
+          photoUrl,
+          quantity: qty,
+        );
+
+        // Update optional category & name_ar on newly created product
+        try {
+          final user = Supabase.instance.client.auth.currentUser;
+          if (user != null) {
+            await Supabase.instance.client.from('sme_products').update({
+              'category': _selectedCategory,
+              'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
+            }).eq('seller_id', user.id).order('created_at', ascending: false).limit(1);
+          }
+        } catch (_) {}
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            backgroundColor: Colors.green.shade700,
+            content: Text(isAr ? '🎉 تم نشر المنتج على المتجر بنجاح!' : '🎉 Product published to Marketplace!'),
+          ));
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -153,272 +266,375 @@ class _AddProductPageState extends State<AddProductPage> {
   @override
   Widget build(BuildContext context) {
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final priceVal = double.tryParse(_priceController.text) ?? 0.0;
+    final vatVal = priceVal * 0.05;
+    final netVal = (priceVal * 0.95).clamp(0.0, double.infinity);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(
-          AppLocalizations.of(context)!.addProductTitle,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
           icon: Icon(
             isAr ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_new_rounded,
-            color: const Color(0xFF0F172A),
+            color: AppColors.textPrimary,
             size: 20,
           ),
           onPressed: () => Navigator.pop(context),
         ),
+        title: Text(
+          _isEditMode
+              ? (isAr ? 'تعديل بيانات المنتج' : 'Edit Product')
+              : (isAr ? 'إضافة منتج جديد' : 'Add New Product'),
+          style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
           Consumer<LocaleProvider>(
             builder: (context, localeProvider, _) {
-              final isAr = localeProvider.locale.languageCode == 'ar';
-              return InkWell(
-                onTap: () => localeProvider.toggleLocale(),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.bluePrimary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.language_rounded, color: AppColors.bluePrimary, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        isAr ? 'EN' : 'العربية',
-                        style: const TextStyle(
-                          color: AppColors.bluePrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+              return TextButton(
+                onPressed: () => localeProvider.toggleLocale(),
+                child: Text(
+                  isAr ? 'EN' : 'العربية',
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.bluePrimary),
                 ),
               );
             },
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ─── 1. HERO PHOTO UPLOADER ──────────────────────────────────
-              Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF003C8E).withValues(alpha: 0.08),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                          border: Border.all(
-                            color: _imageFile != null
-                                ? AppColors.bluePrimary
-                                : Colors.grey.shade300,
-                            width: _imageFile != null ? 2 : 1.5,
-                          ),
-                          image: _imageFile != null
-                              ? DecorationImage(
-                                  image: FileImage(_imageFile!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: _imageFile == null
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.bluePrimary.withValues(alpha: 0.08),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.add_a_photo_rounded,
-                                      color: AppColors.bluePrimary,
-                                      size: 32,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    isAr ? 'اضغط لرفع صورة' : 'Tap to upload photo',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : null,
+              // ── 1. IMAGE UPLOAD SECTION ──────────────────────────────────
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  height: 190,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: (_imageFile != null || _existingPhotoUrl != null)
+                          ? AppColors.bluePrimary
+                          : Colors.grey.shade300,
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
                       ),
-                      if (_imageFile != null)
-                        Container(
-                          margin: const EdgeInsets.all(8),
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: AppColors.bluePrimary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 16),
-                        ),
                     ],
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // ─── 2. MODERN FORM INPUTS ──────────────────────────────────
-              _buildModernTextField(
-                controller: _nameController,
-                label: isAr ? 'اسم المنتج *' : 'Product Name *',
-                hint: isAr ? 'مثال: حبوب إسبريسو فاخرة' : 'e.g. Premium Espresso Beans',
-                icon: Icons.shopping_bag_outlined,
-                validator: (val) => val == null || val.isEmpty
-                    ? AppLocalizations.of(context)!.requiredError
-                    : null,
-              ),
-
-              const SizedBox(height: 18),
-
-              _buildModernTextField(
-                controller: _descController,
-                label: isAr ? 'وصف المنتج' : 'Description',
-                hint: isAr ? 'اكتب مواصفات المنتج وميزاته...' : 'Enter product features, specs & details...',
-                icon: Icons.description_outlined,
-                maxLines: 3,
-              ),
-
-              const SizedBox(height: 18),
-
-              _buildModernTextField(
-                controller: _priceController,
-                label: isAr ? 'السعر (درهم إماراتي) *' : 'Price (AED) *',
-                hint: '0.00',
-                icon: Icons.payments_outlined,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                prefixText: isAr ? 'درهم ' : 'AED ',
-                validator: (val) {
-                  if (val == null || val.isEmpty) return AppLocalizations.of(context)!.requiredError;
-                  if (double.tryParse(val) == null) return AppLocalizations.of(context)!.invalidNumberError;
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 22),
-
-              // ─── 3. FULFILLMENT CHANNEL CARD ────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: _hasWarehouseSub
-                      ? const Color(0xFFEFF6FF)
-                      : const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _hasWarehouseSub
-                        ? const Color(0xFFBFDBFE)
-                        : const Color(0xFFFDE68A),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: _hasWarehouseSub
-                            ? AppColors.bluePrimary
-                            : Colors.amber.shade800,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        _hasWarehouseSub ? Icons.sync_rounded : Icons.storefront_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _hasWarehouseSub
-                                      ? (isAr ? 'مربوط بشبكة مستودعات NXN' : 'Connected to NXN Warehouse Stock')
-                                      : (isAr ? 'شحن عبر التاجر' : 'Merchant Self-Fulfillment'),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: _hasWarehouseSub
-                                        ? const Color(0xFF1E40AF)
-                                        : Colors.amber.shade900,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (_imageFile != null)
+                          Image.file(_imageFile!, fit: BoxFit.cover)
+                        else if (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty)
+                          Image.network(_existingPhotoUrl!, fit: BoxFit.cover)
+                        else
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.blue.shade50.withValues(alpha: 0.5), Colors.white],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
                                   ),
+                                  child: const Icon(Icons.add_a_photo_rounded, size: 36, color: AppColors.bluePrimary),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: _hasWarehouseSub ? Colors.green : Colors.amber,
-                                  shape: BoxShape.circle,
+                                const SizedBox(height: 10),
+                                Text(
+                                  isAr ? 'التقط صورة أو اختر من المعرض' : 'Upload or Snap Product Photo',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _hasWarehouseSub
-                                ? (isAr
-                                    ? 'المنتج مربوط بأرفف المستودع المستأجرة. يتم الخصم تلقائياً من المخزون الذكي مع كل طلب شراء.'
-                                    : 'Product stock is linked to your leased shelves and auto-decremented in Smart Inventory upon buyer order.')
-                                : (isAr
-                                    ? 'يمكنك التداول بشحن التاجر الخاص، أو استئجار أرفف للحصول على التجهيز التلقائي الشامل.'
-                                    : 'You fulfill orders directly, or lease shelf space to activate automated NXN warehouse stock sync.'),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _hasWarehouseSub
-                                  ? const Color(0xFF1E3A8A)
-                                  : Colors.amber.shade900,
-                              height: 1.4,
+                                const SizedBox(height: 4),
+                                Text(
+                                  isAr ? 'JPG, PNG بجودة واضحة' : 'High resolution JPG or PNG',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                ),
+                              ],
                             ),
                           ),
+                        if (_imageFile != null || (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty))
+                          Positioned(
+                            bottom: 12,
+                            right: isAr ? null : 12,
+                            left: isAr ? 12 : null,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.edit_rounded, color: Colors.white, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isAr ? 'تغيير الصورة' : 'Change Photo',
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── 2. CATEGORY SELECTOR CHIPS ──────────────────────────────
+              Text(
+                isAr ? 'تصنيف المنتج' : 'Product Category',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 46,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _categories.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (ctx, i) {
+                    final cat = _categories[i];
+                    final isSelected = _selectedCategory == cat['id'];
+                    final color = cat['color'] as Color;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedCategory = cat['id'] as String),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? color.withValues(alpha: 0.12) : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected ? color : Colors.grey.shade200,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(cat['icon'] as IconData, size: 18, color: isSelected ? color : Colors.grey.shade600),
+                            const SizedBox(width: 8),
+                            Text(
+                              isAr ? cat['nameAr'] as String : cat['nameEn'] as String,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                fontSize: 13,
+                                color: isSelected ? color : Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── 3. PRODUCT INFORMATION CARD ─────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isAr ? 'معلومات المنتج' : 'Product Details',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'اسم المنتج بالإنجليزية *' : 'Product Title (EN) *',
+                        hintText: 'e.g. Specialty Cold Brew Coffee 500ml',
+                        prefixIcon: const Icon(Icons.title_rounded, color: AppColors.bluePrimary),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? (isAr ? 'حقل مطلوب' : 'Required field') : null,
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _nameArController,
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'اسم المنتج بالعربية (اختياري)' : 'Product Title (AR - Optional)',
+                        hintText: 'مثال: قهوة كولد برو فاخرة 500 مل',
+                        prefixIcon: const Icon(Icons.translate_rounded, color: Color(0xFF10AC84)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _descController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'وصف المنتج والمواصفات' : 'Description & Specifications',
+                        hintText: isAr ? 'اكتب تفاصيل وميزات المنتج للمشتري...' : 'Enter product features, ingredients, or specifications...',
+                        prefixIcon: const Icon(Icons.notes_rounded, color: Colors.grey),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── 4. PRICING & STOCK CONTROLLER ────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isAr ? 'التسعير والمخزون' : 'Pricing & Inventory',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            controller: _priceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: isAr ? 'سعر البيع *' : 'Retail Price *',
+                              hintText: '0.00',
+                              prefixIcon: Container(
+                                padding: const EdgeInsets.all(12),
+                                child: Text(
+                                  isAr ? 'د.إ' : 'AED',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.bluePrimary),
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return isAr ? 'مطلوب' : 'Required';
+                              if (double.tryParse(v) == null) return isAr ? 'رقم غير صحيح' : 'Invalid number';
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(isAr ? 'صافي أرباحك' : 'Est. Net', style: TextStyle(fontSize: 11, color: Colors.blue.shade700)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'AED ${netVal.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.bluePrimary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Stock Counter Stepper
+                    Text(
+                      isAr ? 'الكمية المتوفرة في المخزون' : 'Available Stock Quantity',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          _stepBtn(icon: Icons.remove, onPressed: () => _adjustQuantity(-1)),
+                          _quickStepChip('-10', () => _adjustQuantity(-10)),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _qtyController,
+                              textAlign: TextAlign.center,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                              decoration: const InputDecoration(border: InputBorder.none),
+                              onChanged: (_) => setState(() {}),
+                              validator: (v) => (int.tryParse(v ?? '') == null) ? (isAr ? 'رقم غير صحيح' : 'Invalid') : null,
+                            ),
+                          ),
+                          _quickStepChip('+10', () => _adjustQuantity(10)),
+                          _stepBtn(icon: Icons.add, onPressed: () => _adjustQuantity(1)),
                         ],
                       ),
                     ),
@@ -426,135 +642,195 @@ class _AddProductPageState extends State<AddProductPage> {
                 ),
               ),
 
-              const SizedBox(height: 18),
-
-              _buildModernTextField(
-                controller: _qtyController,
-                label: isAr ? 'كمية المخزون الابتدائية *' : 'Initial Stock Quantity *',
-                hint: '50',
-                icon: Icons.inventory_2_outlined,
-                keyboardType: TextInputType.number,
-                validator: (val) {
-                  if (val == null || val.isEmpty) return AppLocalizations.of(context)!.requiredError;
-                  if (int.tryParse(val) == null) return AppLocalizations.of(context)!.invalidNumberError;
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 24),
-
-              Text(
-                isAr
-                    ? 'ملاحظة: إذا كان متجرك معتمداً، سيظهر هذا المنتج فوراً في السوق المعتمد للعملاء.'
-                    : 'Note: If your shop is Verified, this product will be immediately visible on the Public Marketplace.',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontStyle: FontStyle.italic),
-                textAlign: TextAlign.center,
-              ),
-
               const SizedBox(height: 20),
 
-              // ─── 4. PREMIUM SUBMIT BUTTON ────────────────────────────────
+              // ── 5. LIVE MARKETPLACE PREVIEW ──────────────────────────────
               Container(
-                height: 56,
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.remove_red_eye_rounded, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          isAr ? 'معاينة مباشرة في المتجر' : 'Live Marketplace Card Preview',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isAr ? 'مباشر' : 'Live',
+                            style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              image: _imageFile != null
+                                  ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover)
+                                  : (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty
+                                      ? DecorationImage(image: NetworkImage(_existingPhotoUrl!), fit: BoxFit.cover)
+                                      : null),
+                            ),
+                            child: (_imageFile == null && (_existingPhotoUrl == null || _existingPhotoUrl!.isEmpty))
+                                ? const Icon(Icons.shopping_bag_outlined, color: Colors.grey)
+                                : null,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _nameController.text.trim().isNotEmpty
+                                      ? _nameController.text.trim()
+                                      : (isAr ? 'اسم المنتج' : 'Product Name'),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        _selectedCategory,
+                                        style: const TextStyle(fontSize: 10, color: AppColors.bluePrimary, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${_qtyController.text} in stock',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            'AED ${priceVal.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.bluePrimary),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                        )
-                      : Text(
-                          AppLocalizations.of(context)!.saveProductButton,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                ),
               ),
-
-              const SizedBox(height: 30),
             ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          height: 54,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.bluePrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
+            ),
+            child: _isLoading
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(_isEditMode ? Icons.check_circle_rounded : Icons.rocket_launch_rounded, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isEditMode
+                            ? (isAr ? 'حفظ التعديلات' : 'Save Changes')
+                            : (isAr ? 'نشر المنتج في المتجر' : 'Publish to Marketplace'),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildModernTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    String? hint,
-    String? prefixText,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Widget _stepBtn({required IconData icon, required VoidCallback onPressed}) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Icon(icon, size: 18, color: AppColors.textPrimary),
       ),
-      child: TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        validator: validator,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Color(0xFF0F172A)),
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          prefixText: prefixText,
-          prefixIcon: Icon(icon, color: AppColors.bluePrimary, size: 22),
-          labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(color: Colors.grey.shade200),
+    );
+  }
+
+  Widget _quickStepChip(String label, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: AppColors.bluePrimary, width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
           ),
         ),
       ),

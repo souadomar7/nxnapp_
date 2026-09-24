@@ -5,8 +5,17 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../theme.dart';
 import '../providers/locale_provider.dart';
 import 'payment_page.dart';
-import '../core/services/chatbot_engine.dart';
-
+import '../services/ai_agent_service.dart';
+import 'create_shipment_page.dart';
+import 'marketplace/add_product_page.dart';
+import 'marketplace/seller_orders_page.dart';
+import 'booking_page.dart';
+import 'settings/kyc_page.dart';
+import 'profile/wallet_page.dart';
+import 'smart_inventory_stage.dart';
+import 'operations/tracking_page.dart';
+import 'registration_page.dart';
+import 'marketplace/seller_products_page.dart';
 enum ChatCardType { none, inventoryAlert, bookingQuote, gatePass, deliveryTracker, damagedQuarantineAlert }
 
 class ChatMessage {
@@ -15,6 +24,7 @@ class ChatMessage {
   final DateTime timestamp;
   final ChatCardType cardType;
   final dynamic cardData;
+  final AgentAction? agentAction;
 
   ChatMessage({
     required this.text,
@@ -22,6 +32,7 @@ class ChatMessage {
     required this.timestamp,
     this.cardType = ChatCardType.none,
     this.cardData,
+    this.agentAction,
   });
 }
 
@@ -37,7 +48,7 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
   bool _isTyping = false;
-  final ChatbotEngine _chatbotEngine = ChatbotEngine();
+  final AiAgentService _agentService = AiAgentService();
   String? _lastLanguageCode;
 
   @override
@@ -49,7 +60,7 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
     if (isAr) {
       return "👋 أهلاً بك في **المساعد الذكي لـ NXN**! 🤖✨\n\nأنا مستشارك الذكي لإدارة المستودعات والخدمات اللوجستية على مدار الساعة.\n\nإليك ما يمكنني مساعدتك به اليوم:\n\n📦 **المساحات التخزينية والأرفف**\n• حساب فوري للتكاليف وتوصيات المساحة المناسبة\n\n🌡️ **درجات حرارة التخزين**\n• التخزين العادي (25°م)، المبرد (4°م)، والمجمد (-18°م)\n\n🚚 **الشحنات والتوصيل**\n• تصاريح الدخول (STO) وبوالص الشحن Express (WAY)\n\n📜 **الامتثال والتراخيص**\n• ضريبة القيمة المضافة (5%) وتوثيق KYC\n\n💰 **سحوبات التاجر**\n• فترات الحجز (14 يوماً) وإجراءات السحب\n\nاختر من الأسئلة السريعة أدناه أو اكتب سؤالك مباشرة! 👇";
     } else {
-      return "👋 Welcome to **NXN Copilot AI Assistant**! 🤖✨\n\nI am your 24/7 intelligent logistics & fulfillment advisor.\n\nHere is how I can assist you today:\n\n📦 **Micro-Warehousing & Space Subscriptions**\n• Instant shelf rental quotes & capacity recommendations\n\n🌡️ **Storage Temperature Classes**\n• Ambient (25°C), Chilled (4°C), Cold (-18°C) specs\n\n🚚 **Inbound & Outbound Logistics**\n• Gate Pass (STO) scheduling & Courier Express (WAY)\n\n📜 **Compliance & Trade License**\n• UAE FTA Tax rules (5% VAT) & KYC verification\n\n💰 **Merchant Financials**\n• 14-day seller hold periods & payout processing\n\nTap any prompt below or type your question! 👇";
+      return "👋 Welcome to **NXN AI Agent**! 🤖✨\n\nI am your 24/7 intelligent logistics & fulfillment advisor.\n\nHere is how I can assist you today:\n\n📦 **Micro-Warehousing & Space Subscriptions**\n• Instant shelf rental quotes & capacity recommendations\n\n🌡️ **Storage Temperature Classes**\n• Ambient (25°C), Chilled (4°C), Cold (-18°C) specs\n\n🚚 **Inbound & Outbound Logistics**\n• Gate Pass (STO) scheduling & Courier Express (WAY)\n\n📜 **Compliance & Trade License**\n• UAE FTA Tax rules (5% VAT) & KYC verification\n\n💰 **Merchant Financials**\n• 14-day seller hold periods & payout processing\n\nTap any prompt below or type your question! 👇";
     }
   }
 
@@ -97,119 +108,16 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
   }
 
   Future<void> _generateAiResponse(String userQuery) async {
-    final isAr = Localizations.localeOf(context).languageCode == 'ar';
-    final query = userQuery.toLowerCase();
-
-    // Check for explicit quarantine visual alert card request
-    if (query.contains("quarantine") || query.contains("rtv") || query.contains("تالف") || query.contains("عزل") || query.contains("حجر")) {
-      final text = isAr
-          ? "⚠️ **بروتوكول البضائع التالفة والعزل في مستودعات NXN:**\n\n"
-              "عند حدوث تلف أثناء الفحص الوارد أو داخل المستودع:\n"
-              "1. **العزل في النظام:** تحول حالة المنتجات إلى `quarantine` وتخفى فوراً من نتائج البحث وسلات التجميع بالسوق.\n"
-              "2. **العزل الفعلي:** تُنقل المنتجات إلى منطقة الحجر المخصصة بالمركز.\n"
-              "3. **التعويض المالي:** عند التلف بسبب عمليات المستودع، يتم رصيد القيمة البيعية كاملة بمحفظتك.\n"
-              "4. **خيارات التصرف:** خروج البضائع RTV، الإتلاف المصرح، أو إعادة الإدراج بسعر مخفض."
-          : "⚠️ **Damaged Goods & Quarantine Protocol (NXN Hub):**\n\n"
-              "When inventory is damaged during inbound receiving or hub relocation:\n"
-              "1. **System Lock:** Item status updates to `quarantine` and is immediately hidden from marketplace search & picklists.\n"
-              "2. **Physical Isolation:** Moved to the hub Quarantine Hold Area.\n"
-              "3. **Financial Attribution:** If damaged by warehouse ops, **full retail credit** is issued to your Wallet.\n"
-              "4. **Disposition Paths:** Choose RTV Return, Authorized Disposal, or Refurbished Liquidation.";
-
-      setState(() {
-        _isTyping = false;
-        _messages.add(
-          ChatMessage(
-            text: text,
-            isUser: false,
-            timestamp: DateTime.now(),
-            cardType: ChatCardType.damagedQuarantineAlert,
-            cardData: {
-              'hub': 'DXB Hub (Bay 3)',
-              'sku': 'SKU-DXB-002',
-              'product_name': 'Arabian Coffee Blend',
-              'damaged_qty': 2,
-              'reason': 'Packaging damage during hub forklift relocation',
-              'compensation': 70.0,
-            },
-          ),
-        );
-      });
-      _scrollToBottom();
-      return;
-    }
-
-    // 1. First, check official Excel matrix via ChatbotEngine
-    final engineResponse = await _chatbotEngine.processMessage(userQuery, isAr: isAr);
-    String responseText = engineResponse.text;
-
-    // 2. If the query was broad or triggered fallback, enrich with our detailed domain answers
-    final isFallbackNotice = responseText.contains("لم أجد مطابقة") || responseText.contains("predefined rules");
-
-    if (isFallbackNotice) {
-      if (query.contains("price") || query.contains("pricing") || query.contains("cost") || query.contains("fee") || query.contains("100") ||
-          query.contains("سعر") || query.contains("أسعار") || query.contains("تكلفة") || query.contains("رسوم") || query.contains("إيجار")) {
-        responseText = isAr
-            ? "📌 **هيكل أسعار التخزين الدقيق في NXN:**\n\n"
-                "• **السعر الأساسي للرف:** 100 درهم لكل رف شهرياً في جميع مراكز التجميع الـ4 بالدولة (دبي، أبوظبي، الشارقة، العين).\n"
-                "• **رسوم مساعدة العمال:** +50 درهم لكل عامل مخصص.\n"
-                "• **رسوم المنصة:** 5% من المجموع الفرعي.\n"
-                "• **ضريبة القيمة المضافة:** 5% محتسبة وفقاً لقوانين هيئة الضرائب بالدولة.\n\n"
-                "يمكنك تخصيص مساحتك وحساب التكلفة بدقة في تبويب **حجز مساحة**!"
-            : "📌 **NXN Micro-Warehousing Pricing Structure:**\n\n"
-                "• **Base Shelf Rate:** AED 100 per shelf per month across all 4 UAE fulfillment hubs (Dubai, Abu Dhabi, Sharjah, Al Ain).\n"
-                "• **Worker Assistance Fee:** +50 AED per worker assigned.\n"
-                "• **Platform Fee:** 5% of subtotal.\n"
-                "• **UAE VAT:** 5% value-added tax calculated on the subtotal and platform fee.\n\n"
-                "You can customize your space and calculate exact quotes anytime in the **Book Space** tab!";
-      } else if (query.contains("temp") || query.contains("chilled") || query.contains("cold") || query.contains("ambient") ||
-          query.contains("حرارة") || query.contains("تبريد") || query.contains("تجميد") || query.contains("مبرد") || query.contains("بارد")) {
-        responseText = isAr
-            ? "🌡️ **فئات درجات حرارة التخزين ومضاعفات الأسعار:**\n\n"
-                "1. **التخزين العادي (1.0x الأساسي):** مساحات مجهزة ومكيفة للبضائع العامة غير القابلة للتلف.\n"
-                "2. **التخزين المبرد (+30% زيادة):** حرارة ثابتة بين 2°C – 8°C لمستحضرات التجميل والمشروبات والمنتجات الحساسة.\n"
-                "3. **التخزين المجمد (+50% زيادة):** تخزين تحت الصفر للبضائع القابلة للتلف والأغذية والمواد التخصصية."
-            : "🌡️ **Storage Temperature Classes & Pricing Multipliers:**\n\n"
-                "1. **Ambient Storage (1.0x Base):** Standard climate-controlled warehouse space for non-perishable goods.\n"
-                "2. **Chilled Storage (+30% Rate):** Temperature maintained between 2°C – 8°C for cosmetics, beverages, and sensitive items.\n"
-                "3. **Cold Storage (+50% Rate):** Frozen storage below 0°C for perishables and specialized cargo.";
-      } else if (query.contains("kyc") || query.contains("license") || query.contains("trn") || query.contains("document") ||
-          query.contains("رخصة") || query.contains("ترخيص") || query.contains("تحقق") || query.contains("وثائق") || query.contains("مستندات")) {
-        responseText = isAr
-            ? "📜 **متطلبات التحقق والـ KYC للتجار بالدولة:**\n\n"
-                "لتصبح تاخراً معتمداً في سوق NXN، يجب تقديم:\n"
-                "• **رخصة تجارية إماراتية سارية** أو رخصة اعتماد إلكتروني.\n"
-                "• **الهوية الإماراتية** (الوجهين).\n"
-                "• **الرقم الضريبي TRN (15 رقم)** للالتزام بالفواتير الإلكترونية لـ FTA.\n\n"
-                "يتم مراجعة الطلبات والاعتماد خلال 24–48 ساعة عمل."
-            : "📜 **UAE Merchant Verification & KYC Requirements:**\n\n"
-                "To become a verified seller on the NXN Marketplace, merchants must submit:\n"
-                "• **Valid UAE Trade License** or E-Trader License.\n"
-                "• **Emirates ID** (Front & Back).\n"
-                "• **15-Digit FTA Tax Registration Number (TRN)** for e-invoicing compliance.\n\n"
-                "Once submitted, verification is reviewed within 24–48 business hours.";
-      } else if (query.contains("payout") || query.contains("iban") || query.contains("withdraw") || query.contains("settle") ||
-          query.contains("أرباح") || query.contains("سحب") || query.contains("محفظة") || query.contains("تحويل") || query.contains("رصيد")) {
-        responseText = isAr
-            ? "💰 **محرك سحب أرباح التجار عبر الحساب البنكي (IBAN):**\n\n"
-                "• **فترة تعليق 14 يوماً:** تخضع مبيعاتك لفترة تعليق قياسية مدتها 14 يوماً لضمان انتهاء مهلة الإرجاع.\n"
-                "• **صافي الأرباح:** يتم تحويل 95% من صافي المبيعات مباشرة إلى حسابك البنكي المسجل (5% عمولة المنصة).\n"
-                "• يمكنك طلب سحب الأرباح في أي وقت مباشرة من **صفحة المحفظة**."
-            : "💰 **Seller IBAN Payout Engine:**\n\n"
-                "• **14-Day Clearance Hold:** Sales revenue undergoes a standard 14-day clearance hold to accommodate return windows.\n"
-                "• **Net Payout:** 95% net payout transferred directly to your registered UAE IBAN (5% platform commission).\n"
-                "• You can request payouts anytime directly from your **Wallet Page**.";
-      }
-    }
+    final agentResponse = await _agentService.sendMessage(userQuery);
 
     setState(() {
       _isTyping = false;
       _messages.add(
         ChatMessage(
-          text: responseText,
+          text: agentResponse.text,
           isUser: false,
           timestamp: DateTime.now(),
-          cardType: ChatCardType.none,
+          agentAction: agentResponse.action,
         ),
       );
     });
@@ -305,7 +213,7 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isArCurrent ? "المساعد الذكي NXN" : "NXN Copilot",
+                  isArCurrent ? "المساعد الذكي NXN" : "NXN AI Agent",
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -556,6 +464,58 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
                   if (message.cardType != ChatCardType.none) ...[
                     const SizedBox(height: 8),
                     _buildRichCard(message.cardType, message.cardData),
+                  ],
+                  if (message.agentAction != null) ...[
+                    const SizedBox(height: 8),
+                    Builder(
+                      builder: (ctx) {
+                        final isAr = Localizations.localeOf(context).languageCode == 'ar';
+                        String btnText = isAr ? 'تنفيذ الإجراء' : 'Take Action';
+                        Widget page = Container();
+                        if (message.agentAction!.type == 'open_booking') {
+                          btnText = isAr ? 'احجز مساحة الآن' : 'Book Space Now';
+                          page = const BookingPage();
+                        } else if (message.agentAction!.type == 'create_shipment') {
+                          btnText = isAr ? 'إنشاء شحنة جديدة' : 'Create Shipment';
+                          page = const CreateShipmentPage();
+                        } else if (message.agentAction!.type == 'add_product') {
+                          btnText = isAr ? 'إضافة منتج للسوق' : 'Add Product';
+                          page = const AddProductPage();
+                        } else if (message.agentAction!.type == 'view_orders') {
+                          btnText = isAr ? 'عرض الطلبات' : 'View Orders';
+                          page = const SellerOrdersPage();
+                        } else if (message.agentAction!.type == 'view_inventory') {
+                          btnText = isAr ? 'لوحة المخزون' : 'View Inventory';
+                          page = const SmartInventoryStageEN();
+                        } else if (message.agentAction!.type == 'open_kyc') {
+                          btnText = isAr ? 'التحقق من الهوية والترخيص' : 'Verify KYC Documents';
+                          page = const KYCPage();
+                        } else if (message.agentAction!.type == 'open_wallet') {
+                          btnText = isAr ? 'فتح المحفظة' : 'Open Wallet';
+                          page = const WalletPage();
+                        } else if (message.agentAction!.type == 'track_order') {
+                          btnText = isAr ? 'تتبع الشحنة مباشرة' : 'Live Order Tracking';
+                          page = const TrackingPage();
+                        } else if (message.agentAction!.type == 'start_uae_pass') {
+                          btnText = isAr ? 'التسجيل عبر الهوية الرقمية' : 'Register with UAE PASS';
+                          page = const RegistrationPage();
+                        } else if (message.agentAction!.type == 'edit_price' || message.agentAction!.type == 'manage_pricing') {
+                          btnText = isAr ? 'إدارة المنتجات والأسعار' : 'Manage Product Prices';
+                          page = const SellerProductsPage();
+                        }
+                        return ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.bluePrimary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text(btnText),
+                        );
+                      }
+                    ),
                   ],
                 ],
               ),

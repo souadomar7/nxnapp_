@@ -3,6 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:nxnapp/core/services/notification_service.dart';
+import 'package:app_links/app_links.dart';
+import 'pages/onboarding/profile_setup_page.dart';
+import 'services/uae_pass_service.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:nxnapp/l10n/app_localizations.dart';
@@ -19,7 +22,9 @@ import 'data/receive_result.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'providers/cart_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/platform_settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,11 +54,47 @@ void main() async {
     anonKey: supabaseAnonKey!,
   );
 
+  // Handle UAE PASS OAuth callback deep link
+  final appLinks = AppLinks();
+  appLinks.uriLinkStream.listen((uri) async {
+    if (uri.scheme == 'nxn' && uri.host == 'auth') {
+      final code = uri.queryParameters['code'];
+      if (code != null) {
+        try {
+          final uaePassService = UaePassService();
+          final tokenData = await uaePassService.exchangeCodeForToken(code);
+          if (tokenData != null) {
+            final profile = await uaePassService.getUserProfile(tokenData);
+            if (profile != null) {
+              // Navigate to profile setup with the data
+              WarehouseApp.navigatorKey.currentState?.pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => ProfileSetupPage(uaePassData: {
+                    'businessName': profile['fullnameEN'] ?? '',
+                    'contactNumber': profile['mobile'] ?? '',
+                    'licenseNumber': profile['licenseNumber'] ?? '',
+                    'email': profile['email'] ?? '',
+                    'uaePassUuid': profile['uuid'] ?? '',
+                    'licenseOwnerName': profile['licenseOwnerName'] ?? '',
+                  }),
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('UAE PASS callback error: $e');
+        }
+      }
+    }
+  });
+
   runApp(const WarehouseApp());
 }
 
 class WarehouseApp extends StatelessWidget {
   const WarehouseApp({super.key});
+  
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +103,8 @@ class WarehouseApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => PlatformSettingsProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(
           create: (_) => InventoryController(SupabaseInventoryService()),
         ),
@@ -69,6 +112,7 @@ class WarehouseApp extends StatelessWidget {
       child: Consumer2<LocaleProvider, ThemeProvider>(
         builder: (context, localeProvider, themeProvider, child) {
           return MaterialApp(
+            navigatorKey: WarehouseApp.navigatorKey,
             debugShowCheckedModeBanner: false,
             title: 'NXN Warehouses',
             theme: appTheme,

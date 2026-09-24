@@ -7,6 +7,7 @@ import '../services/marketplace_service.dart';
 import '../models/history_models.dart';
 import '../theme.dart';
 import 'qr_scanner_page.dart';
+import 'admin/payout_settlement_page.dart';
 
 class AdminPanelColors {
   static const primary = Color(0xFF1E293B); // Dark Slate Blue for Executive Admin
@@ -714,13 +715,17 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
         const SizedBox(height: 20),
 
         // Financial Payout Release Card
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AdminPanelColors.accentPurple.withValues(alpha: 0.3)),
-          ),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const PayoutSettlementPage()));
+          },
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AdminPanelColors.accentPurple.withValues(alpha: 0.3)),
+            ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -743,6 +748,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
               ),
             ],
           ),
+        ),
         ),
       ],
     );

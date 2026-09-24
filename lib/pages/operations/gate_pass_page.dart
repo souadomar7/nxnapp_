@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/pdf_export_service.dart';
@@ -352,7 +353,7 @@ class GatePassPage extends StatelessWidget {
                         SnackBar(
                           backgroundColor: Colors.green.shade800,
                           content: Text(
-                            isAr ? 'تم حفظ تصريح الدخول في المعرض بنجاح! 📸' : 'Gate Pass saved to Gallery! 📸',
+                            isAr ? 'تم حفظ تصريح الدخول في المعرض والمحفظة المحلية! 📸' : 'Gate Pass cached offline & saved to Gallery! 📸',
                           ),
                         ),
                       );
@@ -368,6 +369,43 @@ class GatePassPage extends StatelessWidget {
                     label: Text(
                       l10n.saveToGallery,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // WhatsApp Courier Sharing & Wallet Export
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final msg = isAr
+                          ? 'تصريح دخول مستودع NXN HUB\nالرمز: $bookingRef\nالموقع: $hubName\nالوقت: $slotStr\nالمركبة: $plateStr\nيرجى إبراز هذا الرمز عند البوابة رقم 3.'
+                          : 'NXN HUB Official Gate Pass\nCode: $bookingRef\nFacility: $hubName\nSlot: $slotStr\nVehicle: $plateStr\nPlease present this pass at Dock Gate 3.';
+                      final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(msg)}');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(isAr ? 'تعذر فتح تطبيق واتساب' : 'Could not launch WhatsApp')),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      elevation: 1,
+                    ),
+                    icon: const Icon(Icons.share_rounded, size: 18),
+                    label: Text(
+                      isAr ? 'مشاركة السائق عبر واتساب' : 'Share with Driver (WhatsApp)',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
                     ),
                   ),
                 ),

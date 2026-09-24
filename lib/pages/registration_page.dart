@@ -25,7 +25,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _pass = TextEditingController();
   final _confirm = TextEditingController();
   bool _obscure = true;
-  bool _agree = false;
   bool _isLoading = false;
 
   void _skipToHome() {
@@ -40,6 +39,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   Future<void> _continueWithUaePass() async {
+    // T&C already accepted on the Terms & Conditions page — proceed directly
     setState(() => _isLoading = true);
     try {
       final data = await UaePassService().signIn();
@@ -52,6 +52,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
           'licenseNumber': (data['licenseNumber'] ?? '').toString(),
           'email': (data['email'] ?? '').toString(),
           'uaePassUuid': (data['uuid'] ?? '').toString(),
+          'licenseOwnerName': (data['licenseOwnerName'] ?? '').toString(),
+          'licenseName': (data['licenseName'] ?? '').toString(),
         };
         Navigator.push(context, MaterialPageRoute(
           builder: (_) => ProfileSetupPage(uaePassData: mappedData),
@@ -74,15 +76,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   Future<void> _submitEmailSignUp() async {
     final l10n = AppLocalizations.of(context)!;
-    if (!_agree) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.agreeTermsError),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
+    // T&C already accepted on the Terms & Conditions page — proceed directly
     if (_formKey.currentState?.validate() ?? false) {
       try {
         final response = await Supabase.instance.client.auth.signUp(
@@ -137,8 +131,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
         }
       } on AuthException catch (e) {
         if (!mounted) return;
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        String msg = e.message;
+        if (msg.contains('Bad Gateway')) {
+          msg = 'Backend service is unavailable (502 Bad Gateway). Please check if your Supabase project is paused in the dashboard.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
       } catch (e) {
         if (!mounted) return;
@@ -330,30 +328,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
-
-                  // Terms agreement
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: Checkbox(
-                          value: _agree,
-                          activeColor: AppColors.bluePrimary,
-                          onChanged: (v) => setState(() => _agree = v ?? false),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          l10n.agreeTerms,
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-
                   const SizedBox(height: 24),
 
                   // Register button

@@ -3,7 +3,8 @@ import 'package:nxnapp/l10n/app_localizations.dart';
 import '../theme.dart';
 import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
-import 'login.dart';
+import '../providers/user_provider.dart';
+import 'registration_page.dart';
 
 class TermsAndConditionsPage extends StatefulWidget {
   const TermsAndConditionsPage({super.key});
@@ -139,10 +140,14 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               // Continue Button
               ElevatedButton(
                 onPressed: _agreed
-                    ? () {
+                    ? () async {
+                        // Persist acceptance so T&C are never shown again on this device
+                        await Provider.of<UserProvider>(context, listen: false)
+                            .acceptTerms();
+                        if (!context.mounted) return;
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          MaterialPageRoute(builder: (_) => const RegistrationPage()),
                         );
                       }
                     : null,
