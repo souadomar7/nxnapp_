@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -28,53 +27,6 @@ class _PayoutSettlementPageState extends State<PayoutSettlementPage> {
       setState(() { _ledgers = List<Map<String, dynamic>>.from(data); _isLoading = false; });
     } catch (e) {
       setState(() => _isLoading = false);
-    }
-  }
-
-  /// Calculate payout for a seller from their delivered buyer_orders
-  Future<void> _calculateAndCreatePayout(String sellerId) async {
-    final isAr = Localizations.localeOf(context).languageCode == 'ar';
-    try {
-      // Get all delivered orders for this seller in current period
-      final periodStart = DateTime.now().subtract(const Duration(days: 14));
-      final orders = await _supabase
-          .from('buyer_orders')
-          .select('total_amount')
-          .eq('seller_id', sellerId)
-          .eq('order_status', 'delivered')
-          .gte('created_at', periodStart.toIso8601String());
-
-      double gross = 0;
-      for (final o in orders as List) {
-        gross += (o['total_amount'] as num?)?.toDouble() ?? 0;
-      }
-
-      final commission = gross * 0.05;       // 5% platform commission
-      const storageFees = 0.0;              // pulled from subscriptions in production
-      final vatAmount = (commission + storageFees) * 0.05; // 5% VAT on fees
-      final netPayout = gross - commission - storageFees - vatAmount;
-
-      await _supabase.from('payout_ledgers').insert({
-        'seller_id': sellerId,
-        'period_start': periodStart.toIso8601String(),
-        'period_end': DateTime.now().toIso8601String(),
-        'gross_sales': gross,
-        'platform_commission': commission,
-        'storage_fees': storageFees,
-        'vat_amount': vatAmount,
-        'net_payout': netPayout,
-        'status': 'pending',
-      });
-
-      _loadLedgers();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: Colors.green,
-        content: Text(isAr ? 'تم إنشاء سجل الدفع بنجاح' : 'Payout record created successfully'),
-      ));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error: $e'), backgroundColor: Colors.red,
-      ));
     }
   }
 

@@ -4,9 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/marketplace_service.dart';
 import '../data/receive_result.dart';
-import '../l10n/app_localizations.dart';
 import '../theme.dart';
-import '../widgets/brand_logo.dart';
 import 'smart_inventory_stage.dart';
 import '../services/pdf_export_service.dart';
 import 'document_preview_page.dart';
@@ -35,9 +33,9 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
   // Current Step (0: Warehouse Hub & Temp, 1: Schedule & Truck, 2: Cargo & Workers, 3: Gate Pass Confirmation)
   int _currentStep = 0;
 
-  // Step 1: Warehouse & Temp Mode
+  // Step 1: Warehouse Hub
   String _selectedWarehouse = 'Dubai Central Warehouse';
-  String _selectedStorageMode = 'Ambient Storage (25°C)';
+  String _selectedStorageMode = 'Standard Shelving';
 
   // Step 2: Schedule & Freight Info
   DateTime? _scheduledDate;
@@ -49,7 +47,7 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
   int _itemCount = 50;
   int _boxCount = 5;
   int _workers = 1;
-  final TextEditingController _productNameCtrl = TextEditingController(text: 'Cold Brew Coffee 500ml');
+  final TextEditingController _productNameCtrl = TextEditingController(text: 'General Merchandise Box');
   final TextEditingController _notesCtrl = TextEditingController();
 
   // Step 4: Output Gate Pass / Confirmation Result
@@ -273,10 +271,8 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
     final isDone = _currentStep > stepIndex;
     final isCurrent = _currentStep == stepIndex;
 
-    Color color = Colors.grey.shade300;
     Color textColor = Colors.grey.shade500;
     if (isDone || isCurrent) {
-      color = ReceiveColors.primary;
       textColor = InventoryColors.textDark;
     }
 
@@ -334,7 +330,7 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
   Widget _buildCurrentStepContent(bool isAr) {
     switch (_currentStep) {
       case 0:
-        return _buildStep1WarehouseAndTemp(isAr);
+        return _buildStep1WarehouseHub(isAr);
       case 1:
         return _buildStep2ScheduleAndFreight(isAr);
       case 2:
@@ -346,8 +342,8 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
     }
   }
 
-  // ─── Step 1: Select Warehouse Hub & Storage Mode ─────────────────────────
-  Widget _buildStep1WarehouseAndTemp(bool isAr) {
+  // ─── Step 1: Select Warehouse Hub ─────────────────────────────────────────
+  Widget _buildStep1WarehouseHub(bool isAr) {
     final hubs = [
       {'name': isAr ? 'مستودع دبي المركزي' : 'Dubai Central Warehouse', 'location': 'Dubai Industrial City', 'icon': Icons.location_city_rounded},
       {'name': isAr ? 'مستودع أبوظبي المركزي' : 'Abu Dhabi Central Hub', 'location': 'KIZAD Logistics Park', 'icon': Icons.location_on_rounded},
@@ -355,22 +351,16 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
       {'name': isAr ? 'مركز تجميع العين' : 'Al Ain Fulfillment Center', 'location': 'Niyadat Industrial Area', 'icon': Icons.warehouse_rounded},
     ];
 
-    final tempModes = [
-      {'title': isAr ? 'تخزين عادي (25°C)' : 'Ambient Storage (25°C)', 'sub': isAr ? 'بضائع عامة غير قابلة للتلف' : 'Standard climate-controlled space', 'icon': Icons.wb_sunny_outlined, 'rate': '1.0x Base'},
-      {'title': isAr ? 'تخزين مبرد (2°C – 8°C)' : 'Chilled Storage (2°C – 8°C)', 'sub': isAr ? 'مشروبات ومستحضرات تجميل (+30%)' : 'Cosmetics & beverages (+30% rate)', 'icon': Icons.ac_unit_rounded, 'rate': '+30% Rate'},
-      {'title': isAr ? 'تخزين مجمد (< 0°C)' : 'Cold Storage (< 0°C)', 'sub': isAr ? 'أغذية مجمدة ومواد تخصصية (+50%)' : 'Frozen items & specialty foods (+50% rate)', 'icon': Icons.kitchen_rounded, 'rate': '+50% Rate'},
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          isAr ? 'الخطوة 1: اختر مستودع الاستلام وفئة التخزين' : 'Step 1: Select Fulfillment Hub & Temperature Class',
+          isAr ? 'الخطوة 1: اختر مستودع الاستلام' : 'Step 1: Select Fulfillment Hub',
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: InventoryColors.textDark),
         ),
         const SizedBox(height: 4),
         Text(
-          isAr ? 'حدد مركز NXN الوارد ونوع درجة الحرارة المطلوبة لشحنتك' : 'Choose destination warehouse and required storage temperature class',
+          isAr ? 'حدد مركز NXN الوارد المخصص لتفريغ شحنتك وإصدار تصريح الدخول' : 'Choose destination warehouse for intake and gate pass clearance',
           style: const TextStyle(fontSize: 12, color: InventoryColors.textSub),
         ),
         const SizedBox(height: 20),
@@ -410,57 +400,6 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
                       ),
                     ),
                     if (selected) const Icon(Icons.check_circle_rounded, color: ReceiveColors.primary, size: 20),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-
-        const SizedBox(height: 20),
-
-        // Storage Temperature Mode
-        Text(isAr ? 'فئة درجة الحرارة' : 'Storage Temperature Class', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        const SizedBox(height: 10),
-        ...tempModes.map((t) {
-          final title = t['title'] as String;
-          final selected = _selectedStorageMode == title;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: InkWell(
-              onTap: () => setState(() => _selectedStorageMode = title),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: selected ? ReceiveColors.primary : ReceiveColors.cardBorder, width: selected ? 2 : 1),
-                ),
-                child: Row(
-                  children: [
-                    Icon(t['icon'] as IconData, color: selected ? ReceiveColors.primary : Colors.grey, size: 22),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: selected ? ReceiveColors.primary : InventoryColors.textDark)),
-                          Text(t['sub'] as String, style: const TextStyle(fontSize: 11, color: InventoryColors.textSub)),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: selected ? ReceiveColors.primary.withValues(alpha: 0.1) : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        t['rate'] as String,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: selected ? ReceiveColors.primary : Colors.grey.shade600),
-                      ),
-                    ),
                   ],
                 ),
               ),

@@ -20,6 +20,7 @@ import 'login.dart';
 import 'registration_page.dart';
 import 'demo_menu_page.dart';
 import 'admin_panel_page.dart';
+import 'marketplace/seller_orders_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -463,6 +464,15 @@ class _ProfilePageState extends State<ProfilePage> {
       _SectionHeader(title: l10n.accountSection),
       _MenuCard(children: [
         _ProfileTile(
+          icon: Icons.receipt_long_rounded,
+          title: Localizations.localeOf(context).languageCode == 'ar' ? 'طلباتي ومشترياتي' : 'My Orders & Purchases',
+          subtitle: Localizations.localeOf(context).languageCode == 'ar' ? 'تتبع مسار طلبات التوصيل وحالة الشحنات' : 'Track delivery orders & shipment status',
+          iconColor: const Color(0xFF10AC84),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const SellerOrdersPage())),
+        ),
+        _Divider(),
+        _ProfileTile(
           icon: Icons.inventory_2_outlined,
           title: l10n.mySubscriptions,
           onTap: () => Navigator.push(context,
@@ -642,7 +652,6 @@ class _MenuCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -652,8 +661,10 @@ class _MenuCard extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
         child: Column(children: children),
       ),
     );
@@ -694,46 +705,49 @@ class _ProfileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        onTap: onTap,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: iconColor, size: 22),
         ),
-        child: Icon(icon, color: iconColor, size: 22),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w700,
-          fontSize: 14.5,
+        title: Text(
+          title,
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w700,
+            fontSize: 14.5,
+          ),
         ),
-      ),
-      subtitle: subtitle != null
-          ? Text(subtitle!,
-              style:
-                  const TextStyle(fontSize: 11.5, color: Colors.grey))
-          : null,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailingText != null)
-            Text(trailingText!,
-                style: TextStyle(
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13)),
-          if (showTrailing) ...[
-            const SizedBox(width: 8),
-            Icon(Icons.arrow_forward_ios_rounded,
-                size: 14, color: Colors.grey.shade400),
+        subtitle: subtitle != null
+            ? Text(subtitle!,
+                style:
+                    const TextStyle(fontSize: 11.5, color: Colors.grey))
+            : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (trailingText != null)
+              Text(trailingText!,
+                  style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13)),
+            if (showTrailing) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_ios_rounded,
+                  size: 14, color: Colors.grey.shade400),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

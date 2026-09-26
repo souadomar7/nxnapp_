@@ -61,4 +61,73 @@ class Validators {
     if (!RegExp(r'^AE\d{21}$').hasMatch(cleaned)) return 'Invalid UAE IBAN';
     return null;
   }
+
+  /// Returns 'Invalid Emirates ID' if [v] is not a valid 15-digit UAE Emirates ID (784-YYYY-XXXXXXX-Z).
+  static String? emiratesId(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final cleaned = v.replaceAll(RegExp(r'[\s\-]'), '');
+    if (!RegExp(r'^784\d{12}$').hasMatch(cleaned)) {
+      return 'Invalid Emirates ID (must be 15 digits starting with 784)';
+    }
+    return null;
+  }
+
+  /// Returns error string if price is not a positive valid number (min AED 1, max AED 500,000).
+  static String? price(String? v, {double min = 1.0, double max = 500000.0}) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final val = double.tryParse(v.trim());
+    if (val == null) return 'Invalid price format';
+    if (val < min) return 'Minimum price is AED ${min.toStringAsFixed(0)}';
+    if (val > max) return 'Maximum price limit is AED ${max.toStringAsFixed(0)}';
+    return null;
+  }
+
+  /// Returns error string if quantity is not a positive integer (min 1, max 100,000).
+  static String? stockQuantity(String? v, {int min = 1, int max = 100000}) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final val = int.tryParse(v.trim());
+    if (val == null) return 'Invalid quantity';
+    if (val < min) return 'Minimum quantity is $min';
+    if (val > max) return 'Maximum quantity is $max';
+    return null;
+  }
+
+  /// Strict UAE Mobile Phone Validator.
+  /// Matches +9715xxxxxxxx, 009715xxxxxxxx, 05xxxxxxxx, or 5xxxxxxxx (9 digits).
+  static String? uaePhone(String? v, {bool allowInternational = false}) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final cleaned = v.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    
+    // UAE Mobile pattern: (+971|00971|0)?5[024568][0-9]{7}
+    final uaeRegex = RegExp(r'^(?:\+971|00971|0)?5[024568]\d{7}$');
+    if (uaeRegex.hasMatch(cleaned)) return null;
+
+    if (allowInternational) {
+      // General valid international phone pattern (E.164)
+      final intlRegex = RegExp(r'^\+?[1-9]\d{7,14}$');
+      if (intlRegex.hasMatch(cleaned)) return null;
+      return 'Invalid international phone number format (+country code)';
+    }
+
+    return 'Invalid UAE mobile number (e.g. +971 50 123 4567 or 0501234567)';
+  }
+
+  /// Validates recipient/contact name (min 3 characters, alphabetic words, no pure digits).
+  static String? recipientName(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final trimmed = v.trim();
+    if (trimmed.length < 3) return 'Name must be at least 3 characters';
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) return 'Name cannot be only numbers';
+    if (trimmed.length > 80) return 'Name is too long (max 80 characters)';
+    return null;
+  }
+
+  /// Validates detailed delivery destination address (ensures building/villa, street, and min detail).
+  static String? deliveryAddress(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final trimmed = v.trim();
+    if (trimmed.length < 8) return 'Address must be detailed (min 8 characters)';
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) return 'Please provide full street & building details';
+    return null;
+  }
 }

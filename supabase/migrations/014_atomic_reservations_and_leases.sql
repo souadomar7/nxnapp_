@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS public.warehouse_leases (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     merchant_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
     warehouse_id TEXT NOT NULL REFERENCES public.warehouses(id) ON DELETE RESTRICT,
-    storage_type TEXT NOT NULL CHECK (storage_type IN ('ambient', 'temperature_controlled', 'cold_storage')),
-    capacity_units INT NOT NULL CHECK (capacity_units > 0), -- e.g., Shelves or Pallets
+    storage_type TEXT DEFAULT 'standard',
+    capacity_units INT NOT NULL CHECK (capacity_units > 0), -- e.g., Shelves
     duration_months INT NOT NULL CHECK (duration_months > 0),
     status TEXT NOT NULL DEFAULT 'reserved' CHECK (status IN ('reserved', 'active', 'expired', 'canceled')),
     monthly_rate_aed NUMERIC(10, 2) NOT NULL,
@@ -79,13 +79,13 @@ CREATE POLICY "Merchants create their own gate passes"
     ON public.gate_passes FOR INSERT
     WITH CHECK (auth.uid() = merchant_id);
 
--- 3. Atomic Space Reservation RPC with Idempotency Replay & Storage Type Multiplier
+-- 3. Atomic Space Reservation RPC with Idempotency Replay
 CREATE OR REPLACE FUNCTION reserve_warehouse_capacity(
     p_warehouse_id TEXT,
-    p_storage_type TEXT,
     p_capacity_units INT,
     p_duration_months INT,
-    p_idempotency_key UUID
+    p_idempotency_key UUID,
+    p_storage_type TEXT DEFAULT 'standard'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -94,7 +94,6 @@ AS $$
 DECLARE
     v_existing_lease public.warehouse_leases%ROWTYPE;
     v_monthly_rate NUMERIC;
-    v_multiplier NUMERIC;
     v_total_shelves INT;
     v_active_units INT;
     v_lease_id UUID;
@@ -146,14 +145,8 @@ BEGIN
         );
     END IF;
 
-    -- 4. Apply Storage-Type Multiplier & Financials (UAE FTA Compliant 5% VAT)
-    v_multiplier := CASE p_storage_type
-        WHEN 'cold_storage' THEN 1.45
-        WHEN 'temperature_controlled' THEN 1.20
-        ELSE 1.00
-    END;
-
-    v_base_total := (p_capacity_units * (v_monthly_rate * v_multiplier)) * p_duration_months;
+    -- 4. Calculate Financials (AED 100/shelf/mo + UAE FTA Compliant 5% VAT)
+    v_base_total := (p_capacity_units * v_monthly_rate) * p_duration_months;
     v_vat := ROUND(v_base_total * 0.05, 2);
     v_grand_total := v_base_total + v_vat;
     v_hold_expiration := now() + INTERVAL '10 minutes';
@@ -178,7 +171,7 @@ BEGIN
         p_capacity_units,
         p_duration_months,
         'reserved',
-        v_monthly_rate * v_multiplier,
+        v_monthly_rate,
         v_vat,
         v_grand_total,
         p_idempotency_key,

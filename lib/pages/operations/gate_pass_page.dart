@@ -324,7 +324,7 @@ class GatePassPage extends StatelessWidget {
                               dateStr: 'Today',
                               itemCount: itemCount ?? 50,
                               laborCount: 1,
-                              tempMode: 'Ambient Storage (25°C)',
+                              tempMode: 'Standard Shelving',
                               truckPlate: plateStr,
                               notes: 'Official Gate Entry',
                             ),

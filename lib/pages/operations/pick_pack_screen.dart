@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme.dart';
-import '../../services/marketplace_service.dart';
 
 /// A single pick task: one line item in an order
 class PickTask {
@@ -84,7 +83,7 @@ class _PickPackScreenState extends State<PickPackScreen> {
         final warehouseId = inv?['warehouse_id'];
         
         // Filter to this warehouse only if specified
-        if (widget.warehouseId != null && warehouseId != null && warehouseId != widget.warehouseId) {
+        if (warehouseId != null && warehouseId != widget.warehouseId) {
           continue;
         }
 

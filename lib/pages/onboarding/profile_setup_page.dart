@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../theme.dart';
-import '../home_shell.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nxnapp/l10n/app_localizations.dart';
 import 'warehouse_selection_page.dart';

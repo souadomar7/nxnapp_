@@ -823,33 +823,81 @@ class MarketplaceService {
 
   Future<List<Map<String, dynamic>>> getOrdersForSeller() async {
     final user = _supabase.auth.currentUser;
-    if (user == null) return [];
+    if (user == null) {
+      return _localOrders.map((o) => {
+        'id': o.id,
+        'customer_name': o.customerName,
+        'customer_phone': o.recipientPhone ?? '',
+        'customer_address': o.customerAddress,
+        'total_amount': o.totalAmount,
+        'status': o.status,
+        'created_at': o.createdAt.toIso8601String(),
+      }).toList();
+    }
     try {
       final data = await _supabase
           .from('sme_orders')
           .select()
           .eq('seller_id', user.id)
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(data);
+      final list = List<Map<String, dynamic>>.from(data);
+      if (list.isEmpty && _localOrders.isNotEmpty) {
+        return _localOrders.map((o) => {
+          'id': o.id,
+          'customer_name': o.customerName,
+          'customer_phone': o.recipientPhone ?? '',
+          'customer_address': o.customerAddress,
+          'total_amount': o.totalAmount,
+          'status': o.status,
+          'created_at': o.createdAt.toIso8601String(),
+        }).toList();
+      }
+      return list;
     } catch (e) {
-      debugPrint('getOrdersForSeller error: $e');
-      return [];
+      debugPrint('getOrdersForSeller error (using local fallback): $e');
+      return _localOrders.map((o) => {
+        'id': o.id,
+        'customer_name': o.customerName,
+        'customer_phone': o.recipientPhone ?? '',
+        'customer_address': o.customerAddress,
+        'total_amount': o.totalAmount,
+        'status': o.status,
+        'created_at': o.createdAt.toIso8601String(),
+      }).toList();
     }
   }
 
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
-    try {
-      await _supabase
-          .from('sme_orders')
-          .update({'status': newStatus})
-          .eq('id', orderId)
-          .eq('seller_id', user.id);
-      MarketplaceService.updateNotifier.value++;
-    } catch (e) {
-      debugPrint('updateOrderStatus error: $e');
+    // Update local state first
+    final localIdx = _localOrders.indexWhere((o) => o.id == orderId);
+    if (localIdx != -1) {
+      final existing = _localOrders[localIdx];
+      _localOrders[localIdx] = SmeOrder(
+        id: existing.id,
+        sellerId: existing.sellerId,
+        customerName: existing.customerName,
+        customerAddress: existing.customerAddress,
+        recipientPhone: existing.recipientPhone,
+        deliveryMethod: existing.deliveryMethod,
+        status: newStatus,
+        totalAmount: existing.totalAmount,
+        createdAt: existing.createdAt,
+      );
+      await _saveLocal();
     }
+
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        await _supabase
+            .from('sme_orders')
+            .update({'status': newStatus})
+            .eq('id', orderId);
+      } catch (e) {
+        debugPrint('updateOrderStatus error: $e');
+      }
+    }
+    MarketplaceService.updateNotifier.value++;
   }
 
   Future<void> createNotification({
@@ -1147,12 +1195,11 @@ class MarketplaceService {
   /// - Base rate:  100 AED × shelves × months
   /// - Worker fee: 50 AED flat per request (binary toggle, not per-worker)
   /// - Does NOT include platform fee or VAT — caller adds those.
-  double calculateRentalPrice(int shelves, int months, bool addWorkers, [int workerCount = 1, String storageType = 'ambient']) {
+  double calculateRentalPrice(int shelves, int months, bool addWorkers, [int workerCount = 1]) {
     const double pricePerShelf = 100.0;
     const double workerRate = 50.0;
-    final double multiplier = storageType == 'cold_storage' ? 1.5 : (storageType == 'chilled' ? 1.3 : 1.0);
 
-    final double base = shelves * pricePerShelf * months * multiplier;
+    final double base = shelves * pricePerShelf * months;
     final double labor = addWorkers ? (workerRate * workerCount) : 0.0;
 
     return base + labor;
@@ -1670,12 +1717,34 @@ class MarketplaceService {
     );
 
     _localOrders.insert(0, newOrder);
+    _localInvoices.insert(
+      0,
+      Invoice(
+        id: newOrder.id,
+        number: newOrder.id,
+        warehouseName: 'NXN Marketplace Dispatch',
+        date: DateTime.now(),
+        amount: totalAmount,
+        vat: totalAmount * 0.05,
+        paid: true,
+        type: InvoiceType.delivery,
+        metaData: {
+          'customer_name': buyerName,
+          'customer_phone': buyerPhone,
+          'customer_address': deliveryAddress,
+          'product_name': product.name,
+          'quantity': quantity,
+        },
+      ),
+    );
     _localActivity.insert(
       0,
       DashboardActivity(
         id: 'ACT-${DateTime.now().millisecondsSinceEpoch}',
         title: '🛒 New Marketplace Order!',
+        titleAr: '🛒 طلب شراء جديد من المتجر!',
         subtitle: '${product.name} x $quantity ($buyerName)',
+        subtitleAr: '${product.name} x $quantity ($buyerName)',
         date: DateTime.now(),
         type: ActivityType.delivery,
         amount: totalAmount,
@@ -1683,11 +1752,48 @@ class MarketplaceService {
     );
     await _saveLocal();
 
-    if (user != null && isUuid.hasMatch(validSellerId)) {
+    if (user != null) {
+      if (isUuid.hasMatch(validSellerId)) {
+        try {
+          await _supabase.from('buyer_orders').insert(buyerOrderData);
+        } catch (e) {
+          try {
+            final fallbackData = Map<String, dynamic>.from(buyerOrderData)..remove('buyer_address');
+            fallbackData['notes'] = 'Address: $deliveryAddress | Phone: $buyerPhone';
+            await _supabase.from('buyer_orders').insert(fallbackData);
+          } catch (_) {}
+        }
+      }
+
       try {
-        await _supabase.from('buyer_orders').insert(buyerOrderData);
+        await _supabase.from('sme_orders').insert({
+          'seller_id': isUuid.hasMatch(validSellerId) ? validSellerId : user.id,
+          if (validProductId != null) 'product_id': validProductId,
+          'customer_name': buyerName,
+          'customer_phone': buyerPhone,
+          'customer_address': deliveryAddress,
+          'delivery_method': 'standard',
+          'total_amount': totalAmount,
+          'quantity': quantity,
+          'status': 'pending',
+          'created_at': DateTime.now().toIso8601String(),
+          'notes': 'Phone: $buyerPhone',
+        });
       } catch (e) {
-        debugPrint('Error placing remote buyer order: $e');
+        try {
+          await _supabase.from('sme_orders').insert({
+            'seller_id': isUuid.hasMatch(validSellerId) ? validSellerId : user.id,
+            if (validProductId != null) 'product_id': validProductId,
+            'customer_name': buyerName,
+            'customer_address': deliveryAddress,
+            'delivery_method': 'standard',
+            'total_amount': totalAmount,
+            'quantity': quantity,
+            'status': 'pending',
+            'created_at': DateTime.now().toIso8601String(),
+            'notes': 'Phone: $buyerPhone',
+          });
+        } catch (_) {}
       }
     }
 
@@ -2028,17 +2134,36 @@ class MarketplaceService {
     );
 
     if (user != null) {
+      final speed = deliverySpeed.toLowerCase();
+      final method = speed.contains('express')
+          ? 'express'
+          : (speed.contains('same') ? 'same_day' : 'standard');
+
       try {
         await _supabase.from('sme_orders').insert({
           'seller_id': user.id,
           'customer_name': recipientName,
-          'delivery_address': destinationAddress,
+          'customer_phone': recipientPhone,
+          'customer_address': destinationAddress,
+          'delivery_method': method,
           'total_amount': deliveryFee,
-          'status': 'pending_dispatch',
+          'status': 'ready_for_shipment',
           'created_at': DateTime.now().toIso8601String(),
+          'notes': notes?.isNotEmpty == true ? 'Phone: $recipientPhone | $notes' : 'Phone: $recipientPhone',
         });
       } catch (e) {
-        debugPrint('Error inserting remote order: $e');
+        try {
+          await _supabase.from('sme_orders').insert({
+            'seller_id': user.id,
+            'customer_name': recipientName,
+            'customer_address': destinationAddress,
+            'delivery_method': method,
+            'total_amount': deliveryFee,
+            'status': 'ready_for_shipment',
+            'created_at': DateTime.now().toIso8601String(),
+            'notes': notes?.isNotEmpty == true ? 'Phone: $recipientPhone | $notes' : 'Phone: $recipientPhone',
+          });
+        } catch (_) {}
       }
     }
 
@@ -2056,7 +2181,6 @@ class MarketplaceService {
     required double refundAmount,
   }) async {
     final user = _supabase.auth.currentUser;
-    final sellerId = user?.id ?? 'souadomar774@gmail.com';
     
     // Step 1: Check Physical Stock Guard
     bool hasPhysicalStock = false;
@@ -2090,7 +2214,7 @@ class MarketplaceService {
           return res;
         }
       } catch (e) {
-        debugPrint('Error invoking remote cancellation RPC: $e');
+        debugPrint('[Subscription Cancellation] Remote RPC not found or failed, using local execution engine.');
       }
     }
 
@@ -2100,7 +2224,7 @@ class MarketplaceService {
       DashboardActivity(
         id: 'ACT-CANCEL-${DateTime.now().millisecondsSinceEpoch}',
         title: 'Subscription Cancellation Requested ($refundModel)',
-        subtitle: 'Effective End: ${effectiveEndDate.day}/${effectiveEndDate.month}/${effectiveEndDate.year} • Refund: AED ${refundAmount.toStringAsFixed(2)}',
+        subtitle: 'Effective End: ${effectiveEndDate.day}/${effectiveEndDate.month}/${effectiveEndDate.year} | Refund: AED ${refundAmount.toStringAsFixed(2)}',
         date: DateTime.now(),
         type: ActivityType.rental,
       ),

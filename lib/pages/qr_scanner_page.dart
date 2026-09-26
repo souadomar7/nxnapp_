@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/marketplace_service.dart';
 import '../models/history_models.dart';
-import '../widgets/camera_scanner.dart';
 import '../theme.dart';
 
 class QrScannerPage extends StatefulWidget {
@@ -106,7 +105,6 @@ class _QrScannerPageState extends State<QrScannerPage> with SingleTickerProvider
 
     // Determine Code Type
     bool isInboundGatePass = code.startsWith('STO') || code.startsWith('GP') || code.contains('DROP');
-    bool isOutboundWaybill = code.startsWith('WAY') || code.startsWith('DEL') || code.contains('COURIER');
 
     showModalBottomSheet(
       context: context,

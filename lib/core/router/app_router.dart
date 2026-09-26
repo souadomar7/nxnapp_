@@ -23,7 +23,6 @@ import '../../pages/operations/tracking_page.dart';
 import '../../pages/copilot_page.dart';
 import '../../pages/marketplace/seller_hub.dart';
 import '../../pages/profile/wallet_page.dart';
-import '../../pages/search_page.dart';
 import '../../pages/qr_scanner_page.dart';
 
 /// Central route registry and RBAC redirect engine.

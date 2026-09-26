@@ -501,7 +501,7 @@ class _SellerProductsPageState extends State<SellerProductsPage> {
                                                   }).eq('id', product.id);
                                                   _loadProducts();
                                                 },
-                                                activeColor: AppColors.bluePrimary,
+                                                activeThumbColor: AppColors.bluePrimary,
                                               ),
                                             ],
                                           ),

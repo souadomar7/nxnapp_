@@ -40,7 +40,7 @@ class PdfExportService {
                       ),
                       pw.SizedBox(height: 4),
                       pw.Text('Smart Fulfillment & Space Leasing Engine', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                      pw.Text('TRN: ${trnNumber ?? "100482910400003"} • Dubai, United Arab Emirates', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                      pw.Text('TRN: ${trnNumber ?? "100482910400003"} | Dubai, United Arab Emirates', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                     ],
                   ),
                   pw.Container(
@@ -181,7 +181,7 @@ class PdfExportService {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text('Official Computer Generated Document. No Signature Required.', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-                      pw.Text('NXN Hub Logistics Platform • Dubai South, UAE', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                      pw.Text('NXN Hub Logistics Platform | Dubai South, UAE', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
                     ],
                   ),
                   pw.BarcodeWidget(
@@ -293,8 +293,8 @@ class PdfExportService {
                     pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(truckPlate.isEmpty ? 'DXB-59821' : truckPlate, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
                   ]),
                   pw.TableRow(children: [
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Storage Temperature Mode:', style: const pw.TextStyle(fontSize: 9))),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(tempMode, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Storage Type:', style: const pw.TextStyle(fontSize: 9))),
+                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(tempMode.isEmpty ? 'Standard Shelving' : tempMode, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
                   ]),
                   pw.TableRow(children: [
                     pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text('Total Inbound Cartons / Boxes:', style: const pw.TextStyle(fontSize: 9))),
@@ -321,7 +321,7 @@ class PdfExportService {
               pw.Divider(color: PdfColors.grey300),
               pw.SizedBox(height: 8),
               pw.Center(
-                child: pw.Text('NXN Warehouse Operations System • Automated Dispatch Control', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                child: pw.Text('NXN Warehouse Operations System | Automated Dispatch Control', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
               ),
             ],
           );
@@ -464,7 +464,7 @@ class PdfExportService {
               pw.Divider(color: PdfColors.grey300),
               pw.SizedBox(height: 8),
               pw.Center(
-                child: pw.Text('NXN Direct Logistics Express • Customer Copy Waybill', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                child: pw.Text('NXN Direct Logistics Express | Customer Copy Waybill', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
               ),
             ],
           );

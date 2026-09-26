@@ -10,6 +10,7 @@ import '../../services/payment_service.dart';
 import '../../models/invoice.dart';
 import 'cart_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/utils/validators.dart';
 
 class PublicProductDetailPage extends StatefulWidget {
   final SmeProduct product;
@@ -186,9 +187,8 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                       ),
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return isAr ? 'يرجى إدخال الاسم الكامل' : 'Please enter your full name';
-                        }
+                        final err = Validators.recipientName(val);
+                        if (err != null) return isAr ? 'يرجى إدخال اسم المستلم الكامل بشكل صحيح' : err;
                         return null;
                       },
                     ),
@@ -207,8 +207,9 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                       ),
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return isAr ? 'يرجى إدخال رقم الهاتف' : 'Please enter your phone number';
+                        final err = Validators.uaePhone(val, allowInternational: false);
+                        if (err != null) {
+                          return isAr ? 'رقم الهاتف يجب أن يكون رقم إماراتي صحيح (مثال: +971501234567 أو 0501234567)' : err;
                         }
                         return null;
                       },
@@ -216,7 +217,7 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                     const SizedBox(height: 10),
 
                     DropdownButtonFormField<String>(
-                      value: selectedEmirate,
+                      initialValue: selectedEmirate,
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: isAr ? 'الإمارة *' : 'Emirate *',
@@ -238,7 +239,8 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                     TextFormField(
                       controller: addressController,
                       decoration: InputDecoration(
-                        labelText: isAr ? 'العنوان / الشارع / المبنى *' : 'Full Address / Street / Villa *',
+                        labelText: isAr ? 'العنوان التفصيلي (الشارع / المبنى / الشقة) *' : 'Full Address / Street / Villa *',
+                        hintText: isAr ? 'مثال: برج الياقوت، شارع الشيخ زايد، شقة 1402' : 'e.g. Ruby Tower, Sheikh Zayed Rd, Apt 1402',
                         prefixIcon: const Icon(Icons.home_outlined, size: 20, color: AppColors.bluePrimary),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
@@ -246,9 +248,8 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                       ),
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return isAr ? 'يرجى إدخال العنوان الكامل' : 'Please enter your delivery address';
-                        }
+                        final err = Validators.deliveryAddress(val);
+                        if (err != null) return isAr ? 'يرجى إدخال عنوان تفصيلي واضح (المبنى، الشارع)' : err;
                         return null;
                       },
                     ),

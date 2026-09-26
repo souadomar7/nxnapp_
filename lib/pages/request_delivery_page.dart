@@ -4,12 +4,11 @@ import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/marketplace_service.dart';
 import '../models/invoice.dart';
-import '../l10n/app_localizations.dart';
 import '../theme.dart';
-import '../widgets/brand_logo.dart';
 import 'payment_page.dart';
 import '../services/pdf_export_service.dart';
 import 'document_preview_page.dart';
+import '../core/utils/validators.dart';
 
 class RequestDeliveryColors {
   static const primary = AppColors.bluePrimary;
@@ -485,7 +484,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
         Text(isAr ? 'مستودع انطلاق الشحنة' : 'Source Dispatch Warehouse', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _dispatchWarehouse,
+          initialValue: _dispatchWarehouse,
           decoration: _inputDeco(),
           dropdownColor: Colors.white,
           items: warehouses.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
@@ -689,7 +688,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
           Text(isAr ? 'الإمارة *' : 'UAE Emirate *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _localCity,
+            initialValue: _localCity,
             decoration: _inputDeco(),
             dropdownColor: Colors.white,
             items: _uaeEmirates.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
@@ -699,7 +698,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
           Text(isAr ? 'الدولة *' : 'Country *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _country,
+            initialValue: _country,
             decoration: _inputDeco(),
             dropdownColor: Colors.white,
             items: _citiesByCountry.keys.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
@@ -712,7 +711,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
           Text(isAr ? 'المدينة *' : 'City *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _internationalCity,
+            initialValue: _internationalCity,
             decoration: _inputDeco(),
             dropdownColor: Colors.white,
             items: (_citiesByCountry[_country] ?? []).map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
@@ -728,30 +727,55 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
         TextFormField(
           controller: _addressCtrl,
           maxLines: 2,
-          validator: (v) => (v == null || v.trim().isEmpty) ? (isAr ? 'يرجى إدخال العنوان' : 'Please enter street address') : null,
-          decoration: _inputDeco().copyWith(prefixIcon: const Icon(Icons.location_on_outlined)),
+          validator: (v) {
+            final err = Validators.deliveryAddress(v);
+            if (err != null) return isAr ? 'يرجى إدخال عنوان تفصيلي واضح (المبنى، الشارع)' : err;
+            return null;
+          },
+          decoration: _inputDeco().copyWith(
+            hintText: isAr ? 'مثال: برج الياقوت، شارع الشيخ زايد، شقة 1402' : 'e.g. Ruby Tower, Sheikh Zayed Rd, Apt 1402',
+            prefixIcon: const Icon(Icons.location_on_outlined),
+          ),
         ),
 
         const SizedBox(height: 16),
 
         // Recipient Name & Phone
-        Text(isAr ? 'اسم المستلم الكامل *' : 'Recipient Full Name *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(isAr ? 'اسم المستلم الكامل (الاسم الأول واسم العائلة) *' : 'Recipient Full Name *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _recipientNameCtrl,
-          validator: (v) => (v == null || v.trim().isEmpty) ? (isAr ? 'يرجى إدخال اسم المستلم' : 'Please enter recipient name') : null,
-          decoration: _inputDeco().copyWith(prefixIcon: const Icon(Icons.person_outline_rounded)),
+          validator: (v) {
+            final err = Validators.recipientName(v);
+            if (err != null) return isAr ? 'يرجى إدخال اسم المستلم الثلاثي أو الثنائي بشكل صحيح' : err;
+            return null;
+          },
+          decoration: _inputDeco().copyWith(
+            hintText: isAr ? 'مثال: محمد راشد المنصوري' : 'e.g. Mohammed Rashid Al Mansoori',
+            prefixIcon: const Icon(Icons.person_outline_rounded),
+          ),
         ),
 
         const SizedBox(height: 16),
 
-        Text(isAr ? 'رقم الهاتف (واتساب) *' : 'Phone Number (WhatsApp) *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(isAr ? 'رقم الهاتف المعتمد (واتساب للتوصيل) *' : 'Verified Mobile Number (WhatsApp) *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _recipientPhoneCtrl,
           keyboardType: TextInputType.phone,
-          validator: (v) => (v == null || v.trim().isEmpty) ? (isAr ? 'يرجى إدخال رقم الهاتف' : 'Please enter phone number') : null,
-          decoration: _inputDeco().copyWith(prefixIcon: const Icon(Icons.phone_outlined)),
+          validator: (v) {
+            final err = Validators.uaePhone(v, allowInternational: _isInternational);
+            if (err != null) {
+              return isAr
+                  ? (_isInternational ? 'صيغة الرقم الدولي غير صحيحة (+رمز الدولة)' : 'رقم الهاتف يجب أن يكون رقم إماراتي صحيح (مثال: 0501234567 أو +971501234567)')
+                  : err;
+            }
+            return null;
+          },
+          decoration: _inputDeco().copyWith(
+            hintText: _isInternational ? '+966 50 123 4567' : '+971 50 123 4567',
+            prefixIcon: const Icon(Icons.phone_outlined),
+          ),
         ),
 
         const SizedBox(height: 16),

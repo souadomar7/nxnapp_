@@ -5,7 +5,6 @@ import '../providers/locale_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/marketplace_service.dart';
 import '../models/history_models.dart';
-import '../theme.dart';
 import 'qr_scanner_page.dart';
 import 'admin/payout_settlement_page.dart';
 
@@ -34,7 +33,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   final MarketplaceService _marketplaceService = MarketplaceService();
 
   List<DashboardActivity> _activities = [];
-  bool _isLoading = true;
 
   // Mock pending seller approvals
   final List<Map<String, String>> _pendingSellers = [
@@ -78,7 +76,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
     if (mounted) {
       setState(() {
         _activities = list;
-        _isLoading = false;
       });
     }
   }

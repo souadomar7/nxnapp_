@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../theme.dart';
 import '../services/marketplace_service.dart';
+import '../core/utils/validators.dart';
 
 class CreateShipmentPage extends StatefulWidget {
   const CreateShipmentPage({super.key});
@@ -42,6 +43,9 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
     'Furniture & Home',
     'Other',
   ];
+
+  // UAE Civil Defence / MOIAT Dangerous Goods Compliance
+  bool _declaredNonHazardous = false;
 
   @override
   void initState() {
@@ -86,6 +90,20 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedWarehouseId == null) return;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    if (!_declaredNonHazardous) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: Text(
+            isAr
+                ? 'يرجى الإقرار بعدم احتواء الشحنة على مواد خطرة وفقاً لاشتراطات الدفاع المدني الإماراتي.'
+                : 'Please declare that cargo contains no hazardous/prohibited materials per UAE Civil Defence regulations.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final service = MarketplaceService();
@@ -415,7 +433,7 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                     Text(isAr ? 'المستودع' : 'Warehouse', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _selectedWarehouseId,
+                      initialValue: _selectedWarehouseId,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         prefixIcon: const Icon(Icons.warehouse_outlined),
@@ -468,16 +486,22 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                                   controller: _pickupAddressCtrl,
                                   decoration: InputDecoration(
                                     labelText: isAr ? 'عنوان الاستلام الكامل *' : 'Full Pickup Address *',
+                                    hintText: isAr ? 'مثال: مستودع رقم 12، منطقة القوز الصناعية 3' : 'e.g. Warehouse 12, Al Quoz Ind. 3',
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                                     prefixIcon: const Icon(Icons.map_outlined),
                                     filled: true, fillColor: Colors.white,
                                   ),
                                   maxLines: 2,
-                                  validator: (v) => !_isDropOff && (v == null || v.isEmpty) ? (isAr ? 'مطلوب' : 'Required') : null,
+                                  validator: (v) {
+                                    if (_isDropOff) return null;
+                                    final err = Validators.deliveryAddress(v);
+                                    if (err != null) return isAr ? 'يرجى إدخال عنوان استلام تفصيلي' : err;
+                                    return null;
+                                  },
                                 ),
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String>(
-                                  value: _goodsType,
+                                  initialValue: _goodsType,
                                   decoration: InputDecoration(
                                     labelText: isAr ? 'نوع البضاعة' : 'Type of Goods',
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -492,23 +516,37 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                                   controller: _contactNameCtrl,
                                   decoration: InputDecoration(
                                     labelText: isAr ? 'اسم جهة الاتصال *' : 'Contact Person Name *',
+                                    hintText: isAr ? 'مثال: أحمد المنصوري' : 'e.g. Ahmed Al Mansoori',
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                                     prefixIcon: const Icon(Icons.person_outline),
                                     filled: true, fillColor: Colors.white,
                                   ),
-                                  validator: (v) => !_isDropOff && (v == null || v.isEmpty) ? (isAr ? 'مطلوب' : 'Required') : null,
+                                  validator: (v) {
+                                    if (_isDropOff) return null;
+                                    final err = Validators.recipientName(v);
+                                    if (err != null) return isAr ? 'يرجى إدخال اسم جهة الاتصال بشكل صحيح' : err;
+                                    return null;
+                                  },
                                 ),
                                 const SizedBox(height: 12),
                                 TextFormField(
                                   controller: _contactPhoneCtrl,
                                   decoration: InputDecoration(
-                                    labelText: isAr ? 'رقم هاتف الاتصال *' : 'Contact Phone *',
+                                    labelText: isAr ? 'رقم هاتف الاتصال المعتمد *' : 'Contact Phone (WhatsApp) *',
+                                    hintText: '+971 50 123 4567',
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                                     prefixIcon: const Icon(Icons.phone_outlined),
                                     filled: true, fillColor: Colors.white,
                                   ),
                                   keyboardType: TextInputType.phone,
-                                  validator: (v) => !_isDropOff && (v == null || v.isEmpty) ? (isAr ? 'مطلوب' : 'Required') : null,
+                                  validator: (v) {
+                                    if (_isDropOff) return null;
+                                    final err = Validators.uaePhone(v, allowInternational: false);
+                                    if (err != null) {
+                                      return isAr ? 'رقم الهاتف يجب أن يكون رقم إماراتي صحيح (مثال: +971501234567 أو 0501234567)' : err;
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ],
                             ),
@@ -560,7 +598,118 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                       maxLines: 3,
                     ),
 
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
+
+                    // ── UAE Civil Defence & MOIAT Compliance Card ─────────────
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: _declaredNonHazardous
+                            ? const Color(0xFFF0FDF4)
+                            : const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _declaredNonHazardous
+                              ? const Color(0xFF86EFAC)
+                              : const Color(0xFFFECACA),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.shield_outlined,
+                                size: 20,
+                                color: _declaredNonHazardous
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFFDC2626),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  isAr
+                                      ? 'اشتراطات الدفاع المدني ووزارة الصناعة (MOIAT)'
+                                      : 'UAE Civil Defence & MOIAT Safety Compliance',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: _declaredNonHazardous
+                                        ? const Color(0xFF166534)
+                                        : const Color(0xFF991B1B),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.info_outline_rounded, size: 18),
+                                color: Colors.grey.shade600,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                      title: Row(
+                                        children: [
+                                          const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            isAr ? 'المواد المحظورة' : 'Prohibited Materials',
+                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                      content: Text(
+                                        isAr
+                                            ? 'وفقاً للقوانين الاتحادية بدولة الإمارات، يُحظر تخزين المواد التالية في المستودعات القياسية دون ترخيص خاص:\n\n'
+                                              '• السوائل والمواد القابلة للاشتعال (بنزين، كحول صناعي، تنر)\n'
+                                              '• أسطوانات الغاز المضغوط والمتفجرات\n'
+                                              '• المواد الكيميائية السامة أو المشعة\n'
+                                              '• البضائع المقلدة أو منتهية الصلاحية\n'
+                                              '• الأدوية التي تتطلب رقابة خاصة دون تصريح MoHaP'
+                                            : 'Per UAE Federal Regulations and Civil Defence safety codes, standard warehouse storage strictly prohibits:\n\n'
+                                              '• Flammable liquids, solvents, and fuel\n'
+                                              '• Compressed gas cylinders and explosives\n'
+                                              '• Toxic, hazardous chemicals or radioactive items\n'
+                                              '• Counterfeit or expired merchandise\n'
+                                              '• Unlicensed pharmaceuticals or controlled substances',
+                                        style: const TextStyle(fontSize: 13, height: 1.5),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: Text(isAr ? 'فهمت ذلك' : 'Understood'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                            dense: true,
+                            activeColor: const Color(0xFF16A34A),
+                            value: _declaredNonHazardous,
+                            onChanged: (val) => setState(() => _declaredNonHazardous = val ?? false),
+                            title: Text(
+                              isAr
+                                  ? 'أقر بأن جميع البضائع الواردة متوافقة مع اشتراطات السلامة وخالية من أي مواد خطرة أو محظورة قانوناً.'
+                                  : 'I declare that this cargo strictly complies with UAE safety laws and contains zero hazardous or prohibited materials.',
+                              style: const TextStyle(fontSize: 12, height: 1.3, fontWeight: FontWeight.w600),
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: _isLoading ? null : _submit,
                       style: ElevatedButton.styleFrom(

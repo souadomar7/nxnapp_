@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/marketplace_service.dart';
 import '../../theme.dart';
 
 class DriverOrdersPage extends StatefulWidget {
@@ -27,15 +28,38 @@ class _DriverOrdersPageState extends State<DriverOrdersPage> {
     setState(() => _isLoading = true);
     try {
       final user = _supabase.auth.currentUser;
-      if (user == null) return;
-      // Load orders assigned to this driver OR all shipped orders if admin driver
-      final data = await _supabase
-          .from('buyer_orders')
-          .select('*, sme_products(name, photo_url)')
-          .inFilter('order_status', ['confirmed', 'preparing', 'ready_for_shipment', 'shipped'])
-          .order('created_at', ascending: false);
+      if (user != null) {
+        // Load orders assigned to this driver OR all shipped orders if admin driver
+        final data = await _supabase
+            .from('buyer_orders')
+            .select('*, sme_products(name, photo_url)')
+            .inFilter('order_status', ['confirmed', 'preparing', 'ready_for_shipment', 'shipped'])
+            .order('created_at', ascending: false);
+        final list = List<Map<String, dynamic>>.from(data);
+        if (list.isNotEmpty) {
+          setState(() {
+            _orders = list;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+
+      // Fallback: load from MarketplaceService orders
+      final serviceOrders = await MarketplaceService().getOrdersForSeller();
       setState(() {
-        _orders = List<Map<String, dynamic>>.from(data);
+        _orders = serviceOrders.map((o) => {
+          'id': o['id'],
+          'customer_name': o['customer_name'] ?? 'Customer',
+          'buyer_phone': o['customer_phone'] ?? '',
+          'buyer_address': o['customer_address'] ?? 'Dubai, UAE',
+          'total_amount': o['total_amount'] ?? 0.0,
+          'order_status': o['status'] ?? 'ready_for_shipment',
+          'sme_products': {
+            'name': 'Marketplace Package',
+            'photo_url': '',
+          },
+        }).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -45,14 +69,22 @@ class _DriverOrdersPageState extends State<DriverOrdersPage> {
 
   Future<Position?> _getCurrentPosition() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return null;
+    if (!serviceEnabled) {
+      return null;
+    }
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return null;
+      if (permission == LocationPermission.denied) {
+        return null;
+      }
     }
-    if (permission == LocationPermission.deniedForever) return null;
-    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    if (permission == LocationPermission.deniedForever) {
+      return null;
+    }
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+    );
   }
 
   Future<void> _markDelivered(Map<String, dynamic> order) async {

@@ -5,7 +5,6 @@ import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import '../../core/auth/session_provider.dart';
 import '../../core/auth/user_role.dart';
-import 'add_product_page.dart';
 import 'public_product_detail_page.dart';
 import '../smart_inventory_stage.dart';
 import '../receive_goods_stage.dart';

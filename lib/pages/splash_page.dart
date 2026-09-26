@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme.dart';
-import '../providers/user_provider.dart';
 import 'home_shell.dart';
 import 'login.dart';
 import 'onboarding/service_overview_page.dart';

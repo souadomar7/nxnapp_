@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/locale_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
-import '../../l10n/app_localizations.dart';
 import '../../models/marketplace_models.dart';
 
 class AddProductPage extends StatefulWidget {
@@ -27,8 +26,6 @@ class _AddProductPageState extends State<AddProductPage> {
 
   String _selectedCategory = 'General';
   bool _isLoading = false;
-  bool _hasWarehouseSub = false;
-  bool _showPreview = true;
   File? _imageFile;
   String? _existingPhotoUrl;
   final ImagePicker _picker = ImagePicker();
@@ -57,10 +54,6 @@ class _AddProductPageState extends State<AddProductPage> {
       _existingPhotoUrl = widget.product!.photoUrl;
       _selectedCategory = widget.product!.category ?? 'General';
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final sub = await _service.hasActiveSubscription();
-      if (mounted) setState(() => _hasWarehouseSub = sub);
-    });
   }
 
   @override
@@ -200,6 +193,9 @@ class _AddProductPageState extends State<AddProductPage> {
         }
       }
 
+      if (!mounted) {
+        return;
+      }
       final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
       if (_isEditMode) {
@@ -267,7 +263,6 @@ class _AddProductPageState extends State<AddProductPage> {
   Widget build(BuildContext context) {
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final priceVal = double.tryParse(_priceController.text) ?? 0.0;
-    final vatVal = priceVal * 0.05;
     final netVal = (priceVal * 0.95).clamp(0.0, double.infinity);
 
     return Scaffold(
@@ -575,7 +570,10 @@ class _AddProductPageState extends State<AddProductPage> {
                             onChanged: (_) => setState(() {}),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return isAr ? 'مطلوب' : 'Required';
-                              if (double.tryParse(v) == null) return isAr ? 'رقم غير صحيح' : 'Invalid number';
+                              final val = double.tryParse(v.trim());
+                              if (val == null) return isAr ? 'رقم غير صحيح' : 'Invalid number';
+                              if (val < 1.0) return isAr ? 'الحد الأدنى للسعر 1 درهم' : 'Minimum price is AED 1';
+                              if (val > 500000.0) return isAr ? 'السعر يتجاوز الحد الأقصى' : 'Price exceeds max limit';
                               return null;
                             },
                           ),
@@ -630,7 +628,14 @@ class _AddProductPageState extends State<AddProductPage> {
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                               decoration: const InputDecoration(border: InputBorder.none),
                               onChanged: (_) => setState(() {}),
-                              validator: (v) => (int.tryParse(v ?? '') == null) ? (isAr ? 'رقم غير صحيح' : 'Invalid') : null,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) return isAr ? 'مطلوب' : 'Required';
+                                final val = int.tryParse(v.trim());
+                                if (val == null) return isAr ? 'رقم غير صحيح' : 'Invalid';
+                                if (val < 0) return isAr ? 'لا يمكن أن تكون الكمية سالبة' : 'Cannot be negative';
+                                if (val > 100000) return isAr ? 'الكمية تتجاوز الحد المسموح' : 'Exceeds maximum limit';
+                                return null;
+                              },
                             ),
                           ),
                           _quickStepChip('+10', () => _adjustQuantity(10)),

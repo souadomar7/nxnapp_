@@ -62,8 +62,9 @@ class ChatbotEngine {
   }
 
   ChatbotIntent? _findBestMatch(String message) {
-    final cleanMsg = _normalizeAr(message);
-    if (cleanMsg.isEmpty) return null;
+    final rawClean = _normalizeAr(message);
+    if (rawClean.isEmpty) return null;
+    final cleanMsg = _normalizeAr(_normalizeSynonyms(message));
     final msgWords = cleanMsg.split(' ').where((w) => w.isNotEmpty).toSet();
 
     double maxScore = 0;
@@ -76,7 +77,7 @@ class ChatbotEngine {
       double score = 0;
 
       // 1. Exact Question Match (Highest Weight: 1000 points)
-      if (cleanMsg == qArClean || cleanMsg == qEnClean) {
+      if (rawClean == qArClean || rawClean == qEnClean) {
         score += 1000;
       }
 

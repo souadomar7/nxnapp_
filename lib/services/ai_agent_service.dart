@@ -86,7 +86,7 @@ Terms must be accepted before completing registration. App state is the source o
 ---
 
 # 7. WAREHOUSE SELECTION & 8. EMIRATE -> AVAILABLE WAREHOUSES
-Help determine: Emirate (Dubai, Abu Dhabi, Sharjah, Al Ain), storage space, shelf count, temperature, duration, workers, and Drop-off/Pick-up preference.
+Help determine: Emirate (Dubai, Abu Dhabi, Sharjah, Al Ain), storage space, shelf count, duration, workers, and Drop-off/Pick-up preference.
 Present available warehouses based on live backend data: [ACTION:open_booking]. Never invent availability or pricing.
 
 ---
@@ -247,7 +247,6 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
               'type': 'OBJECT',
               'properties': {
                 'emirate': {'type': 'STRING', 'description': 'Selected emirate: Dubai, Abu Dhabi, Sharjah, or Al Ain'},
-                'storage_type': {'type': 'STRING', 'description': 'ambient, chilled, or cold_storage'},
               },
             },
           },
@@ -432,8 +431,8 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     ])) {
       return AgentResponse(
         text: isAr
-            ? '🏭 **NXN Warehouses (مستودعات NXN)** هي المنصة الرقمية الذكية المتكاملة الأولى في دولة الإمارات لتخزين البضائع وإدارة سلاسل الإمداد والتجارة الإلكترونية 🇦🇪.\n\nإليك ما تقدمه NXN لرواد الأعمال والتجار:\n\n1️⃣ **تأجير أرفف ومساحات تخزين مرنة**: مستودعات معتمدة في دبي وأبوظبي والشارقة والعين بخيارات تخزين عادي (20–25°م)، مبرد (10–15°م)، أو مجمد (-18°م).\n2️⃣ **توريد البضائع بسلاسة**:\n   • **Drop-off** (الافتراضي): تحضر بضاعتك بنفسك مع تصريح دخول وبوابة فوري.\n   • **Pick-up**: أسطولنا يستلم البضاعة من موقعك.\n3️⃣ **سوق NXN التجاري**: بيع منتجاتك مباشرة مع تحكم كامل بالأسعار والخصومات.\n4️⃣ **نظام إدارة المخزون (WMS)**: تتبع فوري للأرفف والباركود، فحص الجودة، وتنبيهات نفاد المخزون.\n5️⃣ **توثيق رسمي عبر UAE PASS**: تسجيل فوري والتحقق من الرخصة التجارية عبر قاعدة بيانات واصلة.\n\nاضغط أدناه لبدء حجز مساحتك أو استكشاف الخدمات! 📦'
-            : '🏭 **NXN Warehouses** is the UAE\'s premier integrated smart warehousing, micro-fulfillment, and SME logistics platform 🇦🇪.\n\nHere is what NXN provides for you:\n\n1️⃣ **Flexible Shelf & Space Rental**: Certified storage in Dubai, Abu Dhabi, Sharjah, and Al Ain with Ambient (20–25°C), Chilled (10–15°C), or Cold Storage (-18°C).\n2️⃣ **Inbound Cargo Intake**:\n   • **Drop-off** (Default): Bring your goods yourself with an instant digital gate pass.\n   • **Pick-up**: Our logistics fleet collects cargo directly from your facility.\n3️⃣ **NXN SME Marketplace**: List and sell products directly with 100% merchant pricing control.\n4️⃣ **Smart Inventory (WMS)**: Live stock levels, barcode scanning, inspection at intake, and low-inventory alerts.\n5️⃣ **Verified UAE PASS Onboarding**: Instant sign-in and automated Waslah trade license validation.\n\nTap below to explore available warehouse spaces or get started! 📦',
+            ? '🏭 **NXN Warehouses (مستودعات NXN)** هي المنصة الرقمية الذكية المتكاملة الأولى في دولة الإمارات لتخزين البضائع وإدارة سلاسل الإمداد والتجارة الإلكترونية 🇦🇪.\n\nإليك ما تقدمه NXN لرواد الأعمال والتجار:\n\n1️⃣ **تأجير أرفف ومساحات تخزين مرنة**: مستودعات معتمدة ومؤمنة في دبي وأبوظبي والشارقة والعين.\n2️⃣ **توريد البضائع بسلاسة**:\n   • **Drop-off** (الافتراضي): تحضر بضاعتك بنفسك مع تصريح دخول وبوابة فوري.\n   • **Pick-up**: أسطولنا يستلم البضاعة من موقعك.\n3️⃣ **سوق NXN التجاري**: بيع منتجاتك مباشرة مع تحكم كامل بالأسعار والخصومات.\n4️⃣ **نظام إدارة المخزون (WMS)**: تتبع فوري للأرفف والباركود، فحص الجودة، وتنبيهات نفاد المخزون.\n5️⃣ **توثيق رسمي عبر UAE PASS**: تسجيل فوري والتحقق من الرخصة التجارية عبر قاعدة بيانات واصلة.\n\nاضغط أدناه لبدء حجز مساحتك أو استكشاف الخدمات! 📦'
+            : '🏭 **NXN Warehouses** is the UAE\'s premier integrated smart warehousing, micro-fulfillment, and SME logistics platform 🇦🇪.\n\nHere is what NXN provides for you:\n\n1️⃣ **Flexible Shelf & Space Rental**: Certified, secure storage in Dubai, Abu Dhabi, Sharjah, and Al Ain.\n2️⃣ **Inbound Cargo Intake**:\n   • **Drop-off** (Default): Bring your goods yourself with an instant digital gate pass.\n   • **Pick-up**: Our logistics fleet collects cargo directly from your facility.\n3️⃣ **NXN SME Marketplace**: List and sell products directly with 100% merchant pricing control.\n4️⃣ **Smart Inventory (WMS)**: Live stock levels, barcode scanning, inspection at intake, and low-inventory alerts.\n5️⃣ **Verified UAE PASS Onboarding**: Instant sign-in and automated Waslah trade license validation.\n\nTap below to explore available warehouse spaces or get started! 📦',
         action: AgentAction(type: 'open_booking', payload: {}),
       );
     }
@@ -459,28 +458,26 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     ])) {
       return AgentResponse(
         text: isAr
-            ? '💰 **طريقة حساب أسعار تأجير الأرفف في NXN بالتفصيل:**\n\n• **السعر الأساسي**: 100 درهم إماراتي / رف / شهر\n\n• **معامل درجة الحرارة**:\n  - التخزين العادي (Ambient): 1.0x (100 درهم/شهر)\n  - التخزين المبرد (Chilled): 1.3x (130 درهم/شهر)\n  - التخزين المجمد (Cold Storage): 1.5x (150 درهم/شهر)\n\n• **العمالة المساعدة (اختياري)**: 50 درهم / عامل / شهر\n• **رسوم المنصة**: 5% من المجموع الفرعي\n• **ضريبة القيمة المضافة (VAT)**: 5% وفقاً للهيئة الاتحادية للضرائب\n\n💡 *مثال تطبيقي*: حجز رف عادي لشهر واحد = 100 + 5 دراهم رسوم + 5.25 درهم ضريبة = **110.25 درهم إماراتي شامل الضريبة**.'
-            : '💰 **How NXN Shelf Rental Pricing is Calculated:**\n\n• **Base Shelf Rate**: AED 100 / shelf / month\n\n• **Storage Temperature Multipliers**:\n  - Ambient (Dry Goods): 1.0x (AED 100/shelf/mo)\n  - Chilled (10°C–15°C): 1.3x (AED 130/shelf/mo)\n  - Cold Storage (-18°C): 1.5x (AED 150/shelf/mo)\n\n• **Optional Labor/Workers**: AED 50 / worker / month\n• **Platform Fee**: 5% of subtotal\n• **UAE VAT**: 5% applied in accordance with FTA regulations\n\n💡 *Example*: 1 Ambient shelf for 1 month = AED 100 + AED 5 platform fee + AED 5.25 VAT = **AED 110.25 Total**.',
+            ? '💰 **طريقة حساب أسعار تأجير الأرفف في NXN بالتفصيل:**\n\n• **السعر الأساسي**: 100 درهم إماراتي / رف / شهر\n• **العمالة المساعدة (اختياري)**: 50 درهم / عامل / شهر\n• **رسوم المنصة**: 5% من المجموع الفرعي\n• **ضريبة القيمة المضافة (VAT)**: 5% وفقاً للهيئة الاتحادية للضرائب\n\n💡 *مثال تطبيقي*: حجز رف قياسي لشهر واحد = 100 + 5 دراهم رسوم + 5.25 درهم ضريبة = **110.25 درهم إماراتي شامل الضريبة**.'
+            : '💰 **How NXN Shelf Rental Pricing is Calculated:**\n\n• **Base Shelf Rate**: AED 100 / shelf / month\n• **Optional Labor/Workers**: AED 50 / worker / month\n• **Platform Fee**: 5% of subtotal\n• **UAE VAT**: 5% applied in accordance with FTA regulations\n\n💡 *Example*: 1 Standard shelf for 1 month = AED 100 + AED 5 platform fee + AED 5.25 VAT = **AED 110.25 Total**.',
         action: AgentAction(type: 'open_booking', payload: {}),
       );
     }
 
-    // 3. Storage Temperature Classes
+    // 3. Storage Specifications & Shelving Standards
     if (_hasAny(norm, [
-      'temperature', 'temp classes', 'chilled', 'ambient', 'cold storage', 'frozen',
-      'cooling', 'refrigerat', 'freezer',
+      'shelf dimensions', 'shelf size', 'storage specs', 'shelf capacity', 'specifications',
       // Gulf / Egyptian / Levantine
-      'درجات الحراره', 'فئات التخزين', 'تخزين مبرد', 'تخزين مجمد', 'تخزين جاف',
-      'تبريد', 'تجميد', 'ثلاجه', 'تلاجه', 'فريزر', 'حراره التخزين', 'بروده',
+      'مواصفات الرف', 'حجم الرف', 'ابعاد الرف', 'حمولة الرف', 'مساحة الرف', 'سعة الرف',
       // Arabizi / Franco
-      'cold storage', 'bard', 'majmad', 'temperature', 'darajat el 7arara',
+      'shelf size', 'ab3ad el raf', 'size',
       // Urdu / Hindi
-      'thanda storage', 'cold store', 'freezer storage', 'temperature kitna'
+      'shelf kitna bada', 'size kya hai', 'shelf dimensions'
     ])) {
       return AgentResponse(
         text: isAr
-            ? '🌡️ **فئات درجات حرارة التخزين المتوفرة في NXN:**\n\n1️⃣ **التخزين العادي (Ambient - 20°م إلى 25°م)**:\n   • للبضائع العامة، الأجهزة الإلكترونية، والملابس (1.0x)\n\n2️⃣ **التخزين المبرد (Chilled - 10°م إلى 15°م)**:\n   • لمستحضرات التجميل، العطور، والحلويات (1.3x)\n\n3️⃣ **التخزين المجمد (Cold Storage - 18°م تحت الصفر)**:\n   • للأغذية المجمدة والمنتجات الدوائية الحساسة (1.5x)\n\nجميع المستودعات مراقبة رقمياً عبر أجهزة استشعار الحرارة والرطوبة على مدار الساعة.'
-            : '🌡️ **Storage Temperature Classes at NXN:**\n\n1️⃣ **Ambient (20°C–25°C)**:\n   • General cargo, electronics, textiles, and dry goods (1.0x base rate)\n\n2️⃣ **Chilled (10°C–15°C)**:\n   • Cosmetics, perfumes, confectionery, and chocolates (1.3x multiplier)\n\n3️⃣ **Cold Storage (-18°C)**:\n   • Frozen foods, meat, dairy, and sensitive pharmaceuticals (1.5x multiplier)\n\nAll facilities feature continuous 24/7 digital temperature telemetry and automated HVAC alarms.',
+            ? '📦 **مواصفات وأبعاد رفوف التخزين في NXN:**\n\n• **الأبعاد القياسية للرف**: 1.2م (عرض) × 1.0م (عمق) × 1.5م (ارتفاع).\n• **الحد الأقصى للحمولة**: 500 كجم لكل رف.\n• **المراقبة والأمان**: كاميرات CCTV رقمية 24/7 وأنظمة معتمدة من الدفاع المدني.\n• **المرونة**: إمكانية حجز وتخصيص عدة أرفف متجاورة للبضائع الكبيرة.'
+            : '📦 **NXN Storage Shelf Specifications:**\n\n• **Standard Dimensions**: 1.2m (W) x 1.0m (D) x 1.5m (H).\n• **Maximum Weight Capacity**: Up to 500kg per shelf.\n• **Safety & Monitoring**: 24/7 CCTV surveillance & Civil Defence compliant fire safety.\n• **Flexibility**: Option to scale and allocate multiple adjacent shelves for oversized cargo.',
         action: AgentAction(type: 'open_booking', payload: {}),
       );
     }
@@ -503,8 +500,8 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     ])) {
       return AgentResponse(
         text: isAr
-            ? '📦 **حجز مساحات وأرفف التخزين في مستودعات NXN:**\n\n• يتوفر لدينا مستودعات مجهزة في **دبي (القوز وجافزا)، أبوظبي (مصفح)، الشارقة (المنطقة 10)، والعين**.\n• مساحة الرف القياسي: 1.2م × 1.0م × 1.5م بحمولة تصل إلى 500 كجم.\n• تبدأ الاشتراكات من شهر واحد وبمرونة كاملة للتجديد أو الإلغاء.\n\nاضغط على الزر أدناه لاختيار الإمارة وعدد الأرفف ونوع التخزين المطلوب! 👇'
-            : '📦 **Booking Warehouse Storage at NXN:**\n\n• Certified facilities in **Dubai (Al Quoz & JAFZA), Abu Dhabi (Mussafah), Sharjah (Ind. 10), and Al Ain**.\n• Standard Shelf dimensions: 1.2m x 1.0m x 1.5m with up to 500kg load capacity.\n• Flexible subscriptions starting from 1 month with instant confirmation.\n\nTap below to select your preferred Emirate, shelf count, and storage temperature! 👇',
+            ? '📦 **حجز مساحات وأرفف التخزين في مستودعات NXN:**\n\n• يتوفر لدينا مستودعات مجهزة في **دبي (القوز وجافزا)، أبوظبي (مصفح)، الشارقة (المنطقة 10)، والعين**.\n• مساحة الرف القياسي: 1.2م × 1.0م × 1.5م بحمولة تصل إلى 500 كجم.\n• تبدأ الاشتراكات من شهر واحد وبمرونة كاملة للتجديد أو الإلغاء.\n\nاضغط على الزر أدناه لاختيار الإمارة وعدد الأرفف المطلوبة! 👇'
+            : '📦 **Booking Warehouse Storage at NXN:**\n\n• Certified facilities in **Dubai (Al Quoz & JAFZA), Abu Dhabi (Mussafah), Sharjah (Ind. 10), and Al Ain**.\n• Standard Shelf dimensions: 1.2m x 1.0m x 1.5m with up to 500kg load capacity.\n• Flexible subscriptions starting from 1 month with instant confirmation.\n\nTap below to select your preferred Emirate and shelf count! 👇',
         action: AgentAction(type: 'open_booking', payload: {}),
       );
     }
@@ -727,8 +724,8 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     ])) {
       return AgentResponse(
         text: isAr
-            ? '📍 **مواقع مستودعات NXN المعتمدة في دولة الإمارات:**\n\n1️⃣ **دبي (Dubai Central Hub)**: القوز الصناعية وجافزا (JAFZA) - تخزين عادي ومبرد ومجمد.\n2️⃣ **أبوظبي (Abu Dhabi Logistics Park)**: مصفح ومدينة خليفة الصناعية (KIZAD).\n3️⃣ **الشارقة (Sharjah Hub)**: المنطقة الصناعية 10.\n4️⃣ **العين (Al Ain Logistics Center)**: المنطقة الصناعية.\n\nجميع المستودعات مجهزة بكاميرات CCTV على مدار 24/7 وأنظمة إطفاء معتمدة من الدفاع المدني.'
-            : '📍 **Official NXN Warehouse Hub Locations:**\n\n1️⃣ **Dubai Central Hub**: Al Quoz & JAFZA — Ambient, Chilled, and Cold facilities.\n2️⃣ **Abu Dhabi Logistics Hub**: Mussafah Industrial & KIZAD.\n3️⃣ **Sharjah Logistics Hub**: Industrial Area 10.\n4️⃣ **Al Ain Central Hub**: Industrial Zone.\n\nAll locations feature 24/7 security, loading docks, and Civil Defence certified fire suppression.',
+            ? '📍 **مواقع مستودعات NXN المعتمدة في دولة الإمارات:**\n\n1️⃣ **دبي (Dubai Central Hub)**: القوز الصناعية وجافزا (JAFZA) - مستودعات مركزية ذكية.\n2️⃣ **أبوظبي (Abu Dhabi Logistics Park)**: مصفح ومدينة خليفة الصناعية (KIZAD).\n3️⃣ **الشارقة (Sharjah Hub)**: المنطقة الصناعية 10.\n4️⃣ **العين (Al Ain Logistics Center)**: المنطقة الصناعية.\n\nجميع المستودعات مجهزة بكاميرات CCTV على مدار 24/7 وأنظمة إطفاء معتمدة من الدفاع المدني.'
+            : '📍 **Official NXN Warehouse Hub Locations:**\n\n1️⃣ **Dubai Central Hub**: Al Quoz & JAFZA — Smart standard warehousing.\n2️⃣ **Abu Dhabi Logistics Hub**: Mussafah Industrial & KIZAD.\n3️⃣ **Sharjah Logistics Hub**: Industrial Area 10.\n4️⃣ **Al Ain Central Hub**: Industrial Zone.\n\nAll locations feature 24/7 security, loading docks, and Civil Defence certified fire suppression.',
         action: AgentAction(type: 'open_booking', payload: {}),
       );
     }
@@ -753,8 +750,8 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     ])) {
       return AgentResponse(
         text: isAr
-            ? '⚠️ **سياسة البضائع المتضررة والحجر (Quarantine):**\n\n• أثناء فحص الاستلام في المستودع، أي طرد يظهر عليه تلف أو انسكاب يتم نقله فوراً إلى **منطقة الحجر (Bay-Quarantine)**.\n• يتم توثيق التلف بالصور وإرسال إشعار للتاجر خلال 24 ساعة لطلب استبدالها أو إعادتها.'
-            : '⚠️ **Damaged Cargo & Quarantine Policy:**\n\n• During intake dock inspection, any package exhibiting structural damage or temperature violation is placed into **Quarantine (Bay-Quarantine)**.\n• High-resolution photos are logged and an alert is sent to the merchant within 24 hours for disposal or replacement.',
+            ? '⚠️ **سياسة البضائع المتضررة والحجر (Quarantine):**\n\n• أثناء فحص الاستلام في المستودع، أي طرد يظهر عليه تلف أو كسر يتم نقله فوراً إلى **منطقة الحجر (Bay-Quarantine)**.\n• يتم توثيق التلف بالصور وإرسال إشعار للتاجر خلال 24 ساعة لطلب استبدالها أو إعادتها.'
+            : '⚠️ **Damaged Cargo & Quarantine Policy:**\n\n• During intake dock inspection, any package exhibiting structural damage or defect is placed into **Quarantine (Bay-Quarantine)**.\n• High-resolution photos are logged and an alert is sent to the merchant within 24 hours for disposal or replacement.',
         action: AgentAction(type: 'view_inventory', payload: {}),
       );
     }
@@ -813,8 +810,8 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     ])) {
       return AgentResponse(
         text: isAr
-            ? '🚫 **قائمة المواد الممنوعة والمقيدة في مستودعات NXN:**\n\nوفقاً لاشتراطات الدفاع المدني ووزارة الصناعة والتكنولوجيا المتقدمة (MOIAT) في دولة الإمارات، **يمنع تماماً** تخزين:\n❌ المواد الكيميائية القابلة للاشتعال أو السامة أو الحارقة.\n❌ الأسلحة والذخائر والمتفجرات والألعاب النارية.\n❌ المواد المخدرة والممنوعة قانوناً في دولة الإمارات.\n❌ المنتجات التالفة أو مجهولة المصدر دون فواتير رسمية.\n❌ الأطعمة الطازجة غير المعبأة خارج غرف التبريد المخصصة.\n\n✅ **المسموح به**: البضائع الجافة، الأجهزة الكهربائية والإلكترونية، الملابس، مستحضرات التجميل، الأثاث، والمواد الغذائية المعلبة أو المبردة المصرح بها.'
-            : '🚫 **Prohibited & Hazardous Cargo Policy at NXN:**\n\nIn strict compliance with UAE Civil Defence and MOIAT safety regulations, the following items are **strictly prohibited**:\n❌ Flammable chemicals, toxic substances, and volatile acids.\n❌ Firearms, explosives, munitions, and pyrotechnics.\n❌ Narcotics and illicit or non-registered substances.\n❌ Unpackaged or rotting perishable goods prone to biological contamination.\n❌ Counterfeit products violating UAE intellectual property laws.\n\n✅ **Permitted Goods**: Dry general merchandise, consumer electronics, textiles, cosmetics, packaged FMCG foods, and compliant ambient/chilled inventory.',
+            ? '🚫 **قائمة المواد الممنوعة والمقيدة في مستودعات NXN:**\n\nوفقاً لاشتراطات الدفاع المدني ووزارة الصناعة والتكنولوجيا المتقدمة (MOIAT) في دولة الإمارات، **يمنع تماماً** تخزين:\n❌ المواد الكيميائية القابلة للاشتعال أو السامة أو الحارقة.\n❌ الأسلحة والذخائر والمتفجرات والألعاب النارية.\n❌ المواد المخدرة والممنوعة قانوناً في دولة الإمارات.\n❌ المنتجات التالفة أو مجهولة المصدر دون فواتير رسمية.\n❌ الأطعمة الطازجة القابلة للتلف السريع دون تغليف وتصريح.\n\n✅ **المسموح به**: البضائع الجافة، الأجهزة الكهربائية والإلكترونية، الملابس، مستحضرات التجميل، الأثاث، والمواد الغذائية المعلبة المصرح بها.'
+            : '🚫 **Prohibited & Hazardous Cargo Policy at NXN:**\n\nIn strict compliance with UAE Civil Defence and MOIAT safety regulations, the following items are **strictly prohibited**:\n❌ Flammable chemicals, toxic substances, and volatile acids.\n❌ Firearms, explosives, munitions, and pyrotechnics.\n❌ Narcotics and illicit or non-registered substances.\n❌ Unpackaged or rotting perishable goods prone to biological contamination.\n❌ Counterfeit products violating UAE intellectual property laws.\n\n✅ **Permitted Goods**: Dry general merchandise, consumer electronics, textiles, cosmetics, furniture, and packaged FMCG foods.',
       );
     }
 
@@ -903,8 +900,8 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     ])) {
       return AgentResponse(
         text: isAr
-            ? '🚀 **خدمات الشحن وشركاء التوصيل ومواعيد التسليم:**\n\n• **سرعة التوصيل في الإمارات**:\n  - **في نفس اليوم (Same-Day)**: للطلبات المؤكدة قبل الساعة 12:00 ظهراً داخل دبي والشارقة وأبوظبي.\n  - **خلال 24-48 ساعة**: لكافة المناطق الأخرى في دولة الإمارات.\n• **شركاء التوصيل المعتمدون**: أسطول NXN اللوجستي المبرد والجاف بالإضافة إلى شركاء النقل السريع المعتمدين.\n• **إثبات التسليم (POD)**: يتم التوقيع وتأكيد التسليم إلكترونياً مع إشعار فوري للتاجر والمشتري.'
-            : '🚀 **Delivery SLA & Courier Logistics Network:**\n\n• **UAE Delivery Timeframes**:\n  - **Same-Day Express**: For orders confirmed before 12:00 PM within Dubai, Abu Dhabi, and Sharjah.\n  - **Next-Day (24–48 hours)**: Standard coverage across all other UAE Emirates and suburban zones.\n• **Certified Courier Fleet**: NXN temperature-controlled and standard delivery vehicles plus Tier-1 courier partners.\n• **Digital Proof of Delivery (POD)**: Electronic signature captured upon delivery with instantaneous buyer & merchant notifications.',
+            ? '🚀 **خدمات الشحن وشركاء التوصيل ومواعيد التسليم:**\n\n• **سرعة التوصيل في الإمارات**:\n  - **في نفس اليوم (Same-Day)**: للطلبات المؤكدة قبل الساعة 12:00 ظهراً داخل دبي والشارقة وأبوظبي.\n  - **خلال 24-48 ساعة**: لكافة المناطق الأخرى في دولة الإمارات.\n• **شركاء التوصيل المعتمدون**: أسطول NXN اللوجستي بالإضافة إلى شركاء النقل السريع المعتمدين.\n• **إثبات التسليم (POD)**: يتم التوقيع وتأكيد التسليم إلكترونياً مع إشعار فوري للتاجر والمشتري.'
+            : '🚀 **Delivery SLA & Courier Logistics Network:**\n\n• **UAE Delivery Timeframes**:\n  - **Same-Day Express**: For orders confirmed before 12:00 PM within Dubai, Abu Dhabi, and Sharjah.\n  - **Next-Day (24–48 hours)**: Standard coverage across all other UAE Emirates and suburban zones.\n• **Certified Courier Fleet**: NXN dedicated delivery vehicles plus Tier-1 courier partners.\n• **Digital Proof of Delivery (POD)**: Electronic signature captured upon delivery with instantaneous buyer & merchant notifications.',
         action: AgentAction(type: 'track_order', payload: {}),
       );
     }

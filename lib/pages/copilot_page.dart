@@ -58,9 +58,9 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
 
   String _getInitialGreeting(bool isAr) {
     if (isAr) {
-      return "👋 أهلاً بك في **المساعد الذكي لـ NXN**! 🤖✨\n\nأنا مستشارك الذكي لإدارة المستودعات والخدمات اللوجستية على مدار الساعة.\n\nإليك ما يمكنني مساعدتك به اليوم:\n\n📦 **المساحات التخزينية والأرفف**\n• حساب فوري للتكاليف وتوصيات المساحة المناسبة\n\n🌡️ **درجات حرارة التخزين**\n• التخزين العادي (25°م)، المبرد (4°م)، والمجمد (-18°م)\n\n🚚 **الشحنات والتوصيل**\n• تصاريح الدخول (STO) وبوالص الشحن Express (WAY)\n\n📜 **الامتثال والتراخيص**\n• ضريبة القيمة المضافة (5%) وتوثيق KYC\n\n💰 **سحوبات التاجر**\n• فترات الحجز (14 يوماً) وإجراءات السحب\n\nاختر من الأسئلة السريعة أدناه أو اكتب سؤالك مباشرة! 👇";
+      return "👋 أهلاً بك في **المساعد الذكي لـ NXN**! 🤖✨\n\nأنا مستشارك الذكي لإدارة المستودعات والخدمات اللوجستية على مدار الساعة.\n\nإليك ما يمكنني مساعدتك به اليوم:\n\n📦 **المساحات التخزينية والأرفف**\n• حساب فوري للتكاليف وتوصيات المساحة المناسبة\n\n🚚 **الشحنات والتوصيل**\n• خيارات Drop-off و Pick-up وتصاريح الدخول\n\n🛍️ **السوق التجاري والمنتجات**\n• إضافة وتعديل المنتجات والأسعار مباشرة\n\n📜 **الامتثال والتراخيص**\n• ضريبة القيمة المضافة (5%) وتوثيق KYC\n\n💰 **سحوبات التاجر**\n• فترات الحجز (14 يوماً) وإجراءات السحب\n\nاختر من الأسئلة السريعة أدناه أو اكتب سؤالك مباشرة! 👇";
     } else {
-      return "👋 Welcome to **NXN AI Agent**! 🤖✨\n\nI am your 24/7 intelligent logistics & fulfillment advisor.\n\nHere is how I can assist you today:\n\n📦 **Micro-Warehousing & Space Subscriptions**\n• Instant shelf rental quotes & capacity recommendations\n\n🌡️ **Storage Temperature Classes**\n• Ambient (25°C), Chilled (4°C), Cold (-18°C) specs\n\n🚚 **Inbound & Outbound Logistics**\n• Gate Pass (STO) scheduling & Courier Express (WAY)\n\n📜 **Compliance & Trade License**\n• UAE FTA Tax rules (5% VAT) & KYC verification\n\n💰 **Merchant Financials**\n• 14-day seller hold periods & payout processing\n\nTap any prompt below or type your question! 👇";
+      return "👋 Welcome to **NXN AI Agent**! 🤖✨\n\nI am your 24/7 intelligent logistics & fulfillment advisor.\n\nHere is how I can assist you today:\n\n📦 **Micro-Warehousing & Space Subscriptions**\n• Instant shelf rental quotes & capacity recommendations\n\n🚚 **Inbound & Outbound Logistics**\n• Drop-off vs. Pick-up choices & Gate Pass (STO) scheduling\n\n🛍️ **Marketplace & Products**\n• Adding products & 100% merchant price control\n\n📜 **Compliance & Trade License**\n• UAE FTA Tax rules (5% VAT) & KYC verification\n\n💰 **Merchant Financials**\n• 14-day seller hold periods & payout processing\n\nTap any prompt below or type your question! 👇";
     }
   }
 
@@ -290,13 +290,13 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
     final suggestions = isAr
         ? [
             {"label": "❓ كيف يتم حساب أسعار إيجار الأرفف؟", "query": "كيف يتم حساب أسعار إيجار الأرفف والاشتراك؟"},
-            {"label": "🌡️ ما هي فئات درجات حرارة التخزين؟", "query": "ما هي فئات درجات حرارة التخزين؟"},
+            {"label": "🚛 ما الفرق بين Drop-off و Pick-up؟", "query": "ما الفرق بين تسليم البضائع Drop-off واستلامها Pick-up؟"},
             {"label": "📜 ما المستندات المطلوبة للتحقق (KYC)؟", "query": "ما هي المستندات والبيانات المطلوبة للتحقق (KYC)؟"},
             {"label": "💰 كيف تعمل سحوبات الأرباح للتاجر (14 يوماً)؟", "query": "كيف تعمل سحوبات الأرباح للتاجر (14 يوماً) للحساب البنكي؟"},
           ]
         : [
             {"label": "❓ How is shelf rental pricing calculated?", "query": "How is shelf rental pricing and subscription calculated?"},
-            {"label": "🌡️ What are the storage temperature classes?", "query": "What are the storage temperature classes?"},
+            {"label": "🚛 Drop-off vs Pick-up differences?", "query": "What is the difference between Drop-off and Pick-up?"},
             {"label": "📜 What documents are required for KYC?", "query": "What documents are required for KYC verification?"},
             {"label": "💰 How do 14-day seller payouts work?", "query": "How do 14-day seller IBAN payouts work?"},
           ];

@@ -15,12 +15,20 @@ class PrimeWarehouse {
   final String id;
   final String nameEn;
   final String nameAr;
+  final String subtitleEn;
+  final String subtitleAr;
+  final int totalShelves;
+  final List<String> storageTags;
   final IconData icon;
 
   const PrimeWarehouse({
     required this.id,
     required this.nameEn,
     required this.nameAr,
+    required this.subtitleEn,
+    required this.subtitleAr,
+    required this.totalShelves,
+    required this.storageTags,
     required this.icon,
   });
 }
@@ -45,7 +53,6 @@ class BookingConfig {
   int durationMonths;
   bool addWorkers;
   int workerCount;
-  String storageType; // 'ambient', 'chilled', 'cold_storage'
 
   BookingConfig({
     this.isSelected = false,
@@ -53,7 +60,6 @@ class BookingConfig {
     this.durationMonths = 1,
     this.addWorkers = false,
     this.workerCount = 1,
-    this.storageType = 'ambient',
   });
 
   /// Calculate price breakdown using configurable platform rates.
@@ -66,10 +72,7 @@ class BookingConfig {
     double platformFeeRate = 0.05,
     double vatRate = 0.05,
   }) {
-    final double multiplier = storageType == 'cold_storage'
-        ? 1.5
-        : (storageType == 'chilled' ? 1.3 : 1.0);
-    final double baseCost = shelfBasePriceAed * shelves * durationMonths * multiplier;
+    final double baseCost = shelfBasePriceAed * shelves * durationMonths;
     final double workerFee = addWorkers ? (workerFeePerUnit * workerCount) : 0.0;
     final double subtotal = baseCost + workerFee;
     final double platformFee = subtotal * platformFeeRate;
@@ -95,25 +98,45 @@ class BookingPage extends StatefulWidget {
 class _BookingPageState extends State<BookingPage> {
   final List<PrimeWarehouse> _warehouses = [
     const PrimeWarehouse(
-        id: 'dxb',
-        nameEn: 'Dubai',
-        nameAr: 'دبي',
-        icon: Icons.business_outlined),
+      id: 'dxb',
+      nameEn: 'Dubai',
+      nameAr: 'دبي',
+      subtitleEn: 'Al Quoz Logistics Hub',
+      subtitleAr: 'منطقة القوز اللوجستية',
+      totalShelves: 200,
+      storageTags: ['Fast Dispatch', '24/7 Access', 'Secured'],
+      icon: Icons.business_outlined,
+    ),
     const PrimeWarehouse(
-        id: 'auh',
-        nameEn: 'Abu Dhabi',
-        nameAr: 'أبو ظبي',
-        icon: Icons.location_city_outlined),
+      id: 'auh',
+      nameEn: 'Abu Dhabi',
+      nameAr: 'أبو ظبي',
+      subtitleEn: 'KIZAD Industrial Zone',
+      subtitleAr: 'مدينة كيزاد الصناعية',
+      totalShelves: 150,
+      storageTags: ['Standard Bay', 'Forklift Ready', 'Secured'],
+      icon: Icons.location_city_outlined,
+    ),
     const PrimeWarehouse(
-        id: 'shj',
-        nameEn: 'Sharjah',
-        nameAr: 'الشارقة',
-        icon: Icons.mosque_outlined),
+      id: 'shj',
+      nameEn: 'Sharjah',
+      nameAr: 'الشارقة',
+      subtitleEn: 'Industrial Area 4',
+      subtitleAr: 'المنطقة الصناعية 4',
+      totalShelves: 100,
+      storageTags: ['Fast Dispatch', 'Central Location'],
+      icon: Icons.mosque_outlined,
+    ),
     const PrimeWarehouse(
-        id: 'aln',
-        nameEn: 'Al Ain',
-        nameAr: 'العين',
-        icon: Icons.landscape_outlined),
+      id: 'aln',
+      nameEn: 'Al Ain',
+      nameAr: 'العين',
+      subtitleEn: 'Sanaiya Logistics Oasis',
+      subtitleAr: 'صناعية العين',
+      totalShelves: 100,
+      storageTags: ['Regional Hub', 'High Capacity'],
+      icon: Icons.landscape_outlined,
+    ),
   ];
 
   final Map<String, BookingConfig> _configs = {};
@@ -191,7 +214,13 @@ class _BookingPageState extends State<BookingPage> {
                           },
                         ),
                       ] else
-                        _EmptyState(l10n: l10n),
+                        _VisualWarehouseShowcase(
+                          warehouses: _warehouses,
+                          isAr: isAr,
+                          onSelectWarehouse: (id) => setState(() {
+                            _configs[id]!.isSelected = true;
+                          }),
+                        ),
                     ],
                   ),
                 ),
@@ -243,9 +272,9 @@ class _BookingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SliverAppBar(
-      expandedHeight: 155,
+      expandedHeight: 180,
       pinned: true,
-      backgroundColor: AppColors.bluePrimary,
+      backgroundColor: const Color(0xFF003C8E),
       elevation: 0,
       scrolledUnderElevation: 0,
       leading: IconButton(
@@ -255,73 +284,158 @@ class _BookingHeader extends StatelessWidget {
       ),
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          color: AppColors.bluePrimary,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const BrandLogo(height: 28, isLight: true),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.warehouse_outlined,
-                                color: Colors.white, size: 13),
-                            const SizedBox(width: 5),
-                            Text(
-                              isAr ? 'حجز المساحة' : 'Book Space',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isAr ? 'اختر مستودعك' : 'Choose Your Warehouse',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        isAr
-                            ? 'اعثر على مخزن للإيجار اليوم'
-                            : 'Find a warehouse to rent today',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF06152D),
+                Color(0xFF003C8E),
+                Color(0xFF1E50FF),
+              ],
             ),
           ),
+          child: Stack(
+            children: [
+              // Ambient glow circles
+              Positioned(
+                top: -30,
+                right: -20,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const BrandLogo(height: 28, isLight: true),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.25)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.verified_rounded,
+                                    color: Color(0xFF38BDF8), size: 14),
+                                const SizedBox(width: 5),
+                                Text(
+                                  isAr ? 'حجز فوري معتمد' : 'Instant Hold & Pass',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isAr ? 'اختر مستودعك اللوجستي' : 'Choose Your Warehouse Hub',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isAr
+                                ? 'مستودعات ذكية متكاملة ومؤمنة في كافة إمارات الدولة'
+                                : 'Prime smart & secured warehousing across UAE',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Feature highlights row
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _HeaderBadge(
+                                  icon: Icons.timer_outlined,
+                                  label: isAr ? 'ضمان حجز 10 دقائق' : '10-Min Lock Guarantee',
+                                ),
+                                const SizedBox(width: 6),
+                                _HeaderBadge(
+                                  icon: Icons.verified_user_outlined,
+                                  label: isAr ? 'مستودع آمن ومؤمن' : 'Secured & Insured',
+                                ),
+                                const SizedBox(width: 6),
+                                _HeaderBadge(
+                                  icon: Icons.qr_code_2_rounded,
+                                  label: isAr ? 'تصريح دخول فوري' : 'QR Gate Pass',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _HeaderBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _HeaderBadge({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFF38BDF8), size: 12),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -330,30 +444,59 @@ class _BookingHeader extends StatelessWidget {
 // ── Section Title ──────────────────────────────────────────────────────────────
 class _SectionTitle extends StatelessWidget {
   final String title;
-  const _SectionTitle({required this.title});
+  final String? actionText;
+  final VoidCallback? onAction;
+
+  const _SectionTitle({
+    required this.title,
+    this.actionText,
+    this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Container(
-          width: 3,
-          height: 16,
-          decoration: BoxDecoration(
-            color: AppColors.bluePrimary,
-            borderRadius: BorderRadius.circular(2),
-          ),
+        Row(
+          children: [
+            Container(
+              width: 3.5,
+              height: 18,
+              decoration: BoxDecoration(
+                color: AppColors.bluePrimary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 5),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-            letterSpacing: 0.2,
+        if (actionText != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              actionText!,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.bluePrimary,
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -381,16 +524,17 @@ class _WarehouseGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      childAspectRatio: 3.2,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
+      childAspectRatio: 1.15,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
       children: warehouses.map((w) {
         final isSelected = configs[w.id]!.isSelected;
         return _GridItem(
-            w: w,
-            isSelected: isSelected,
-            isAr: isAr,
-            onTap: () => onToggle(w.id));
+          w: w,
+          isSelected: isSelected,
+          isAr: isAr,
+          onTap: () => onToggle(w.id),
+        );
       }).toList(),
     );
   }
@@ -403,62 +547,195 @@ class _GridItem extends StatelessWidget {
   final bool isAr;
   final VoidCallback onTap;
 
-  const _GridItem(
-      {required this.w,
-      required this.isSelected,
-      required this.isAr,
-      required this.onTap});
+  const _GridItem({
+    required this.w,
+    required this.isSelected,
+    required this.isAr,
+    required this.onTap,
+  });
+
+  Color _getEmirateColor(String id) {
+    switch (id) {
+      case 'dxb':
+        return const Color(0xFF1E50FF); // Dubai Cobalt
+      case 'auh':
+        return const Color(0xFF0A192F); // Abu Dhabi Navy
+      case 'shj':
+        return const Color(0xFF0D9488); // Sharjah Teal
+      case 'aln':
+        return const Color(0xFFD97706); // Al Ain Amber
+      default:
+        return AppColors.bluePrimary;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: isSelected ? AppColors.bluePrimary : Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      elevation: 0,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        splashColor: AppColors.blueGlow,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected ? AppColors.bluePrimary : AppColors.border,
-              width: 1.5,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.18)
-                      : AppColors.blueGlow,
-                  borderRadius: BorderRadius.circular(9),
+    final emirateColor = _getEmirateColor(w.id);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFF0F5FF) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected ? AppColors.bluePrimary : AppColors.border,
+          width: isSelected ? 2 : 1,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: AppColors.bluePrimary.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
                 ),
-                child: Icon(
-                  w.icon,
-                  color: isSelected ? Colors.white : AppColors.bluePrimary,
-                  size: 17,
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  isAr ? w.nameAr : w.nameEn,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          splashColor: AppColors.blueGlow,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top Row: Icon badge + Selection pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.bluePrimary
+                            : emirateColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        w.icon,
+                        color: isSelected ? Colors.white : emirateColor,
+                        size: 18,
+                      ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.bluePrimary
+                            : Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isSelected
+                            ? Icons.check_rounded
+                            : Icons.add_rounded,
+                        color: isSelected ? Colors.white : Colors.grey.shade400,
+                        size: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                // Middle: Emirate Name + Subtitle
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isAr ? w.nameAr : w.nameEn,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppColors.bluePrimary
+                                : AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                          ),
+                        ),
+                        if (w.id == 'dxb') ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E50FF).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'HOT',
+                              style: TextStyle(
+                                color: Color(0xFF1E50FF),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isAr ? w.subtitleAr : w.subtitleEn,
+                      style: TextStyle(
+                        color: isSelected
+                            ? AppColors.textSecondary
+                            : Colors.grey.shade500,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+                // Bottom: Capacity tag pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.bluePrimary.withValues(alpha: 0.08)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 11,
+                        color: isSelected
+                            ? AppColors.bluePrimary
+                            : Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${w.totalShelves} ${isAr ? "رف متاح" : "Shelves"}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected
+                              ? AppColors.bluePrimary
+                              : Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              if (isSelected)
-                const Icon(Icons.check_circle_rounded,
-                    color: Colors.white, size: 16),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -586,19 +863,11 @@ class _RentalConfigCard extends StatelessWidget {
             ),
           ),
 
-          // ── Storage Class & Sliders ────────────────────────────────────────────
+          // ── Capacity Sliders ───────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
               children: [
-                _StorageCategorySelector(
-                  selectedType: config.storageType,
-                  onSelected: (type) {
-                    config.storageType = type;
-                    onUpdate();
-                  },
-                ),
-                const SizedBox(height: 10),
                 _QuickPresetChips(
                   currentShelves: config.shelves,
                   onSelect: (val) {
@@ -775,67 +1044,6 @@ class _OversizedCargoGuardCardState extends State<_OversizedCargoGuardCard> {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _StorageCategorySelector extends StatelessWidget {
-  final String selectedType;
-  final ValueChanged<String> onSelected;
-
-  const _StorageCategorySelector({required this.selectedType, required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    final options = [
-      {'key': 'ambient', 'label': 'Ambient (1.0x)', 'icon': Icons.wb_sunny_outlined},
-      {'key': 'chilled', 'label': 'Chilled (+30%)', 'icon': Icons.ac_unit_rounded},
-      {'key': 'cold_storage', 'label': 'Cold (+50%)', 'icon': Icons.kitchen_rounded},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Storage Temperature Class',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          children: options.map((opt) {
-            final key = opt['key'] as String;
-            final isSelected = selectedType == key;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => onSelected(key),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.bluePrimary : AppColors.bg,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isSelected ? AppColors.bluePrimary : AppColors.border),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(opt['icon'] as IconData, size: 12, color: isSelected ? Colors.white : AppColors.textSecondary),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          opt['label'] as String,
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.textPrimary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 }
@@ -1129,46 +1337,338 @@ class _CounterButton extends StatelessWidget {
   }
 }
 
-// ── Empty State ────────────────────────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  final AppLocalizations l10n;
-  const _EmptyState({required this.l10n});
+// ── Visual Warehouse Showcase (Empty State Replacement) ───────────────────────
+class _VisualWarehouseShowcase extends StatelessWidget {
+  final List<PrimeWarehouse> warehouses;
+  final bool isAr;
+  final Function(String id) onSelectWarehouse;
+
+  const _VisualWarehouseShowcase({
+    required this.warehouses,
+    required this.isAr,
+    required this.onSelectWarehouse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 14),
+        // ── 1. Featured Flagship Hub Showcase Card ─────────────────────────────
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF071A38),
+                Color(0xFF003C8E),
+                Color(0xFF1E50FF),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF003C8E).withValues(alpha: 0.22),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Background decorative circle
+              Positioned(
+                right: -25,
+                top: -25,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.07),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star_rounded, color: Color(0xFF38BDF8), size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                isAr ? 'المستودع الرئيسي الموصى به' : 'FLAGSHIP FACILITY',
+                                style: const TextStyle(
+                                  color: Color(0xFF38BDF8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: Colors.greenAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                isAr ? '200 رف متاح' : '200 Shelves Live',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      isAr ? 'مستودع دبي المركزي الذكي (القوز 3)' : 'Dubai Central Smart Hub (Al Quoz 3)',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isAr
+                          ? 'موقع استراتيجي بالقرب من شارع الشيخ زايد مع مراقبة أمنية 24/7 ورفوف تخزين عالية التحمل'
+                          : 'Prime location off SZR with 24/7 CCTV, high-capacity shelving & instant gate pass entry.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Highlights row
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _ShowcasePill(icon: Icons.shelves, label: isAr ? 'رفوف قياسية' : 'Standard Shelves'),
+                        _ShowcasePill(icon: Icons.bolt_rounded, label: isAr ? 'حجز فوري' : 'Instant Hold'),
+                        _ShowcasePill(icon: Icons.security_rounded, label: isAr ? 'تأمين شامل' : '100% Insured'),
+                        _ShowcasePill(icon: Icons.receipt_long_rounded, label: isAr ? 'شامل الضريبة 5%' : 'FTA TRN Verified'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => onSelectWarehouse('dxb'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.bluePrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.touch_app_rounded, size: 18, color: AppColors.bluePrimary),
+                        label: Text(
+                          isAr ? 'اختر مستودع دبي وابدأ التخصيص ⚡' : 'Select Dubai Hub & Configure ⚡',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                            color: AppColors.bluePrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── 2. Why Choose NXN Warehouses Visual Grid ───────────────────────────
+        Text(
+          isAr ? 'مميزات شبكة مستودعات NXN' : 'Why Businesses Choose NXN Hubs',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          childAspectRatio: 1.35,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          children: [
+            _FeatureTile(
+              icon: Icons.speed_rounded,
+              iconBg: const Color(0xFFEEF2FF),
+              iconColor: const Color(0xFF4F46E5),
+              title: isAr ? 'حجز فوري 10 دقائق' : '10-Min Hold Guarantee',
+              desc: isAr ? 'تثبيت السعر والرفوف دون تأخير' : 'Locks capacity & pricing instantly without risk',
+            ),
+            _FeatureTile(
+              icon: Icons.aspect_ratio_rounded,
+              iconBg: const Color(0xFFF0FDF4),
+              iconColor: const Color(0xFF16A34A),
+              title: isAr ? 'مرونة التوسع' : 'Flexible Space Scaling',
+              desc: isAr ? 'زيادة أو تقليص الرفوف شهرياً' : 'Scale shelf capacity easily on a monthly basis',
+            ),
+            _FeatureTile(
+              icon: Icons.qr_code_scanner_rounded,
+              iconBg: const Color(0xFFFFF7ED),
+              iconColor: const Color(0xFFEA580C),
+              title: isAr ? 'تصريح مرور رقمي' : 'Instant Dock Gate Pass',
+              desc: isAr ? 'دخول مباشر لسائقي التوصيل والشحن' : 'QR token for drivers, zero gate queueing',
+            ),
+            _FeatureTile(
+              icon: Icons.account_balance_rounded,
+              iconBg: const Color(0xFFF8FAFC),
+              iconColor: const Color(0xFF0284C7),
+              title: isAr ? 'فواتير ضريبية معتمدة' : 'FTA Compliant VAT',
+              desc: isAr ? 'فواتير رسمية متوافقة مع الأنظمة' : 'Fully registered TRN: 100492819200003',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ShowcasePill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _ShowcasePill({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(vertical: 40),
-      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String title;
+  final String desc;
+
+  const _FeatureTile({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.title,
+    required this.desc,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: AppColors.blueGlow,
-              borderRadius: BorderRadius.circular(18),
+              color: iconBg,
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.warehouse_outlined,
-                size: 36, color: AppColors.blueMid),
+            child: Icon(icon, color: iconColor, size: 16),
           ),
-          const SizedBox(height: 14),
-          Text(
-            l10n.noEmirateSelected,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Tap a location above to get started',
-            style: TextStyle(color: AppColors.blueLight, fontSize: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11.5,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  color: Colors.grey.shade600,
+                  height: 1.25,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ],
       ),

@@ -161,7 +161,7 @@ class _WalletPageState extends State<WalletPage> {
                                   ? tx['created_at'].toString().split('T').first
                                   : 'Recent';
 
-                              return Container(
+                              return Material(
                                 color: Colors.white,
                                 child: ListTile(
                                   leading: CircleAvatar(

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../theme.dart';
-import '../../services/uae_pass_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AccountInReviewPage extends StatelessWidget {

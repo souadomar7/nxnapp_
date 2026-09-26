@@ -4,7 +4,6 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../providers/locale_provider.dart';
 import '../data/inventory_controller.dart';
-import '../widgets/brand_logo.dart';
 import '../data/receive_result.dart';
 import '../l10n/app_localizations.dart';
 import '../theme.dart';
@@ -718,11 +717,11 @@ class _SmartInventoryStageENState extends State<SmartInventoryStageEN> {
           }
         } else {
           itemsList.addAll([
-            {'name': isAr ? 'مستخلص القهوة الباردة' : 'Cold Brew Coffee Concentrate', 'sku': 'SKU-CBD-001', 'qty': 42, 'status': 'in_stock', 'category': isAr ? 'مبرد 2-8°م' : 'Chilled 2-8°C'},
-            {'name': isAr ? 'زيت زيتون عضوي 1 لتر' : 'Organic Olive Oil 1L', 'sku': 'SKU-OIL-992', 'qty': 8, 'status': 'low_stock', 'category': isAr ? 'تخزين عادي' : 'Ambient'},
-            {'name': isAr ? 'حليب اللوز (12×1 لتر)' : 'Almond Milk Pack (12x1L)', 'sku': 'SKU-MLK-304', 'qty': 115, 'status': 'in_stock', 'category': isAr ? 'تخزين عادي' : 'Ambient'},
-            {'name': isAr ? 'توت مجمد مشكل 500غ' : 'Frozen Berry Blend 500g', 'sku': 'SKU-FRZ-441', 'qty': 0, 'status': 'out_of_stock', 'category': isAr ? 'مجمد <0°م' : 'Cold <0°C'},
-            {'name': isAr ? 'عسل طبيعي 500غ' : 'Natural Honey Jar 500g', 'sku': 'SKU-HNY-110', 'qty': 4, 'status': 'low_stock', 'category': isAr ? 'تخزين عادي' : 'Ambient'},
+            {'name': isAr ? 'طقم أكواب سيراميك' : 'Ceramic Mug Set', 'sku': 'SKU-MUG-001', 'qty': 42, 'status': 'in_stock', 'category': isAr ? 'أدوات منزلية' : 'Homeware'},
+            {'name': isAr ? 'زيت زيتون عضوي 1 لتر' : 'Organic Olive Oil 1L', 'sku': 'SKU-OIL-992', 'qty': 8, 'status': 'low_stock', 'category': isAr ? 'أغذية معلبة' : 'FMCG Food'},
+            {'name': isAr ? 'حليب اللوز (12×1 لتر)' : 'Almond Milk Pack (12x1L)', 'sku': 'SKU-MLK-304', 'qty': 115, 'status': 'in_stock', 'category': isAr ? 'مشروبات' : 'Beverages'},
+            {'name': isAr ? 'سماعات لاسلكية برو' : 'Wireless Pro Earbuds', 'sku': 'SKU-AUD-441', 'qty': 0, 'status': 'out_of_stock', 'category': isAr ? 'إلكترونيات' : 'Electronics'},
+            {'name': isAr ? 'عسل طبيعي 500غ' : 'Natural Honey Jar 500g', 'sku': 'SKU-HNY-110', 'qty': 4, 'status': 'low_stock', 'category': isAr ? 'أغذية معلبة' : 'FMCG Food'},
           ]);
         }
 

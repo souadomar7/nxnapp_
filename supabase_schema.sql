@@ -393,3 +393,91 @@ CREATE TRIGGER on_auth_user_created
 -- ==============================================================================
 -- ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 -- ALTER PUBLICATION supabase_realtime ADD TABLE buyer_orders;
+
+-- ==============================================================================
+-- 4. RPC STORED PROCEDURES (Subscription Cancellation & Offline Gate Pass Sync)
+-- ==============================================================================
+
+CREATE OR REPLACE FUNCTION public.request_subscription_cancellation(
+    p_subscription_id TEXT,
+    p_refund_model    TEXT,
+    p_refund_amount   NUMERIC
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_has_stock BOOLEAN := false;
+    v_has_outbound BOOLEAN := false;
+    v_end_date TIMESTAMP WITH TIME ZONE;
+BEGIN
+    v_end_date := timezone('utc', now()) + INTERVAL '14 days';
+
+    -- Check if seller has in-stock items
+    SELECT EXISTS (
+        SELECT 1 FROM public.sme_inventory 
+        WHERE seller_id = auth.uid() AND quantity > 0 AND status != 'cleared'
+    ) INTO v_has_stock;
+
+    -- Check if seller has pending outbound orders
+    SELECT EXISTS (
+        SELECT 1 FROM public.sme_orders
+        WHERE seller_id = auth.uid() AND status IN ('pending', 'pending_dispatch', 'in_transit')
+    ) INTO v_has_outbound;
+
+    -- Update subscription record if table exists
+    UPDATE public.sme_subscriptions
+    SET auto_renew = false,
+        cancellation_pending = true,
+        refund_amount = p_refund_amount,
+        end_date = v_end_date
+    WHERE id = p_subscription_id AND seller_id = auth.uid();
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'status', 'cancellation_pending',
+        'has_physical_stock', v_has_stock,
+        'has_pending_outbound', v_has_outbound,
+        'effective_end_date', v_end_date,
+        'refund_amount', p_refund_amount
+    );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.sync_offline_gate_pass(
+    p_pass_code       TEXT,
+    p_lease_id        TEXT,
+    p_qr_signature    TEXT,
+    p_dock_gate       TEXT,
+    p_driver_name     TEXT,
+    p_driver_license  TEXT,
+    p_vehicle_plate   TEXT,
+    p_valid_until     TEXT,
+    p_idempotency_key TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- Log / Insert to offline sync audit
+    INSERT INTO public.dashboard_activities (
+        id, seller_id, title, title_ar, subtitle, subtitle_ar, date, type
+    ) VALUES (
+        COALESCE(p_idempotency_key, gen_random_uuid()::text),
+        auth.uid(),
+        'Offline Gate Pass Synced: ' || p_pass_code,
+        'مزامنة تصريح دخول: ' || p_pass_code,
+        'Driver: ' || p_driver_name || ' (' || p_vehicle_plate || ') | Gate: ' || p_dock_gate,
+        'السائق: ' || p_driver_name || ' (' || p_vehicle_plate || ') | البوابة: ' || p_dock_gate,
+        now(),
+        'dispatch'
+    )
+    ON CONFLICT (id) DO NOTHING;
+
+    RETURN jsonb_build_object('success', true, 'pass_code', p_pass_code);
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$;

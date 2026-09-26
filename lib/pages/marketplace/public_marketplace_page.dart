@@ -7,7 +7,6 @@ import '../../services/marketplace_service.dart';
 import '../../models/marketplace_models.dart';
 import 'public_product_detail_page.dart';
 import 'cart_page.dart';
-import '../../sheets/quote_sheet.dart';
 
 class PublicMarketplacePage extends StatefulWidget {
   const PublicMarketplacePage({super.key});

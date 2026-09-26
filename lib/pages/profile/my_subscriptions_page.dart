@@ -626,38 +626,50 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
 
           const SizedBox(height: 20),
 
-          // ── POLICY A CARD ────────────────────────────────────────────────
-          _buildPolicyOptionTile(
-            model: RefundPolicyModel.strictNonRefundable,
-            badgeTitle: isAr ? 'نموذج أ: غير قابل للاسترداد (Standard SaaS)' : 'Model A: Strict Non-Refundable (Standard SaaS)',
-            badgeColor: Colors.grey.shade700,
-            financialImpact: isAr ? 'يتم مصادرة المدة المتبقية. لا يتم إصدار أي استرداد مالي.' : 'Remaining months are forfeited. No refund issued.',
-            exampleBreakdown: isAr ? 'المبلغ المدفوع: 600 د.إ • الاسترداد: 0.00 د.إ' : 'Total Paid: 600 AED • Refund: 0.00 AED',
-            calculatedRefundStr: '0.00 AED',
-          ),
+          RadioGroup<RefundPolicyModel>(
+            groupValue: _selectedModel,
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _selectedModel = val);
+              }
+            },
+            child: Column(
+              children: [
+                // ── POLICY A CARD ────────────────────────────────────────────────
+                _buildPolicyOptionTile(
+                  model: RefundPolicyModel.strictNonRefundable,
+                  badgeTitle: isAr ? 'نموذج أ: غير قابل للاسترداد (Standard SaaS)' : 'Model A: Strict Non-Refundable (Standard SaaS)',
+                  badgeColor: Colors.grey.shade700,
+                  financialImpact: isAr ? 'يتم مصادرة المدة المتبقية. لا يتم إصدار أي استرداد مالي.' : 'Remaining months are forfeited. No refund issued.',
+                  exampleBreakdown: isAr ? 'المبلغ المدفوع: 600 د.إ • الاسترداد: 0.00 د.إ' : 'Total Paid: 600 AED • Refund: 0.00 AED',
+                  calculatedRefundStr: '0.00 AED',
+                ),
 
-          const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-          // ── POLICY B CARD ────────────────────────────────────────────────
-          _buildPolicyOptionTile(
-            model: RefundPolicyModel.partialWithFee,
-            badgeTitle: isAr ? '⭐ نموذج ب: استرداد جزئي مع غرامة خروج (موصى به)' : '⭐ Model B: Partial Refund with Exit Fee (Recommended)',
-            badgeColor: Colors.blue.shade800,
-            financialImpact: isAr ? 'استرداد الأشهر غير المستعملة خصماً منها رسوم الغرامة (100 د.إ).' : 'Unused months refunded minus a cancellation penalty (100 AED fee).',
-            exampleBreakdown: isAr ? 'المدفوع: 600 د.إ • المستخدم: 200 د.إ • الغرامة: 100 د.إ' : 'Paid: 600 AED • Used: 200 AED • Exit Fee: 100 AED',
-            calculatedRefundStr: '300.00 AED',
-          ),
+                // ── POLICY B CARD ────────────────────────────────────────────────
+                _buildPolicyOptionTile(
+                  model: RefundPolicyModel.partialWithFee,
+                  badgeTitle: isAr ? '⭐ نموذج ب: استرداد جزئي مع غرامة خروج (موصى به)' : '⭐ Model B: Partial Refund with Exit Fee (Recommended)',
+                  badgeColor: Colors.blue.shade800,
+                  financialImpact: isAr ? 'استرداد الأشهر غير المستعملة خصماً منها رسوم الغرامة (100 د.إ).' : 'Unused months refunded minus a cancellation penalty (100 AED fee).',
+                  exampleBreakdown: isAr ? 'المدفوع: 600 د.إ • المستخدم: 200 د.إ • الغرامة: 100 د.إ' : 'Paid: 600 AED • Used: 200 AED • Exit Fee: 100 AED',
+                  calculatedRefundStr: '300.00 AED',
+                ),
 
-          const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-          // ── POLICY C CARD ────────────────────────────────────────────────
-          _buildPolicyOptionTile(
-            model: RefundPolicyModel.recalculateStandard,
-            badgeTitle: isAr ? 'نموذج ج: إعادة الاحتساب بالسعر الشهري القياسي' : 'Model C: Recalculate to Standard Monthly Rate',
-            badgeColor: Colors.purple.shade800,
-            financialImpact: isAr ? 'إلغاء خصم الباقة متعددة الأشهُر واحتساب الشهر المستعمل بالسعر الكامل (250 د.إ).' : 'Discounted multi-month rates revert to standard monthly pricing for used months.',
-            exampleBreakdown: isAr ? 'المدفوع بخصم 15%: 510 د.إ • سعر الشهر الكامل: 250 د.إ' : 'Paid (15% 3-mo discount): 510 AED • 1-Mo Full Rate: 250 AED',
-            calculatedRefundStr: '260.00 AED',
+                // ── POLICY C CARD ────────────────────────────────────────────────
+                _buildPolicyOptionTile(
+                  model: RefundPolicyModel.recalculateStandard,
+                  badgeTitle: isAr ? 'نموذج ج: إعادة الاحتساب بالسعر الشهري القياسي' : 'Model C: Recalculate to Standard Monthly Rate',
+                  badgeColor: Colors.purple.shade800,
+                  financialImpact: isAr ? 'إلغاء خصم الباقة متعددة الأشهُر واحتساب الشهر المستعمل بالسعر الكامل (250 د.إ).' : 'Discounted multi-month rates revert to standard monthly pricing for used months.',
+                  exampleBreakdown: isAr ? 'المدفوع بخصم 15%: 510 د.إ • سعر الشهر الكامل: 250 د.إ' : 'Paid (15% 3-mo discount): 510 AED • 1-Mo Full Rate: 250 AED',
+                  calculatedRefundStr: '260.00 AED',
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 20),
@@ -739,11 +751,7 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
           children: [
             Radio<RefundPolicyModel>(
               value: model,
-              groupValue: _selectedModel,
               activeColor: badgeColor,
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedModel = val);
-              },
             ),
             const SizedBox(width: 8),
             Expanded(
