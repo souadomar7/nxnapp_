@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:nxnapp/core/services/notification_service.dart';
 import 'package:app_links/app_links.dart';
 import 'pages/onboarding/profile_setup_page.dart';
 import 'services/uae_pass_service.dart';
+import 'services/gate_pass_sync_service.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:nxnapp/l10n/app_localizations.dart';
@@ -53,6 +55,13 @@ void main() async {
     url: supabaseUrl!,
     anonKey: supabaseAnonKey!,
   );
+
+  try {
+    await Hive.initFlutter();
+    await GatePassSyncService.initialize();
+  } catch (e) {
+    debugPrint('GatePassSyncService initialization warning: $e');
+  }
 
   // Handle UAE PASS OAuth callback deep link
   final appLinks = AppLinks();

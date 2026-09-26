@@ -281,8 +281,6 @@ BEGIN
         'qr_signature', v_qr_sig
     );
 END;
-$$;
-
 -- 5. Passive Expiry Cleanup (Run in Supabase SQL editor with pg_cron)
 DO $$
 BEGIN
@@ -303,3 +301,61 @@ EXCEPTION WHEN OTHERS THEN
     NULL;
 END;
 $$;
+
+-- 6. Complementary PostgreSQL Idempotent Sync RPC
+CREATE OR REPLACE FUNCTION sync_offline_gate_pass(
+    p_pass_code TEXT,
+    p_lease_id UUID,
+    p_qr_signature TEXT,
+    p_dock_gate TEXT,
+    p_driver_name TEXT,
+    p_driver_license TEXT,
+    p_vehicle_plate TEXT,
+    p_valid_until TIMESTAMPTZ,
+    p_idempotency_key UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_existing_id UUID;
+BEGIN
+    -- Check if already inserted via pass_code or idempotency_key
+    SELECT id INTO v_existing_id
+    FROM public.gate_passes
+    WHERE pass_code = p_pass_code;
+
+    IF FOUND THEN
+        RETURN jsonb_build_object('success', true, 'replayed', true, 'id', v_existing_id);
+    END IF;
+
+    -- Insert confirmed record
+    INSERT INTO public.gate_passes (
+        pass_code,
+        lease_id,
+        merchant_id,
+        dock_gate,
+        driver_name,
+        driver_license,
+        vehicle_plate,
+        qr_signature,
+        valid_until,
+        status
+    ) VALUES (
+        p_pass_code,
+        p_lease_id,
+        auth.uid(),
+        p_dock_gate,
+        p_driver_name,
+        p_driver_license,
+        p_vehicle_plate,
+        p_qr_signature,
+        p_valid_until,
+        'issued'
+    ) RETURNING id INTO v_existing_id;
+
+    RETURN jsonb_build_object('success', true, 'replayed', false, 'id', v_existing_id);
+END;
+$$;
+

@@ -9,6 +9,7 @@ import '../core/auth/session_provider.dart';
 import '../core/auth/user_role.dart';
 
 import '../widgets/brand_logo.dart';
+import '../widgets/sync_status_badge.dart';
 import 'booking_page.dart';
 import 'payment_page.dart';
 import 'marketplace/public_marketplace_page.dart';
@@ -153,6 +154,7 @@ class _HomePageState extends State<HomePage> {
               const BrandLogo(height: 36, isLight: true),
               Row(
                 children: [
+                  const SyncStatusBadge(),
                   Consumer<LocaleProvider>(
                     builder: (context, localeProvider, _) {
                       final isAr = localeProvider.locale.languageCode == 'ar';
