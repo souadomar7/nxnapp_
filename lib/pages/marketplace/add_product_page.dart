@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +8,7 @@ import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import '../../models/marketplace_models.dart';
 import '../../providers/merchant_data_provider.dart';
+import '../../widgets/marketplace_image.dart';
 
 class AddProductPage extends StatefulWidget {
   final SmeProduct? product;
@@ -30,6 +32,7 @@ class AddProductPage extends StatefulWidget {
 
 class _AddProductPageState extends State<AddProductPage> {
   final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
   final _nameController = TextEditingController();
   final _nameArController = TextEditingController();
   final _descController = TextEditingController();
@@ -75,6 +78,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _nameController.dispose();
     _nameArController.dispose();
     _descController.dispose();
@@ -182,7 +186,12 @@ class _AddProductPageState extends State<AddProductPage> {
     if (source == null) return;
 
     try {
-      final XFile? picked = await _picker.pickImage(source: source, imageQuality: 75);
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 75,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
       if (picked != null) {
         setState(() {
           _imageFile = File(picked.path);
@@ -195,7 +204,38 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.orange.shade800,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  isAr
+                      ? 'يرجى إدخال سعر المنتج واسم المنتج بالكامل'
+                      : 'Please enter product title and retail price',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          140,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOut,
+        );
+      }
+      return;
+    }
     setState(() => _isLoading = true);
 
     try {
@@ -207,13 +247,19 @@ class _AddProductPageState extends State<AddProductPage> {
         final uploaded = await _service.uploadImage(_imageFile!);
         if (uploaded != null && uploaded.isNotEmpty) {
           photoUrl = uploaded;
+        } else {
+          try {
+            final bytes = await _imageFile!.readAsBytes();
+            photoUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+          } catch (_) {
+            photoUrl = _imageFile!.path;
+          }
         }
       }
 
       if (!mounted) {
         return;
       }
-      final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
       if (_isEditMode) {
         await _service.updateProduct(
@@ -315,6 +361,7 @@ class _AddProductPageState extends State<AddProductPage> {
         ],
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
         child: Form(
@@ -352,7 +399,7 @@ class _AddProductPageState extends State<AddProductPage> {
                         if (_imageFile != null)
                           Image.file(_imageFile!, fit: BoxFit.cover)
                         else if (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty)
-                          Image.network(_existingPhotoUrl!, fit: BoxFit.cover)
+                          MarketplaceImage(imagePath: _existingPhotoUrl, fit: BoxFit.cover)
                         else
                           Container(
                             decoration: BoxDecoration(
@@ -470,7 +517,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
               const SizedBox(height: 24),
 
-              // ── 3. PRODUCT INFORMATION CARD ─────────────────────────────
+              // ── 3. PRODUCT INFORMATION & PRICING CARD ───────────────────
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -488,7 +535,7 @@ class _AddProductPageState extends State<AddProductPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isAr ? 'معلومات المنتج' : 'Product Details',
+                      isAr ? 'معلومات وتسعير المنتج' : 'Product Details & Pricing',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 16),
@@ -506,60 +553,8 @@ class _AddProductPageState extends State<AddProductPage> {
                       validator: (v) => (v == null || v.trim().isEmpty) ? (isAr ? 'حقل مطلوب' : 'Required field') : null,
                     ),
                     const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _nameArController,
-                      decoration: InputDecoration(
-                        labelText: isAr ? 'اسم المنتج بالعربية (اختياري)' : 'Product Title (AR - Optional)',
-                        hintText: 'مثال: قهوة كولد برو فاخرة 500 مل',
-                        prefixIcon: const Icon(Icons.translate_rounded, color: Color(0xFF10AC84)),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _descController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: isAr ? 'وصف المنتج والمواصفات' : 'Description & Specifications',
-                        hintText: isAr ? 'اكتب تفاصيل وميزات المنتج للمشتري...' : 'Enter product features, ingredients, or specifications...',
-                        prefixIcon: const Icon(Icons.notes_rounded, color: Colors.grey),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 20),
-
-              // ── 4. PRICING & STOCK CONTROLLER ────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAr ? 'التسعير والمخزون' : 'Pricing & Inventory',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
-                    ),
-                    const SizedBox(height: 16),
+                    // Retail Price and Estimated Net in direct prominence
                     Row(
                       children: [
                         Expanded(
@@ -568,7 +563,7 @@ class _AddProductPageState extends State<AddProductPage> {
                             controller: _priceController,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             decoration: InputDecoration(
-                              labelText: isAr ? 'سعر البيع *' : 'Retail Price *',
+                              labelText: isAr ? 'سعر البيع المطلوب *' : 'Retail Price *',
                               hintText: '0.00',
                               prefixIcon: Container(
                                 padding: const EdgeInsets.all(12),
@@ -616,7 +611,8 @@ class _AddProductPageState extends State<AddProductPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
+
                     // Stock Counter Stepper
                     Text(
                       isAr ? 'الكمية المتوفرة في المخزون' : 'Available Stock Quantity',
@@ -656,6 +652,34 @@ class _AddProductPageState extends State<AddProductPage> {
                           _stepBtn(icon: Icons.add, onPressed: () => _adjustQuantity(1)),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _nameArController,
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'اسم المنتج بالعربية (اختياري)' : 'Product Title (AR - Optional)',
+                        hintText: 'مثال: قهوة كولد برو فاخرة 500 مل',
+                        prefixIcon: const Icon(Icons.translate_rounded, color: Color(0xFF10AC84)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _descController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: isAr ? 'وصف المنتج والمواصفات' : 'Description & Specifications',
+                        hintText: isAr ? 'اكتب تفاصيل وميزات المنتج للمشتري...' : 'Enter product features, ingredients, or specifications...',
+                        prefixIcon: const Icon(Icons.notes_rounded, color: Colors.grey),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                      onChanged: (_) => setState(() {}),
                     ),
                   ],
                 ),
@@ -708,21 +732,22 @@ class _AddProductPageState extends State<AddProductPage> {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 60,
+                              height: 60,
                               color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                              image: _imageFile != null
-                                  ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover)
-                                  : (_existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty
-                                      ? DecorationImage(image: NetworkImage(_existingPhotoUrl!), fit: BoxFit.cover)
-                                      : null),
+                              child: _imageFile != null
+                                  ? Image.file(_imageFile!, fit: BoxFit.cover)
+                                  : MarketplaceImage(
+                                      imagePath: _existingPhotoUrl,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                      defaultIcon: Icons.shopping_bag_outlined,
+                                    ),
                             ),
-                            child: (_imageFile == null && (_existingPhotoUrl == null || _existingPhotoUrl!.isEmpty))
-                                ? const Icon(Icons.shopping_bag_outlined, color: Colors.grey)
-                                : null,
                           ),
                           const SizedBox(width: 14),
                           Expanded(

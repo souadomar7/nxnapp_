@@ -15,6 +15,7 @@ import 'seller_orders_page.dart';
 import 'seller_products_page.dart';
 import 'add_product_page.dart';
 import 'home_seller_marketplace_hub.dart';
+import '../../widgets/marketplace_image.dart';
 import '../booking_page.dart';
 import '../copilot_page.dart';
 import '../notifications_page.dart';
@@ -415,19 +416,10 @@ class _ProductGridCard extends StatelessWidget {
                 height: 120,
                 width: double.infinity,
                 color: Colors.grey.shade100,
-                child: product.photoUrl != null
-                    ? Image.network(
-                        product.photoUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(Icons.inventory_2_outlined,
-                              size: 40, color: Colors.grey),
-                        ),
-                      )
-                    : const Center(
-                        child: Icon(Icons.inventory_2_outlined,
-                            size: 40, color: Colors.grey),
-                      ),
+                child: MarketplaceImage(
+                  imagePath: product.photoUrl,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
 

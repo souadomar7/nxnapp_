@@ -12,6 +12,7 @@ import '../../services/payment_service.dart';
 import '../operations/order_tracking_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/validators.dart';
+import '../../widgets/marketplace_image.dart';
 
 class PublicProductDetailPage extends StatefulWidget {
   final SmeProduct product;
@@ -127,19 +128,19 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              width: 50,
+                              height: 50,
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              image: widget.product.photoUrl != null && widget.product.photoUrl!.isNotEmpty
-                                  ? DecorationImage(image: NetworkImage(widget.product.photoUrl!), fit: BoxFit.cover)
-                                  : null,
+                              child: MarketplaceImage(
+                                imagePath: widget.product.photoUrl,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              ),
                             ),
-                            child: widget.product.photoUrl == null || widget.product.photoUrl!.isEmpty
-                                ? const Icon(Icons.inventory_2_outlined, color: Colors.grey, size: 24)
-                                : null,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -819,10 +820,10 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                     ),
                   ),
                   child: hasImage
-                      ? Image.network(
-                          widget.product.photoUrl!,
+                      ? MarketplaceImage(
+                          imagePath: widget.product.photoUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildFallbackShowcase(categoryName, isAr),
+                          placeholder: _buildFallbackShowcase(categoryName, isAr),
                         )
                       : _buildFallbackShowcase(categoryName, isAr),
                 ),

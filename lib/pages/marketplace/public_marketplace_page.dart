@@ -7,6 +7,7 @@ import '../../services/marketplace_service.dart';
 import '../../models/marketplace_models.dart';
 import 'public_product_detail_page.dart';
 import 'cart_page.dart';
+import '../../widgets/marketplace_image.dart';
 
 class PublicMarketplacePage extends StatefulWidget {
   const PublicMarketplacePage({super.key});
@@ -749,29 +750,28 @@ class _ProductCardState extends State<_ProductCard>
                   child: Stack(
                     children: [
                       // Image / Placeholder
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                          gradient: product.photoUrl == null
-                              ? LinearGradient(
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: double.infinity,
+                          child: MarketplaceImage(
+                            imagePath: product.photoUrl,
+                            fit: BoxFit.cover,
+                            placeholder: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [accent.withValues(alpha: 0.08), accent.withValues(alpha: 0.18)],
-                                )
-                              : null,
-                          image: product.photoUrl != null
-                              ? DecorationImage(
-                                  image: NetworkImage(product.photoUrl!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: product.photoUrl == null
-                            ? Center(
+                                ),
+                              ),
+                              child: Center(
                                 child: Icon(_productIcon(), size: 44, color: accent.withValues(alpha: 0.5)),
-                              )
-                            : null,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
 
                       // Favorite Button

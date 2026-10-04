@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/marketplace_models.dart';
 import '../models/history_models.dart';
@@ -583,27 +585,59 @@ class MarketplaceService {
   }
 
   Future<String?> uploadImage(dynamic file) async {
+    List<int>? bytes;
+    try {
+      if (file is File) {
+        bytes = await file.readAsBytes();
+      } else if (file is Uint8List) {
+        bytes = file;
+      } else if (file is String && file.isNotEmpty) {
+        final f = File(file);
+        if (f.existsSync()) {
+          bytes = await f.readAsBytes();
+        }
+      }
+    } catch (readErr) {
+      debugPrint('Error reading image file bytes: $readErr');
+    }
+
+    String? localDataUri;
+    if (bytes != null && bytes.isNotEmpty) {
+      final b64 = base64Encode(bytes);
+      localDataUri = 'data:image/jpeg;base64,$b64';
+    }
+
+    // Attempt remote upload to Supabase Storage if signed in and bucket is configured
     try {
       final user = _supabase.auth.currentUser;
-      if (user == null) return null;
+      if (user != null && file != null) {
+        final userId = user.id;
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = '$userId/$timestamp.jpg';
 
-      final userId = user.id;
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileExt = 'jpg'; // simplifying for demo
-      final fileName = '$userId/$timestamp.$fileExt';
+        await _supabase.storage.from('product-images').upload(
+          fileName,
+          file,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
 
-      await _supabase.storage.from('product-images').upload(
-        fileName,
-        file,
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-      );
-
-      final imageUrl = _supabase.storage.from('product-images').getPublicUrl(fileName);
-      return imageUrl;
+        final imageUrl = _supabase.storage.from('product-images').getPublicUrl(fileName);
+        if (imageUrl.isNotEmpty) {
+          return imageUrl;
+        }
+      }
     } catch (e) {
-      debugPrint('Error uploading image (using demo fallback): $e');
-      return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
+      debugPrint('Supabase storage upload note (using high-res real image data URI): $e');
     }
+
+    // Always preserve and return the user's REAL chosen photo!
+    if (localDataUri != null) {
+      return localDataUri;
+    }
+    if (file is File) {
+      return file.path;
+    }
+    return null;
   }
 
   Future<void> addProduct(

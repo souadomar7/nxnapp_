@@ -5,6 +5,7 @@ import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import '../../models/marketplace_models.dart';
 import 'add_product_page.dart';
+import '../../widgets/marketplace_image.dart';
 
 class SellerProductsPage extends StatefulWidget {
   const SellerProductsPage({super.key});
@@ -478,16 +479,12 @@ class _SellerProductsPageState extends State<SellerProductsPage> {
                                         width: 80,
                                         height: 80,
                                         color: Colors.grey.shade100,
-                                        child: product.photoUrl != null && product.photoUrl!.isNotEmpty
-                                            ? Image.network(
-                                                product.photoUrl!,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) => const Icon(
-                                                  Icons.image_not_supported_outlined,
-                                                  color: Colors.grey,
-                                                ),
-                                              )
-                                            : const Icon(Icons.inventory_2_outlined, color: Colors.grey),
+                                        child: MarketplaceImage(
+                                          imagePath: product.photoUrl,
+                                          width: 80,
+                                          height: 80,
+                                          fit: BoxFit.cover,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 14),

@@ -9,6 +9,7 @@ import '../../services/payment_service.dart';
 import '../../models/invoice.dart';
 import '../operations/order_tracking_page.dart';
 import '../../core/utils/validators.dart';
+import '../../widgets/marketplace_image.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -887,7 +888,6 @@ class _CartPageState extends State<CartPage> {
         ...cart.items.map((item) {
           final prod = item.product;
           final prodName = prod.getLocalizedName(isAr);
-          final hasImage = prod.photoUrl != null && prod.photoUrl!.isNotEmpty;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -904,17 +904,19 @@ class _CartPageState extends State<CartPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Product Thumbnail
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    width: 80,
+                    height: 80,
                     color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(14),
-                    image: hasImage ? DecorationImage(image: NetworkImage(prod.photoUrl!), fit: BoxFit.cover) : null,
+                    child: MarketplaceImage(
+                      imagePath: prod.photoUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                  child: !hasImage
-                      ? const Center(child: Icon(Icons.inventory_2_outlined, color: AppColors.bluePrimary, size: 32))
-                      : null,
                 ),
 
                 const SizedBox(width: 12),
