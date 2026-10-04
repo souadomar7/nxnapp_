@@ -33,7 +33,7 @@ class SupabaseInventoryService implements InventoryService {
     for (var item in inventory) {
       if (item.status == 'in_stock') {
         if (item.quantity > 0) {
-          inStock += item.quantity;
+          inStock += item.quantity.toInt();
           if (item.quantity < 10) {
             lowStock++; // items that are running low
           }
@@ -49,9 +49,9 @@ class SupabaseInventoryService implements InventoryService {
       inStock: inStock, // Or use stats['items']
       lowStock: lowStock, 
       outOfStock: outOfStock,
-      suppliers: stats['shelves'] as int, // Reuse 'suppliers' field for 'shelves count' to avoid UI break or rename it
-      totalValue: (stats['totalValue'] as num).toDouble() == 0 ? 24500.0 : (stats['totalValue'] as num).toDouble(),
-      activeRentals: stats['activeRentals'] as List<dynamic>,
+      suppliers: stats['shelves'] as int? ?? 0,
+      totalValue: (stats['totalValue'] as num?)?.toDouble() ?? 0.0,
+      activeRentals: (stats['activeRentals'] as List<dynamic>?) ?? [],
     );
   }
 
@@ -64,14 +64,7 @@ class SupabaseInventoryService implements InventoryService {
     inventory.sort((a, b) => b.quantity.compareTo(a.quantity));
     
     if (inventory.isEmpty) {
-      // Return demo data if no inventory exists
-      return [
-        const StockPoint('Electronics', 120),
-        const StockPoint('Clothing', 80),
-        const StockPoint('Home', 60),
-        const StockPoint('Beauty', 45),
-        const StockPoint('Toys', 30),
-      ];
+      return [];
     }
 
     final top = inventory.take(5);

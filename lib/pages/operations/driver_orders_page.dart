@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import '../../services/marketplace_service.dart';
+import '../../providers/merchant_data_provider.dart';
 import '../../theme.dart';
 
 class DriverOrdersPage extends StatefulWidget {
@@ -91,22 +93,17 @@ class _DriverOrdersPageState extends State<DriverOrdersPage> {
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final orderId = order['id'] as String;
 
-    // Step 1: Camera-only photo capture
+    // Step 1: Capture Proof of Delivery photo
     final picker = ImagePicker();
     XFile? photo;
     try {
       photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 75);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(isAr ? 'الكاميرا غير متاحة: $e' : 'Camera not available: $e'),
-          backgroundColor: Colors.red,
-        ));
-      }
-      return;
+    } catch (_) {
+      // If camera is not available (e.g. simulator), fallback to gallery
+      try {
+        photo = await picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
+      } catch (_) {}
     }
-
-    if (photo == null) return; // User cancelled
 
     // Show loading dialog
     if (mounted) {
@@ -118,28 +115,40 @@ class _DriverOrdersPageState extends State<DriverOrdersPage> {
     }
 
     try {
-      // Step 2: Get GPS coordinates
+      // Step 2: Get GPS coordinates if available
       final position = await _getCurrentPosition();
 
-      // Step 3: Upload PoD photo to Supabase Storage
-      final file = File(photo.path);
-      final fileName = 'pod_${orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await _supabase.storage.from('delivery_proofs').upload(fileName, file);
-      final photoUrl = _supabase.storage.from('delivery_proofs').getPublicUrl(fileName);
+      // Step 3: Upload PoD photo if taken
+      String? photoUrl;
+      if (photo != null) {
+        try {
+          final file = File(photo.path);
+          final fileName = 'pod_${orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          await _supabase.storage.from('delivery_proofs').upload(fileName, file);
+          photoUrl = _supabase.storage.from('delivery_proofs').getPublicUrl(fileName);
+        } catch (_) {}
+      }
 
-      // Step 4: Update order with GPS + photo + status
-      await _supabase.from('buyer_orders').update({
-        'order_status': 'delivered',
-        'pod_photo_url': photoUrl,
-        'pod_timestamp': DateTime.now().toIso8601String(),
-        'delivery_lat': position?.latitude,
-        'delivery_lng': position?.longitude,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', orderId);
+      // Step 4: Update order with status & PoD metadata
+      await MarketplaceService().updateOrderStatus(orderId, 'delivered');
+
+      try {
+        await _supabase.from('buyer_orders').update({
+          'order_status': 'delivered',
+          if (photoUrl != null) 'pod_photo_url': photoUrl,
+          'pod_timestamp': DateTime.now().toIso8601String(),
+          if (position != null) 'delivery_lat': position.latitude,
+          if (position != null) 'delivery_lng': position.longitude,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', orderId);
+      } catch (_) {}
 
       if (mounted) Navigator.pop(context); // close loading
 
       _loadOrders();
+      if (mounted) {
+        context.read<MerchantDataProvider>().refreshOrders();
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

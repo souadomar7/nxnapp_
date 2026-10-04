@@ -77,6 +77,20 @@ ALTER TABLE sme_sellers ADD COLUMN IF NOT EXISTS uae_pass_uuid TEXT;
 ALTER TABLE sme_sellers ADD COLUMN IF NOT EXISTS selected_warehouse_id TEXT REFERENCES warehouses(id) ON DELETE SET NULL;
 ALTER TABLE sme_sellers ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP WITH TIME ZONE;
 
+-- Canonical profiles table
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id                UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name         TEXT,
+    phone             TEXT,
+    role              TEXT DEFAULT 'customer',
+    status            TEXT DEFAULT 'active',
+    kyc_status        TEXT DEFAULT 'basic',
+    terms_accepted_at TIMESTAMP WITH TIME ZONE,
+    terms_version     TEXT,
+    warehouse_id      TEXT REFERENCES warehouses(id) ON DELETE SET NULL,
+    created_at        TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
+);
+
 -- ==============================================================================
 -- 3. PRODUCT CATALOGUE — v3: +name_ar, +quantity, +is_hidden, +hidden_reason
 -- ==============================================================================
@@ -88,6 +102,7 @@ CREATE TABLE IF NOT EXISTS sme_products (
     description TEXT,
     price       NUMERIC(10,2) NOT NULL,
     photo_url   TEXT,
+    category    TEXT,
     quantity    INTEGER NOT NULL DEFAULT 0,
     is_hidden   BOOLEAN DEFAULT false NOT NULL,
     hidden_reason TEXT,
@@ -96,6 +111,7 @@ CREATE TABLE IF NOT EXISTS sme_products (
 
 -- Migration
 ALTER TABLE sme_products ADD COLUMN IF NOT EXISTS name_ar TEXT;
+ALTER TABLE sme_products ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE sme_products ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE sme_products ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT false NOT NULL;
 ALTER TABLE sme_products ADD COLUMN IF NOT EXISTS hidden_reason TEXT;
@@ -179,6 +195,9 @@ CREATE TABLE IF NOT EXISTS sme_invoices (
     stripe_payment_id   TEXT,
     created_at          TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL
 );
+
+-- Migration
+ALTER TABLE sme_invoices ADD COLUMN IF NOT EXISTS warehouse_name_ar TEXT;
 
 -- ==============================================================================
 -- 8. OUTBOUND ORDERS — v3: +product_id, +customer_phone, +customer_email,
@@ -395,7 +414,36 @@ CREATE TRIGGER on_auth_user_created
 -- ALTER PUBLICATION supabase_realtime ADD TABLE buyer_orders;
 
 -- ==============================================================================
--- 4. RPC STORED PROCEDURES (Subscription Cancellation & Offline Gate Pass Sync)
+-- 4. DOCK GATE PASSES TABLE (Gate Security & Offline Admission State)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.dock_gate_passes (
+    id              TEXT PRIMARY KEY,
+    pass_code       TEXT NOT NULL,
+    lease_id        TEXT,
+    qr_signature    TEXT NOT NULL,
+    dock_gate       TEXT NOT NULL,
+    driver_name     TEXT,
+    driver_license  TEXT,
+    vehicle_plate   TEXT,
+    valid_until     TIMESTAMP WITH TIME ZONE NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'admitted'
+                        CHECK (status IN ('pending', 'admitted', 'expired', 'revoked')),
+    sync_count      INTEGER NOT NULL DEFAULT 1,
+    synced_at       TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL,
+    last_synced_at  TIMESTAMP WITH TIME ZONE,
+    synced_by       UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE public.dock_gate_passes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own dock passes"
+  ON public.dock_gate_passes FOR SELECT USING (auth.uid() = synced_by);
+
+CREATE POLICY "Service roles and staff can manage dock passes"
+  ON public.dock_gate_passes FOR ALL USING (true);
+
+-- ==============================================================================
+-- 5. RPC STORED PROCEDURES (Hardened Cancellation & Offline Gate Pass Sync)
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION public.request_subscription_cancellation(
@@ -406,42 +454,60 @@ CREATE OR REPLACE FUNCTION public.request_subscription_cancellation(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
+    v_seller_id UUID;
     v_has_stock BOOLEAN := false;
     v_has_outbound BOOLEAN := false;
-    v_end_date TIMESTAMP WITH TIME ZONE;
+    v_effective_end TIMESTAMPTZ;
 BEGIN
-    v_end_date := timezone('utc', now()) + INTERVAL '14 days';
+    v_seller_id := auth.uid();
+    IF v_seller_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'UNAUTHORIZED: Valid session required');
+    END IF;
 
-    -- Check if seller has in-stock items
+    -- Validate subscription ownership
+    IF NOT EXISTS (
+        SELECT 1 FROM public.sme_subscriptions 
+        WHERE id = p_subscription_id AND seller_id = v_seller_id
+    ) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'SUBSCRIPTION_NOT_FOUND');
+    END IF;
+
+    v_effective_end := timezone('utc', now()) + INTERVAL '14 days';
+
+    -- Check physical stock & pending outbound orders
     SELECT EXISTS (
         SELECT 1 FROM public.sme_inventory 
-        WHERE seller_id = auth.uid() AND quantity > 0 AND status != 'cleared'
+        WHERE seller_id = v_seller_id AND quantity > 0 AND status != 'cleared'
     ) INTO v_has_stock;
 
-    -- Check if seller has pending outbound orders
     SELECT EXISTS (
         SELECT 1 FROM public.sme_orders
-        WHERE seller_id = auth.uid() AND status IN ('pending', 'pending_dispatch', 'in_transit')
+        WHERE seller_id = v_seller_id AND status IN ('pending', 'pending_dispatch', 'in_transit')
     ) INTO v_has_outbound;
 
-    -- Update subscription record if table exists
+    -- Apply cancellation terms
     UPDATE public.sme_subscriptions
     SET auto_renew = false,
         cancellation_pending = true,
+        refund_model = p_refund_model,
         refund_amount = p_refund_amount,
-        end_date = v_end_date
-    WHERE id = p_subscription_id AND seller_id = auth.uid();
+        end_date = v_effective_end,
+        updated_at = timezone('utc', now())
+    WHERE id = p_subscription_id AND seller_id = v_seller_id;
 
     RETURN jsonb_build_object(
         'success', true,
         'status', 'cancellation_pending',
         'has_physical_stock', v_has_stock,
         'has_pending_outbound', v_has_outbound,
-        'effective_end_date', v_end_date,
+        'effective_end_date', v_effective_end,
         'refund_amount', p_refund_amount
     );
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$;
 
@@ -459,14 +525,35 @@ CREATE OR REPLACE FUNCTION public.sync_offline_gate_pass(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
+DECLARE
+    v_user_id UUID;
+    v_sync_key TEXT;
 BEGIN
-    -- Log / Insert to offline sync audit
+    v_user_id := auth.uid();
+    v_sync_key := COALESCE(p_idempotency_key, p_pass_code);
+
+    -- 1. Ensure target gate pass table records the synced admission
+    INSERT INTO public.dock_gate_passes (
+        id, pass_code, lease_id, qr_signature, dock_gate, 
+        driver_name, driver_license, vehicle_plate, valid_until, 
+        status, synced_at, synced_by
+    ) VALUES (
+        v_sync_key, p_pass_code, p_lease_id, p_qr_signature, p_dock_gate,
+        p_driver_name, p_driver_license, p_vehicle_plate, p_valid_until::timestamptz,
+        'admitted', timezone('utc', now()), v_user_id
+    )
+    ON CONFLICT (id) DO UPDATE 
+    SET sync_count = public.dock_gate_passes.sync_count + 1,
+        last_synced_at = timezone('utc', now());
+
+    -- 2. Log activity audit trail
     INSERT INTO public.dashboard_activities (
         id, seller_id, title, title_ar, subtitle, subtitle_ar, date, type
     ) VALUES (
-        COALESCE(p_idempotency_key, gen_random_uuid()::text),
-        auth.uid(),
+        'act_' || v_sync_key,
+        v_user_id,
         'Offline Gate Pass Synced: ' || p_pass_code,
         'مزامنة تصريح دخول: ' || p_pass_code,
         'Driver: ' || p_driver_name || ' (' || p_vehicle_plate || ') | Gate: ' || p_dock_gate,
@@ -476,8 +563,560 @@ BEGIN
     )
     ON CONFLICT (id) DO NOTHING;
 
-    RETURN jsonb_build_object('success', true, 'pass_code', p_pass_code);
+    RETURN jsonb_build_object(
+        'success', true, 
+        'pass_code', p_pass_code,
+        'idempotency_key', v_sync_key
+    );
 EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$;
+
+-- ==============================================================================
+-- 15. MERCHANT WALLET, ESCROW & DOUBLE-ENTRY LEDGER SYSTEM (FINTECH SPEC)
+-- ==============================================================================
+
+-- 1. Merchants Table
+CREATE TABLE IF NOT EXISTS public.merchants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+    business_name VARCHAR(255) NOT NULL,
+    trade_license_number VARCHAR(100) NOT NULL,
+    vat_number VARCHAR(50),
+    bank_name VARCHAR(100),
+    bank_account_holder_name VARCHAR(255),
+    bank_iban VARCHAR(34),
+    bank_swift_bic VARCHAR(11),
+    payout_schedule VARCHAR(20) NOT NULL DEFAULT 'manual' 
+        CHECK (payout_schedule IN ('manual', 'daily', 'weekly', 'biweekly', 'monthly')),
+    is_payout_enabled BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
+);
+
+-- 2. In-App Merchant Wallets
+CREATE TABLE IF NOT EXISTS public.wallets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    merchant_id UUID NOT NULL UNIQUE REFERENCES public.merchants(id) ON DELETE RESTRICT,
+    currency CHAR(3) NOT NULL DEFAULT 'AED',
+    available_balance_cents BIGINT NOT NULL DEFAULT 0 CHECK (available_balance_cents >= 0),
+    pending_escrow_cents BIGINT NOT NULL DEFAULT 0 CHECK (pending_escrow_cents >= 0),
+    locked_payout_cents BIGINT NOT NULL DEFAULT 0 CHECK (locked_payout_cents >= 0),
+    lifetime_earnings_cents BIGINT NOT NULL DEFAULT 0 CHECK (lifetime_earnings_cents >= 0),
+    lifetime_payouts_cents BIGINT NOT NULL DEFAULT 0 CHECK (lifetime_payouts_cents >= 0),
+    min_withdrawal_threshold_cents BIGINT NOT NULL DEFAULT 5000 CHECK (min_withdrawal_threshold_cents >= 1000),
+    version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
+);
+
+-- 3. Multi-Vendor Platform Orders & Escrow Lifecycle
+CREATE TABLE IF NOT EXISTS public.orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_number VARCHAR(64) NOT NULL UNIQUE,
+    merchant_id UUID NOT NULL REFERENCES public.merchants(id) ON DELETE RESTRICT,
+    customer_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    currency CHAR(3) NOT NULL DEFAULT 'AED',
+    gross_amount_cents BIGINT NOT NULL CHECK (gross_amount_cents > 0),
+    platform_fee_percent NUMERIC(5, 2) NOT NULL DEFAULT 5.00,
+    platform_fee_cents BIGINT NOT NULL DEFAULT 0 CHECK (platform_fee_cents >= 0),
+    payment_processing_fee_cents BIGINT NOT NULL DEFAULT 0 CHECK (payment_processing_fee_cents >= 0),
+    net_merchant_amount_cents BIGINT NOT NULL CHECK (net_merchant_amount_cents >= 0),
+    payment_status VARCHAR(30) NOT NULL DEFAULT 'pending' 
+        CHECK (payment_status IN ('pending', 'captured', 'failed', 'refunded', 'disputed')),
+    fulfillment_status VARCHAR(30) NOT NULL DEFAULT 'unfulfilled'
+        CHECK (fulfillment_status IN ('unfulfilled', 'in_preparation', 'ready_for_pickup', 'in_transit', 'delivered', 'returned', 'cancelled')),
+    escrow_status VARCHAR(30) NOT NULL DEFAULT 'held'
+        CHECK (escrow_status IN ('held', 'eligible_for_release', 'released_to_available', 'refunded_to_customer')),
+    return_window_closes_at TIMESTAMPTZ,
+    escrow_released_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
+);
+
+-- 4. Payout Requests
+CREATE TABLE IF NOT EXISTS public.payout_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reference_id VARCHAR(64) NOT NULL UNIQUE,
+    merchant_id UUID NOT NULL REFERENCES public.merchants(id) ON DELETE RESTRICT,
+    wallet_id UUID NOT NULL REFERENCES public.wallets(id) ON DELETE RESTRICT,
+    currency CHAR(3) NOT NULL DEFAULT 'AED',
+    amount_cents BIGINT NOT NULL CHECK (amount_cents > 0),
+    payout_fee_cents BIGINT NOT NULL DEFAULT 0 CHECK (payout_fee_cents >= 0),
+    net_payout_amount_cents BIGINT NOT NULL CHECK (net_payout_amount_cents > 0),
+    status VARCHAR(30) NOT NULL DEFAULT 'requested'
+        CHECK (status IN ('requested', 'pending_approval', 'approved', 'processing_gateway', 'dispatched', 'paid', 'rejected', 'failed', 'cancelled')),
+    idempotency_key VARCHAR(128) NOT NULL UNIQUE,
+    destination_bank_name VARCHAR(100) NOT NULL,
+    destination_iban VARCHAR(34) NOT NULL,
+    gateway_name VARCHAR(50) DEFAULT 'Fintx',
+    gateway_transfer_reference VARCHAR(128),
+    failure_reason TEXT,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+    approved_at TIMESTAMPTZ,
+    processed_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ
+);
+
+-- 5. Double-Entry Wallet Transactions & Immutable Ledger
+CREATE TABLE IF NOT EXISTS public.wallet_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transaction_ref VARCHAR(64) NOT NULL UNIQUE,
+    wallet_id UUID NOT NULL REFERENCES public.wallets(id) ON DELETE RESTRICT,
+    merchant_id UUID NOT NULL REFERENCES public.merchants(id) ON DELETE RESTRICT,
+    type VARCHAR(40) NOT NULL 
+        CHECK (type IN (
+            'escrow_credit', 'escrow_to_available', 'escrow_reversal_refund',
+            'payout_lock', 'payout_settled', 'payout_unlock_reversal',
+            'manual_platform_adjustment_credit', 'manual_platform_adjustment_debit',
+            'platform_storage_fee_deduction'
+        )),
+    source_event VARCHAR(50) NOT NULL,
+    related_order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
+    related_payout_id UUID REFERENCES public.payout_requests(id) ON DELETE SET NULL,
+    currency CHAR(3) NOT NULL DEFAULT 'AED',
+    amount_cents BIGINT NOT NULL,
+    balance_bucket VARCHAR(20) NOT NULL CHECK (balance_bucket IN ('available', 'pending_escrow', 'locked_payout')),
+    running_available_cents BIGINT NOT NULL,
+    running_escrow_cents BIGINT NOT NULL,
+    running_locked_cents BIGINT NOT NULL,
+    description TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
+);
+
+-- 6. Payout State Transition & Audit Log
+CREATE TABLE IF NOT EXISTS public.payout_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    payout_id UUID NOT NULL REFERENCES public.payout_requests(id) ON DELETE CASCADE,
+    from_status VARCHAR(30) NOT NULL,
+    to_status VARCHAR(30) NOT NULL,
+    actor_id UUID,
+    actor_role VARCHAR(50) NOT NULL DEFAULT 'system',
+    notes TEXT,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
+);
+
+-- Indices for High-Throughput Queries
+CREATE INDEX IF NOT EXISTS idx_wallets_merchant_id ON public.wallets(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_orders_merchant_escrow ON public.orders(merchant_id, escrow_status);
+CREATE INDEX IF NOT EXISTS idx_payout_requests_merchant ON public.payout_requests(merchant_id, status);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_wallet_id ON public.wallet_transactions(wallet_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_order ON public.wallet_transactions(related_order_id);
+
+-- ==============================================================================
+-- 16. ATOMIC PL/PGSQL PROCEDURES WITH PESSIMISTIC LOCKING
+-- ==============================================================================
+
+-- Stored Procedure 1: Atomic Escrow Release to Available Balance
+CREATE OR REPLACE FUNCTION public.process_order_escrow_release(
+    p_order_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_order RECORD;
+    v_wallet RECORD;
+    v_tx_ref TEXT;
+BEGIN
+    -- 1. Lock the order row
+    SELECT * INTO v_order
+    FROM public.orders
+    WHERE id = p_order_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'ORDER_NOT_FOUND', 'message', 'Order not found');
+    END IF;
+
+    IF v_order.escrow_status = 'released_to_available' THEN
+        RETURN jsonb_build_object('success', true, 'message', 'Escrow already released', 'order_id', p_order_id);
+    END IF;
+
+    IF v_order.fulfillment_status != 'delivered' THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'NOT_DELIVERED', 'message', 'Order is not delivered yet');
+    END IF;
+
+    -- 2. Lock the associated merchant wallet
+    SELECT * INTO v_wallet
+    FROM public.wallets
+    WHERE merchant_id = v_order.merchant_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'WALLET_NOT_FOUND', 'message', 'Merchant wallet missing');
+    END IF;
+
+    -- 3. Update Wallet Balances (Atomic Shift)
+    UPDATE public.wallets
+    SET 
+        pending_escrow_cents = pending_escrow_cents - v_order.net_merchant_amount_cents,
+        available_balance_cents = available_balance_cents + v_order.net_merchant_amount_cents,
+        lifetime_earnings_cents = lifetime_earnings_cents + v_order.net_merchant_amount_cents,
+        version = version + 1,
+        updated_at = timezone('utc', now())
+    WHERE id = v_wallet.id;
+
+    -- 4. Mark Order Escrow Released
+    UPDATE public.orders
+    SET 
+        escrow_status = 'released_to_available',
+        escrow_released_at = timezone('utc', now()),
+        updated_at = timezone('utc', now())
+    WHERE id = p_order_id;
+
+    -- 5. Record Double-Entry Ledger Entry
+    v_tx_ref := 'TX-REL-' || UPPER(SUBSTRING(gen_random_uuid()::text, 1, 8));
+    INSERT INTO public.wallet_transactions (
+        transaction_ref, wallet_id, merchant_id, type, source_event,
+        related_order_id, currency, amount_cents, balance_bucket,
+        running_available_cents, running_escrow_cents, running_locked_cents, description
+    ) VALUES (
+        v_tx_ref, v_wallet.id, v_order.merchant_id, 'escrow_to_available', 'order_fulfilled',
+        v_order.id, v_order.currency, v_order.net_merchant_amount_cents, 'available',
+        v_wallet.available_balance_cents + v_order.net_merchant_amount_cents,
+        v_wallet.pending_escrow_cents - v_order.net_merchant_amount_cents,
+        v_wallet.locked_payout_cents,
+        'Escrow funds released for delivered Order #' || v_order.order_number
+    );
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'order_id', p_order_id,
+        'net_amount_released_cents', v_order.net_merchant_amount_cents,
+        'transaction_ref', v_tx_ref
+    );
+END;
+$$;
+
+-- Stored Procedure 2: Atomic Payout Request & Balance Locking
+CREATE OR REPLACE FUNCTION public.request_merchant_payout(
+    p_merchant_id UUID,
+    p_amount_cents BIGINT,
+    p_idempotency_key VARCHAR(128)
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_wallet RECORD;
+    v_merchant RECORD;
+    v_existing_payout RECORD;
+    v_payout_id UUID;
+    v_payout_ref TEXT;
+    v_tx_ref TEXT;
+BEGIN
+    -- Idempotency Check
+    SELECT * INTO v_existing_payout
+    FROM public.payout_requests
+    WHERE idempotency_key = p_idempotency_key;
+
+    IF FOUND THEN
+        RETURN jsonb_build_object(
+            'success', true,
+            'is_duplicate', true,
+            'payout_id', v_existing_payout.id,
+            'reference_id', v_existing_payout.reference_id,
+            'status', v_existing_payout.status
+        );
+    END IF;
+
+    -- Fetch merchant bank details
+    SELECT * INTO v_merchant FROM public.merchants WHERE id = p_merchant_id;
+    IF NOT FOUND OR v_merchant.bank_iban IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'INVALID_BANK_DETAILS', 'message', 'Merchant bank details missing or incomplete');
+    END IF;
+
+    IF NOT v_merchant.is_payout_enabled THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'PAYOUTS_DISABLED', 'message', 'Payouts are currently disabled for this merchant');
+    END IF;
+
+    -- Lock the wallet row
+    SELECT * INTO v_wallet
+    FROM public.wallets
+    WHERE merchant_id = p_merchant_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'WALLET_NOT_FOUND', 'message', 'Merchant wallet not found');
+    END IF;
+
+    -- Validate Threshold & Available Balance
+    IF p_amount_cents < v_wallet.min_withdrawal_threshold_cents THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error_code', 'BELOW_MIN_THRESHOLD', 
+            'message', 'Withdrawal amount must be at least AED ' || (v_wallet.min_withdrawal_threshold_cents / 100)::text
+        );
+    END IF;
+
+    IF v_wallet.available_balance_cents < p_amount_cents THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error_code', 'INSUFFICIENT_FUNDS', 
+            'message', 'Insufficient available balance'
+        );
+    END IF;
+
+    -- Deduct from available, lock in payout bucket
+    UPDATE public.wallets
+    SET 
+        available_balance_cents = available_balance_cents - p_amount_cents,
+        locked_payout_cents = locked_payout_cents + p_amount_cents,
+        version = version + 1,
+        updated_at = timezone('utc', now())
+    WHERE id = v_wallet.id;
+
+    -- Insert Payout Record
+    v_payout_id := gen_random_uuid();
+    v_payout_ref := 'PO-' || TO_CHAR(now(), 'YYYYMMDD') || '-' || UPPER(SUBSTRING(v_payout_id::text, 1, 6));
+
+    INSERT INTO public.payout_requests (
+        id, reference_id, merchant_id, wallet_id, currency,
+        amount_cents, payout_fee_cents, net_payout_amount_cents,
+        status, idempotency_key, destination_bank_name, destination_iban, gateway_name
+    ) VALUES (
+        v_payout_id, v_payout_ref, p_merchant_id, v_wallet.id, v_wallet.currency,
+        p_amount_cents, 0, p_amount_cents,
+        'requested', p_idempotency_key, v_merchant.bank_name, v_merchant.bank_iban, 'Fintx'
+    );
+
+    -- Record Ledger Transaction
+    v_tx_ref := 'TX-LCK-' || UPPER(SUBSTRING(gen_random_uuid()::text, 1, 8));
+    INSERT INTO public.wallet_transactions (
+        transaction_ref, wallet_id, merchant_id, type, source_event,
+        related_payout_id, currency, amount_cents, balance_bucket,
+        running_available_cents, running_escrow_cents, running_locked_cents, description
+    ) VALUES (
+        v_tx_ref, v_wallet.id, p_merchant_id, 'payout_lock', 'payout_requested',
+        v_payout_id, v_wallet.currency, -p_amount_cents, 'locked_payout',
+        v_wallet.available_balance_cents - p_amount_cents,
+        v_wallet.pending_escrow_cents,
+        v_wallet.locked_payout_cents + p_amount_cents,
+        'Funds locked for withdrawal request #' || v_payout_ref
+    );
+
+    -- Log Audit Trail
+    INSERT INTO public.payout_audit_logs (payout_id, from_status, to_status, actor_role, notes)
+    VALUES (v_payout_id, 'none', 'requested', 'merchant', 'Payout request initiated via app');
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'payout_id', v_payout_id,
+        'reference_id', v_payout_ref,
+        'amount_cents', p_amount_cents,
+        'status', 'requested'
+    );
+END;
+$$;
+
+-- Stored Procedure 3: Approve & Dispatch Payout (Admin / Automated Gateway Dispatch)
+CREATE OR REPLACE FUNCTION public.approve_and_dispatch_payout(
+    p_payout_id UUID,
+    p_gateway_transfer_ref VARCHAR(128) DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_payout RECORD;
+    v_wallet RECORD;
+    v_tx_ref TEXT;
+BEGIN
+    SELECT * INTO v_payout
+    FROM public.payout_requests
+    WHERE id = p_payout_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'PAYOUT_NOT_FOUND', 'message', 'Payout request not found');
+    END IF;
+
+    IF v_payout.status NOT IN ('requested', 'pending_approval', 'approved') THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'INVALID_STATE_TRANSITION', 'message', 'Payout cannot be dispatched from state ' || v_payout.status);
+    END IF;
+
+    -- Lock the wallet row
+    SELECT * INTO v_wallet
+    FROM public.wallets
+    WHERE id = v_payout.wallet_id
+    FOR UPDATE;
+
+    -- Deduct from locked_payout bucket, record lifetime payout
+    UPDATE public.wallets
+    SET 
+        locked_payout_cents = locked_payout_cents - v_payout.amount_cents,
+        lifetime_payouts_cents = lifetime_payouts_cents + v_payout.net_payout_amount_cents,
+        version = version + 1,
+        updated_at = timezone('utc', now())
+    WHERE id = v_wallet.id;
+
+    -- Update Payout Request Status
+    UPDATE public.payout_requests
+    SET 
+        status = 'paid',
+        gateway_transfer_reference = COALESCE(p_gateway_transfer_ref, gateway_transfer_reference),
+        completed_at = timezone('utc', now())
+    WHERE id = p_payout_id;
+
+    -- Record Ledger Entry
+    v_tx_ref := 'TX-DISP-' || UPPER(SUBSTRING(gen_random_uuid()::text, 1, 8));
+    INSERT INTO public.wallet_transactions (
+        transaction_ref, wallet_id, merchant_id, type, source_event,
+        related_payout_id, currency, amount_cents, balance_bucket,
+        running_available_cents, running_escrow_cents, running_locked_cents, description
+    ) VALUES (
+        v_tx_ref, v_wallet.id, v_payout.merchant_id, 'payout_settled', 'fintx_transfer_settled',
+        p_payout_id, v_payout.currency, -v_payout.amount_cents, 'locked_payout',
+        v_wallet.available_balance_cents,
+        v_wallet.pending_escrow_cents,
+        v_wallet.locked_payout_cents - v_payout.amount_cents,
+        'Payout settled and transferred via Fintx IBAN #' || v_payout.destination_iban
+    );
+
+    -- Log Audit Trail
+    INSERT INTO public.payout_audit_logs (payout_id, from_status, to_status, actor_role, notes)
+    VALUES (p_payout_id, v_payout.status, 'paid', 'system', 'Payout dispatched and settled via gateway');
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'payout_id', p_payout_id,
+        'status', 'paid',
+        'transaction_ref', v_tx_ref
+    );
+END;
+$$;
+
+-- Stored Procedure 4: Fail / Reject & Refund Payout (Rollback locked balance to available)
+CREATE OR REPLACE FUNCTION public.fail_and_refund_payout(
+    p_payout_id UUID,
+    p_failure_reason TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_payout RECORD;
+    v_wallet RECORD;
+    v_tx_ref TEXT;
+BEGIN
+    SELECT * INTO v_payout
+    FROM public.payout_requests
+    WHERE id = p_payout_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'PAYOUT_NOT_FOUND', 'message', 'Payout request not found');
+    END IF;
+
+    IF v_payout.status IN ('paid', 'refunded', 'cancelled') THEN
+        RETURN jsonb_build_object('success', false, 'error_code', 'ALREADY_FINALIZED', 'message', 'Payout is already in final state: ' || v_payout.status);
+    END IF;
+
+    -- Lock the wallet row
+    SELECT * INTO v_wallet
+    FROM public.wallets
+    WHERE id = v_payout.wallet_id
+    FOR UPDATE;
+
+    -- Rollback: Move funds from locked_payout back to available_balance
+    UPDATE public.wallets
+    SET 
+        locked_payout_cents = locked_payout_cents - v_payout.amount_cents,
+        available_balance_cents = available_balance_cents + v_payout.amount_cents,
+        version = version + 1,
+        updated_at = timezone('utc', now())
+    WHERE id = v_wallet.id;
+
+    -- Update Payout Request Status
+    UPDATE public.payout_requests
+    SET 
+        status = 'failed',
+        failure_reason = p_failure_reason
+    WHERE id = p_payout_id;
+
+    -- Record Ledger Entry
+    v_tx_ref := 'TX-REV-' || UPPER(SUBSTRING(gen_random_uuid()::text, 1, 8));
+    INSERT INTO public.wallet_transactions (
+        transaction_ref, wallet_id, merchant_id, type, source_event,
+        related_payout_id, currency, amount_cents, balance_bucket,
+        running_available_cents, running_escrow_cents, running_locked_cents, description
+    ) VALUES (
+        v_tx_ref, v_wallet.id, v_payout.merchant_id, 'payout_unlock_reversal', 'gateway_transfer_failed',
+        p_payout_id, v_payout.currency, v_payout.amount_cents, 'available',
+        v_wallet.available_balance_cents + v_payout.amount_cents,
+        v_wallet.pending_escrow_cents,
+        v_wallet.locked_payout_cents - v_payout.amount_cents,
+        'Payout failed (' || p_failure_reason || '); funds unlocked back to available balance'
+    );
+
+    -- Log Audit Trail
+    INSERT INTO public.payout_audit_logs (payout_id, from_status, to_status, actor_role, notes)
+    VALUES (p_payout_id, v_payout.status, 'failed', 'system', 'Payout failed: ' || p_failure_reason);
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'payout_id', p_payout_id,
+        'status', 'failed',
+        'refunded_amount_cents', v_payout.amount_cents,
+        'transaction_ref', v_tx_ref
+    );
+END;
+$$;
+
+-- RLS Security Policies
+ALTER TABLE public.merchants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payout_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payout_audit_logs ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+    CREATE POLICY "Merchants view own profile" ON public.merchants 
+        FOR SELECT USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Merchants view own wallet" ON public.wallets 
+        FOR SELECT USING (merchant_id IN (SELECT id FROM public.merchants WHERE user_id = auth.uid()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Merchants view own orders" ON public.orders 
+        FOR SELECT USING (merchant_id IN (SELECT id FROM public.merchants WHERE user_id = auth.uid()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Merchants view own payouts" ON public.payout_requests 
+        FOR SELECT USING (merchant_id IN (SELECT id FROM public.merchants WHERE user_id = auth.uid()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Merchants view own ledger" ON public.wallet_transactions 
+        FOR SELECT USING (merchant_id IN (SELECT id FROM public.merchants WHERE user_id = auth.uid()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ==============================================================================
+-- RUNTIME COMPATIBILITY MIGRATIONS
+-- ==============================================================================
+-- 1. Ensure storage bucket for product photos exists
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('product-images', 'product-images', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- 2. Safe additive columns for product catalogue
+ALTER TABLE public.sme_products ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.sme_products ADD COLUMN IF NOT EXISTS category TEXT;
+ALTER TABLE public.sme_products ADD COLUMN IF NOT EXISTS name_ar TEXT;
+
+-- 3. Safe additive columns for inbound requests
+ALTER TABLE public.sme_inbound_requests ADD COLUMN IF NOT EXISTS shipment_type TEXT DEFAULT 'drop_off';
+
+

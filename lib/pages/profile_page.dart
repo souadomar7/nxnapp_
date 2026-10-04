@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../theme.dart';
 import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
@@ -16,6 +17,7 @@ import 'profile/my_subscriptions_page.dart';
 import 'profile/wallet_page.dart';
 import 'marketplace/seller_hub.dart';
 import '../services/marketplace_service.dart';
+import '../providers/merchant_data_provider.dart';
 import 'login.dart';
 import 'registration_page.dart';
 import 'demo_menu_page.dart';
@@ -521,30 +523,60 @@ class _ProfilePageState extends State<ProfilePage> {
 
       const SizedBox(height: 24),
 
-      _SectionHeader(title: 'System & Tools'),
-      _MenuCard(children: [
-        _ProfileTile(
-          icon: Icons.admin_panel_settings_rounded,
-          title: Localizations.localeOf(context).languageCode == 'ar' ? 'لوحة تحكم الإدارة والمستودع' : 'Super Admin & Ops Control Panel',
-          subtitle: Localizations.localeOf(context).languageCode == 'ar' ? 'إشراف الشحنات والاعتمادات والسحوبات' : 'Inbound, Outbound, KYC & Payouts control',
-          iconColor: Colors.amber.shade800,
-          onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AdminPanelPage())),
-        ),
-        _Divider(),
-        _ProfileTile(
-          icon: Icons.developer_mode_rounded,
-          title: 'All Features Demo Menu',
-          subtitle: 'Quick access to all app pages',
-          iconColor: AppColors.bluePrimary,
-          onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const DemoMenuPage())),
-        ),
-      ]),
+      if (kDebugMode || SessionProvider.of(context).canAccessSuperAdmin || SessionProvider.of(context).canAccessWms) ...[
+        _SectionHeader(title: 'System & Tools (Staff / Debug)'),
+        _MenuCard(children: [
+          if (SessionProvider.of(context).canAccessSuperAdmin || SessionProvider.of(context).canAccessWms || kDebugMode)
+            _ProfileTile(
+              icon: Icons.admin_panel_settings_rounded,
+              title: Localizations.localeOf(context).languageCode == 'ar' ? 'لوحة تحكم الإدارة والمستودع' : 'Super Admin & Ops Control Panel',
+              subtitle: Localizations.localeOf(context).languageCode == 'ar' ? 'إشراف الشحنات والاعتمادات والسحوبات' : 'Inbound, Outbound, KYC & Payouts control',
+              iconColor: Colors.amber.shade800,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const AdminPanelPage())),
+            ),
+          if (kDebugMode) ...[
+            _Divider(),
+            _ProfileTile(
+              icon: Icons.developer_mode_rounded,
+              title: 'All Features Demo Menu',
+              subtitle: 'Quick access to all app pages (Debug Only)',
+              iconColor: AppColors.bluePrimary,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const DemoMenuPage())),
+            ),
+            _Divider(),
+            _ProfileTile(
+              icon: Icons.cleaning_services_rounded,
+              title: Localizations.localeOf(context).languageCode == 'ar' ? 'مسح الذاكرة المؤقتة وإعادة التعيين' : 'Clear Local Cache & Reset Data',
+              subtitle: Localizations.localeOf(context).languageCode == 'ar' ? 'تفريغ المستودعات والبيانات المؤقتة لبدء نظيف' : 'Wipe local test leases & cache for a clean slate',
+              iconColor: Colors.deepOrange,
+              onTap: () async {
+                final isAr = Localizations.localeOf(context).languageCode == 'ar';
+                await _service.clearAllData();
+                if (!context.mounted) return;
+                await context.read<MerchantDataProvider>().clearAllData();
+                if (!context.mounted) return;
+                await context.read<MerchantDataProvider>().refreshDashboard(force: true);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: Colors.green.shade700,
+                    content: Text(
+                      isAr ? 'تم مسح البيانات المؤقتة بنجاح! 🧹' : 'Local cache wiped clean! 🧹',
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ]),
+        const SizedBox(height: 24),
+      ],
 
       const SizedBox(height: 24),
 

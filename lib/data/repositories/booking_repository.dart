@@ -50,13 +50,7 @@ class BookingRepository {
           'seller_id': _uid,
           'warehouse_id': warehouseId,
           'shelves_count': shelvesCount,
-          'months': months,
-          'storage_type': storageType,
-          'add_workers': addWorkers,
-          'worker_count': workerCount,
           'is_active': false,
-          'auto_renew': false,
-          'cancellation_pending': false,
           'start_date': now.toIso8601String(),
           'end_date': endDate.toIso8601String(),
           'created_at': now.toIso8601String(),
@@ -94,7 +88,7 @@ class BookingRepository {
 
   // ── Cancel / Reactivate ───────────────────────────────────────────────────
 
-  /// Marks subscription [subscriptionId] as pending cancellation.
+  /// Marks subscription [subscriptionId] as cancelled.
   Future<void> cancelSubscription(
     String subscriptionId, {
     String? reason,
@@ -102,20 +96,18 @@ class BookingRepository {
     await _supabase
         .from('sme_subscriptions')
         .update({
-          'cancellation_pending': true,
-          if (reason != null) 'cancellation_reason': reason,
+          'is_active': false,
         })
         .eq('id', subscriptionId)
         .eq('seller_id', _uid);
   }
 
-  /// Clears the cancellation flag and re-enables auto-renewal.
+  /// Re-enables subscription.
   Future<void> reactivateSubscription(String subscriptionId) async {
     await _supabase
         .from('sme_subscriptions')
         .update({
-          'cancellation_pending': false,
-          'auto_renew': true,
+          'is_active': true,
         })
         .eq('id', subscriptionId)
         .eq('seller_id', _uid);

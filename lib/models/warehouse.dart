@@ -27,6 +27,36 @@ class Warehouse {
     this.lng,
   });
 
+  String getLocalizedName(bool isAr) {
+    if (isAr) {
+      if (nameAr != null && nameAr!.trim().isNotEmpty) return nameAr!;
+      if (name.contains('Dubai Central')) return 'مستودع دبي المركزي';
+      if (name.contains('Sharjah Regional')) return 'مستودع الشارقة الإقليمي';
+      if (name.contains('Abu Dhabi Central')) return 'مستودع أبوظبي المركزي';
+      if (name.contains('Al Ain Central')) return 'مستودع العين المركزي';
+      return name.replaceAll('Warehouse', 'مستودع').replaceAll('Hub', 'مركز');
+    }
+    return name;
+  }
+
+  String getLocalizedEmirate(bool isAr) {
+    if (isAr) {
+      if (emirateAr != null && emirateAr!.trim().isNotEmpty) return emirateAr!;
+      switch (emirate.toLowerCase()) {
+        case 'dubai': return 'دبي';
+        case 'abu dhabi': return 'أبوظبي';
+        case 'sharjah': return 'الشارقة';
+        case 'al ain': return 'العين';
+        case 'ajman': return 'عجمان';
+        case 'ras al khaimah': return 'رأس الخيمة';
+        case 'fujairah': return 'الفجيرة';
+        case 'umm al quwain': return 'أم القيوين';
+        default: return emirate;
+      }
+    }
+    return emirate;
+  }
+
   factory Warehouse.fromJson(Map<String, dynamic> json) {
     return Warehouse(
       id: json['id'] as String,

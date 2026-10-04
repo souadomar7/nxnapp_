@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme.dart';
+import '../core/utils/localization_utils.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -93,15 +94,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
-  String _timeAgo(String? createdAt) {
+  String _timeAgo(String? createdAt, bool isAr) {
     if (createdAt == null) return '';
     try {
       final dt = DateTime.parse(createdAt).toLocal();
-      final diff = DateTime.now().difference(dt);
-      if (diff.inMinutes < 1) return 'Just now';
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
-      return '${diff.inDays}d ago';
+      return LocalizationUtils.formatRelativeTime(dt, isArabic: isAr);
     } catch (_) {
       return '';
     }
@@ -204,6 +201,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                   children: [
                                     Text(
                                       n['title'] ?? '',
+                                      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                       style: TextStyle(
                                         fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
                                         fontSize: 14,
@@ -213,11 +211,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                     const SizedBox(height: 4),
                                     Text(
                                       n['body'] ?? '',
+                                      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4),
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      _timeAgo(n['created_at']),
+                                      _timeAgo(n['created_at'], isAr),
+                                      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                       style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
                                     ),
                                   ],

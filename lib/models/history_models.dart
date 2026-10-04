@@ -32,14 +32,20 @@ class DashboardActivity {
 
   String getDisplayTitle(bool isAr) {
     if (isAr) {
-      if (titleAr != null && titleAr!.isNotEmpty) return titleAr!;
+      if (titleAr != null && titleAr!.trim().isNotEmpty) return titleAr!;
+      if (title.contains('Payment Success')) return 'تم سداد الفاتورة بنجاح';
       if (title.contains('Invoice Generated')) return 'تم إنشاء الفاتورة';
+      if (title.contains('Inbound Shipment') || title.contains('Inbound STO Intake')) return 'شحنة واردة للمستودع (STO)';
+      if (title.contains('Delivery Dispatch WAY') || title.contains('Delivery Order')) return 'طلب شحن وتوصيل مشتري';
       if (title.contains('Space Rented')) return 'تم استئجار مساحة تخزينية';
       if (title.contains('Damaged Item Disposition Resolved')) return 'تم حسم معالجة المنتجات التالفة';
-      if (title.contains('Inbound STO Intake Received')) return 'تم استلام الشحنة الواردة (STO)';
-      if (title.contains('Delivery Dispatch WAY Created')) return 'تم إنشاء طلب الشحن (WAY)';
       if (title.contains('Wallet Payout Requested')) return 'تم طلب سحب الأرباح';
       if (title.contains('New Product Listed')) return 'تم إضافة منتج جديد للكتالوج';
+      if (title.contains('Order Placed')) return 'تم استلام طلب جديد';
+      if (title.contains('Order Confirmed')) return 'تم تأكيد الطلب';
+      if (title.contains('Order Preparing')) return 'قيد تجهيز الطلب';
+      if (title.contains('Ready for Shipment')) return 'جاهز للشحن والتسليم';
+      if (title.contains('Order Delivered')) return 'تم تسليم الطلب بنجاح';
       return title;
     }
     return title;
@@ -47,12 +53,31 @@ class DashboardActivity {
 
   String getDisplaySubtitle(bool isAr) {
     if (isAr) {
-      if (subtitleAr != null && subtitleAr!.isNotEmpty) return subtitleAr!;
+      if (subtitleAr != null && subtitleAr!.trim().isNotEmpty) return subtitleAr!;
       return subtitle
+          .replaceAll('AED • PAID', 'درهم • تم السداد')
           .replaceAll('AED • PENDING', 'درهم • قيد الانتظار')
+          .replaceAll(' • PAID', ' • تم السداد')
+          .replaceAll(' • PENDING', ' • قيد الانتظار')
+          .replaceAll(' • CONFIRMED', ' • مؤكد')
+          .replaceAll(' • PREPARING', ' • قيد التجهيز')
+          .replaceAll(' • READY_FOR_SHIPMENT', ' • جاهز للشحن')
+          .replaceAll(' • SHIPPED', ' • تم الشحن')
+          .replaceAll(' • DELIVERED', ' • تم التسليم')
+          .replaceAll(' • CANCELLED', ' • ملغي')
+          .replaceAll('PAID', 'تم السداد')
           .replaceAll('PENDING', 'قيد الانتظار')
+          .replaceAll('CONFIRMED', 'مؤكد')
+          .replaceAll('PREPARING', 'قيد التجهيز')
+          .replaceAll('READY_FOR_SHIPMENT', 'جاهز للشحن')
+          .replaceAll('SHIPPED', 'تم الشحن')
+          .replaceAll('DELIVERED', 'تم التسليم')
           .replaceAll('Warehouse', 'مستودع')
           .replaceAll('Shelves', 'أرفف')
+          .replaceAll('Shelf', 'رف')
+          .replaceAll('items', 'عناصر')
+          .replaceAll('item', 'عنصر')
+          .replaceAll('To ', 'إلى ')
           .replaceAll('Disposition:', 'الإجراء:')
           .replaceAll('Database updated.', 'تم تحديث البيانات.')
           .replaceAll('database_', 'قاعدة البيانات')
@@ -64,7 +89,10 @@ class DashboardActivity {
           .replaceAll('Dubai Central Warehouse', 'مستودع دبي المركزي')
           .replaceAll('Abu Dhabi Central Warehouse', 'مستودع أبوظبي المركزي')
           .replaceAll('Sharjah Regional Hub', 'مستودع الشارقة الإقليمي')
-          .replaceAll('Al Ain Central Warehouse', 'مستودع العين المركزي');
+          .replaceAll('Al Ain Central Warehouse', 'مستودع العين المركزي')
+          .replaceAll('Single/Multi Warehouse Booking', 'حجز مساحات تخزين متعددة')
+          .replaceAll('Cold Brew Coffee', 'قهوة باردة')
+          .replaceAll('AED', 'درهم');
     }
     return subtitle;
   }

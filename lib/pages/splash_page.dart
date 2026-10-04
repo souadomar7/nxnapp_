@@ -5,6 +5,8 @@ import '../theme.dart';
 import 'home_shell.dart';
 import 'login.dart';
 import 'onboarding/service_overview_page.dart';
+import 'onboarding/account_in_review_page.dart';
+import 'terms_and_conditions.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -26,12 +28,13 @@ class _SplashPageState extends State<SplashPage> {
 
     if (!mounted) return;
 
-    // Read the persisted terms-accepted flag directly from SharedPreferences
-    // so we don't depend on UserProvider having finished its async load.
+    // Read the persisted terms-accepted and guest flags directly from SharedPreferences
     bool termsAccepted = false;
+    bool isGuest = false;
     try {
       final prefs = await SharedPreferences.getInstance();
       termsAccepted = prefs.getBool('terms_accepted') ?? false;
+      isGuest = prefs.getBool('is_guest') ?? false;
     } catch (_) {}
 
     if (!mounted) return;
@@ -40,20 +43,57 @@ class _SplashPageState extends State<SplashPage> {
     final currentUser = Supabase.instance.client.auth.currentUser;
     final isLoggedIn = currentUser != null;
 
-    if (isLoggedIn && termsAccepted) {
-      // Returning authenticated user — go straight to the app
+    if (isLoggedIn) {
+      // 1. Check account verification status from database to prevent bypassing review gate
+      try {
+        final sellerDoc = await Supabase.instance.client
+            .from('sme_sellers')
+            .select('is_verified')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+
+        if (sellerDoc != null && sellerDoc['is_verified'] == false) {
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AccountInReviewPage()),
+          );
+          return;
+        }
+      } catch (e) {
+        debugPrint('Account status check note: $e');
+      }
+
+      if (!mounted) return;
+
+      // 2. If logged in but terms not accepted on this device (e.g. new phone or cleared cache)
+      if (!termsAccepted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const TermsAndConditionsPage()),
+        );
+        return;
+      }
+
+      // 3. Authenticated, approved, and terms accepted
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeShell()),
       );
-    } else if (!isLoggedIn && termsAccepted) {
-      // User has accepted T&C before but is not logged in — skip onboarding
+    } else if (isGuest && termsAccepted) {
+      // Guest exploration session with terms accepted
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+      );
+    } else if (termsAccepted) {
+      // User has accepted T&C before but is not logged in — skip onboarding intro
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginPage()),
       );
     } else {
-      // First-time user or T&C not yet accepted — show the full onboarding flow
+      // First-time user — show the full onboarding overview
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ServiceOverviewPage()),

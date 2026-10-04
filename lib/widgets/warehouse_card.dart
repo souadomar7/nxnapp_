@@ -39,13 +39,20 @@ class WarehouseCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(isAr ? (w.nameAr ?? w.name) : w.name, style: Theme.of(context).textTheme.titleMedium),
+                        Text(
+                          w.getLocalizedName(isAr),
+                          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                            AppLocalizations.of(context)!
-                                .emirateAndShelves(
-                                    w.shelvesAvailable, isAr ? (w.emirateAr ?? w.emirate) : w.emirate),
-                            style: Theme.of(context).textTheme.bodyMedium),
+                          AppLocalizations.of(context)!.emirateAndShelves(
+                            w.shelvesAvailable,
+                            w.getLocalizedEmirate(isAr),
+                          ),
+                          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ],
                     ),
                   ),

@@ -1,13 +1,15 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/invoice.dart';
 import '../services/marketplace_service.dart';
 import '../services/payment_service.dart';
 import '../l10n/app_localizations.dart';
 import '../theme.dart';
+import 'package:provider/provider.dart';
+import '../providers/merchant_data_provider.dart';
 import '../services/bilingual_pdf_invoice_service.dart';
 import 'receipt_page.dart';
 
@@ -149,6 +151,10 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
           // The Stripe webhook will eventually also mark paid=true.
           // We also do it here for immediate UI feedback.
           await service.updateInvoiceStatus(widget.invoice.id, true);
+
+          if (mounted) {
+            context.read<MerchantDataProvider>().refreshDashboard(force: true);
+          }
         } catch (e) {
           debugPrint('Error activating subscription after payment: $e');
         }
@@ -187,7 +193,8 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final aedFormat = NumberFormat.currency(locale: 'en_AE', symbol: 'AED ', decimalDigits: 2);
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final aedFormat = NumberFormat.currency(locale: 'en_AE', symbol: isAr ? 'درهم ' : 'AED ', decimalDigits: 2);
     final cardType = _getCardType(_cardNumberController.text.replaceAll(' ', ''));
 
     return Stack(
@@ -197,9 +204,9 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0.5,
-            title: const Text(
-              'Secure Checkout',
-              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
+            title: Text(
+              isAr ? 'الدفع الآمن' : 'Secure Checkout',
+              style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
             ),
             centerTitle: true,
             leading: IconButton(
@@ -234,9 +241,10 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                         children: [
                           Expanded(
                             child: Text(
-                              widget.invoice.warehouseName,
+                              widget.invoice.getWarehouseName(isAr),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
+                              textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                             ),
                           ),
@@ -281,44 +289,278 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
 
                 // 2. Select Payment Method Title
                 Text(
-                  l10n.choosePaymentMethod,
+                  isAr ? 'اختر طريقة الدفع الآمنة' : l10n.choosePaymentMethod,
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 12),
 
                 // Payment Method Selector
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildMethodTab(
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildMethodTab(
+                        method: PaymentMethod.fintx,
+                        icon: Icons.account_balance_wallet_rounded,
+                        label: isAr ? 'بوابة Fintx' : 'Fintx Gateway',
+                      ),
+                      const SizedBox(width: 8),
+                      _buildMethodTab(
                         method: PaymentMethod.card,
                         icon: Icons.credit_card_rounded,
-                        label: 'Card',
+                        label: isAr ? 'بطاقة بنكية' : 'Card (Visa/MC)',
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildMethodTab(
+                      const SizedBox(width: 8),
+                      _buildMethodTab(
                         method: PaymentMethod.applePay,
                         icon: Icons.apple,
                         label: 'Apple Pay',
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildMethodTab(
-                        method: PaymentMethod.cash,
-                        icon: Icons.local_post_office_rounded,
-                        label: 'Post Office',
+                      const SizedBox(width: 8),
+                      _buildMethodTab(
+                        method: PaymentMethod.wallet,
+                        icon: Icons.wallet_rounded,
+                        label: isAr ? 'محفظة NXN' : 'NXN Wallet',
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      _buildMethodTab(
+                        method: PaymentMethod.cash,
+                        icon: Icons.storefront_rounded,
+                        label: isAr ? 'مكتب NXN (نقداً)' : 'Cash at NXN Office',
+                      ),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 24),
 
                 // 3. Payment details block
-                if (_selectedMethod == PaymentMethod.card) ...[
+                if (_selectedMethod == PaymentMethod.fintx) ...[
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10AC84).withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.verified_user_rounded, color: Color(0xFF10AC84), size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      isAr ? 'بوابة Fintx للمدفوعات' : 'Fintx UAE Gateway',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10AC84),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                isAr ? 'معتمد من المصرف المركزي' : 'CBUAE Certified',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          isAr
+                              ? 'أوركسترا دفع إماراتية متكاملة تدعم:\n• Apple Pay & Google Pay\n• مدفوعات آني الفورية (Aani UAE Instant Pay)\n• فيزا، ماستركارد، وبطاقة جيوان الوطنية\n• تقسيط تابي وتمارا 0% فوائد'
+                              : 'Direct UAE payment orchestration supporting:\n• Apple Pay & Google Pay\n• Aani Instant Payments (UAE Central Bank)\n• Visa, Mastercard & Jaywan\n• Tabby & Tamara 0% Interest Installments',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.lock_rounded, color: Color(0xFF10AC84), size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  isAr
+                                      ? 'تسوية مشفرة 256-bit وإصدار فاتورة ضريبية فورية.'
+                                      : 'Instant 256-bit encrypted settlement & instant invoice certification.',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (_selectedMethod == PaymentMethod.wallet) ...[
+                  // Merchant In-App Wallet Details
+                  Consumer<MerchantDataProvider>(
+                    builder: (context, merchantData, _) {
+                      final balance = merchantData.walletBalance;
+                      final isSufficient = balance >= widget.invoice.total;
+                      return Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSufficient ? const Color(0xFF10AC84).withValues(alpha: 0.4) : Colors.amber.shade300,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.bluePrimary, size: 20),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          isAr ? 'محفظة التاجر الحالية' : 'Merchant Wallet Balance',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isSufficient
+                                        ? const Color(0xFF10AC84).withValues(alpha: 0.12)
+                                        : Colors.amber.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    isSufficient
+                                        ? (isAr ? 'رصيد كافٍ' : 'Sufficient')
+                                        : (isAr ? 'رصيد غير كافٍ' : 'Low Balance'),
+                                    style: TextStyle(
+                                      color: isSufficient ? const Color(0xFF10AC84) : Colors.amber.shade900,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isAr ? 'الرصيد المتاح للسحب والدفع:' : 'Available Balance:',
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                ),
+                                Text(
+                                  aedFormat.format(balance),
+                                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.bluePrimary),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isAr ? 'المبلغ المطلوب خصمه:' : 'Deduction Amount:',
+                                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                ),
+                                Text(
+                                  '- ${aedFormat.format(widget.invoice.total)}',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 20),
+                            Row(
+                              children: [
+                                Icon(
+                                  isSufficient ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
+                                  size: 16,
+                                  color: isSufficient ? const Color(0xFF10AC84) : Colors.amber.shade800,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    isSufficient
+                                        ? (isAr
+                                            ? 'سيتم الخصم مباشرة من رصيدك المتاح دون أي رسوم إضافية.'
+                                            : 'Instant deduction from your wallet with 0% gateway fee.')
+                                        : (isAr
+                                            ? 'المبلغ المطلوب أكبر من رصيدك الحالي. يرجى شحن المحفظة أو اختيار Fintx/البطاقة.'
+                                            : 'Insufficient funds. Please choose Fintx or Card to complete payment.'),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isSufficient ? const Color(0xFF10AC84) : Colors.amber.shade900,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ] else if (_selectedMethod == PaymentMethod.card) ...[
                   // Visual Simulated Card
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
@@ -351,7 +593,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                           children: [
                             const Icon(Icons.contactless_outlined, color: Colors.white, size: 28),
                             Text(
-                              cardType == 'Generic' ? 'Credit Card' : cardType,
+                              cardType == 'Generic' ? (isAr ? 'بطاقة دفع' : 'Credit Card') : cardType,
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ],
@@ -375,11 +617,11 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('CARDHOLDER', style: TextStyle(color: Colors.white70, fontSize: 9)),
+                                Text(isAr ? 'حامل البطاقة' : 'CARDHOLDER', style: const TextStyle(color: Colors.white70, fontSize: 9)),
                                 const SizedBox(height: 2),
                                 Text(
                                   _nameController.text.isEmpty
-                                      ? 'YOUR NAME'
+                                      ? (isAr ? 'الاسم بالكامل' : 'YOUR NAME')
                                       : _nameController.text.toUpperCase(),
                                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                 ),
@@ -388,7 +630,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('EXPIRES', style: TextStyle(color: Colors.white70, fontSize: 9)),
+                                Text(isAr ? 'تاريخ الانتهاء' : 'EXPIRES', style: const TextStyle(color: Colors.white70, fontSize: 9)),
                                 const SizedBox(height: 2),
                                 Text(
                                   _expiryController.text.isEmpty ? 'MM/YY' : _expiryController.text,
@@ -412,9 +654,9 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                         TextFormField(
                           controller: _cardNumberController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Card Number',
-                            prefixIcon: Icon(Icons.credit_card),
+                          decoration: InputDecoration(
+                            labelText: isAr ? 'رقم البطاقة' : 'Card Number',
+                            prefixIcon: const Icon(Icons.credit_card),
                             hintText: '4000 1234 5678 9010',
                           ),
                           inputFormatters: [
@@ -423,7 +665,9 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                             _CardNumberFormatter(),
                           ],
                           onChanged: (v) => setState(() {}),
-                          validator: (v) => (v == null || v.replaceAll(' ', '').length < 16) ? 'Enter valid 16-digit card number' : null,
+                          validator: (v) => (v == null || v.replaceAll(' ', '').length < 16)
+                              ? (isAr ? 'يرجى إدخال 16 رقم صحيح' : 'Enter valid 16-digit card number')
+                              : null,
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -432,10 +676,10 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                               child: TextFormField(
                                 controller: _expiryController,
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Expiry Date',
+                                decoration: InputDecoration(
+                                  labelText: isAr ? 'تاريخ الانتهاء' : 'Expiry Date',
                                   hintText: 'MM/YY',
-                                  prefixIcon: Icon(Icons.calendar_today),
+                                  prefixIcon: const Icon(Icons.calendar_today),
                                 ),
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
@@ -443,7 +687,9 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                                   _CardExpiryFormatter(),
                                 ],
                                 onChanged: (v) => setState(() {}),
-                                validator: (v) => (v == null || v.length < 5) ? 'Expiry required' : null,
+                                validator: (v) => (v == null || v.length < 5)
+                                    ? (isAr ? 'مطلوب' : 'Expiry required')
+                                    : null,
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -461,7 +707,9 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                                   FilteringTextInputFormatter.digitsOnly,
                                   LengthLimitingTextInputFormatter(3),
                                 ],
-                                validator: (v) => (v == null || v.length < 3) ? 'CVV required' : null,
+                                validator: (v) => (v == null || v.length < 3)
+                                    ? (isAr ? 'مطلوب' : 'CVV required')
+                                    : null,
                               ),
                             ),
                           ],
@@ -471,12 +719,14 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                           controller: _nameController,
                           keyboardType: TextInputType.name,
                           textCapitalization: TextCapitalization.words,
-                          decoration: const InputDecoration(
-                            labelText: 'Cardholder Name',
-                            prefixIcon: Icon(Icons.person_outline),
+                          decoration: InputDecoration(
+                            labelText: isAr ? 'اسم حامل البطاقة' : 'Cardholder Name',
+                            prefixIcon: const Icon(Icons.person_outline),
                           ),
                           onChanged: (v) => setState(() {}),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? (isAr ? 'الاسم مطلوب' : 'Name is required')
+                              : null,
                         ),
                       ],
                     ),
@@ -494,13 +744,15 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                       children: [
                         const Icon(Icons.apple, size: 60, color: Colors.black),
                         const SizedBox(height: 12),
-                        const Text(
-                          'Apple Pay Checkout',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        Text(
+                          isAr ? 'الدفع السريع عبر Apple Pay' : 'Apple Pay Checkout',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Authenticate securely using FaceID/TouchID associated with your Apple Wallet.',
+                          isAr
+                              ? 'المصادقة الآمنة عبر بصمة الوجه (FaceID) أو الإصبع (TouchID) المرتبطة بمحفظة Apple الخاصة بك.'
+                              : 'Authenticate securely using FaceID/TouchID associated with your Apple Wallet.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                         ),
@@ -508,7 +760,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                     ),
                   ),
                 ] else ...[
-                  // Post Office Cash Details Info
+                  // NXN Office Cash Details Info
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -518,15 +770,17 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                     ),
                     child: Column(
                       children: [
-                        const Icon(Icons.local_post_office_outlined, size: 60, color: Colors.orange),
+                        const Icon(Icons.storefront_outlined, size: 60, color: Colors.orange),
                         const SizedBox(height: 12),
-                        const Text(
-                          'Emirates Post Office Payout',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.orange),
+                        Text(
+                          isAr ? 'دفع نقدي في مكتب استقبال NXN' : 'Cash at NXN Office Reception',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.orange),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'A booking invoice has been generated. You can present this invoice code at any Emirates Post outlet to complete payment in cash.',
+                          isAr
+                              ? 'تم إصدار الفاتورة. يرجى التوجه لمكتب استقبال مستودع NXN وإبراز الفاتورة مع بطاقة الهوية الإماراتية لدفع المبلغ نقداً وتفعيل حجز الأرفف فورياً.'
+                              : 'An invoice has been generated. Please visit the NXN Office reception desk with your invoice QR and Emirates ID to pay in cash and immediately activate your booking.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                         ),
@@ -538,21 +792,36 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                 const SizedBox(height: 40),
 
                 // Pay Button
-                ElevatedButton(
-                  onPressed: _processPayment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.bluePrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 1,
-                  ),
-                  child: Text(
-                    _selectedMethod == PaymentMethod.cash
-                        ? 'Confirm Cash Order'
-                        : 'Pay ${aedFormat.format(widget.invoice.total)}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                Consumer<MerchantDataProvider>(
+                  builder: (context, merchantData, _) {
+                    final isWalletInsufficient = _selectedMethod == PaymentMethod.wallet &&
+                        merchantData.walletBalance < widget.invoice.total;
+
+                    return ElevatedButton(
+                      onPressed: isWalletInsufficient ? null : _processPayment,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isWalletInsufficient ? Colors.grey : AppColors.bluePrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 1,
+                      ),
+                      child: Text(
+                        isWalletInsufficient
+                            ? (isAr ? 'رصيد المحفظة غير كافٍ' : 'Insufficient Wallet Balance')
+                            : _selectedMethod == PaymentMethod.cash
+                                ? (isAr ? 'تأكيد طلب الدفع النقدي' : 'Confirm Cash Order')
+                                : _selectedMethod == PaymentMethod.wallet
+                                    ? (isAr
+                                        ? 'خصم ${aedFormat.format(widget.invoice.total)} من المحفظة'
+                                        : 'Pay ${aedFormat.format(widget.invoice.total)} with Wallet')
+                                    : (isAr
+                                        ? 'دفع ${aedFormat.format(widget.invoice.total)}'
+                                        : 'Pay ${aedFormat.format(widget.invoice.total)}'),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

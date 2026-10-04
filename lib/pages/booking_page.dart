@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'checkout_page.dart';
 import '../models/invoice.dart';
 import '../services/marketplace_service.dart';
@@ -56,23 +56,23 @@ class BookingConfig {
 
   BookingConfig({
     this.isSelected = false,
-    this.shelves = 5,
+    this.shelves = 2,
     this.durationMonths = 1,
     this.addWorkers = false,
     this.workerCount = 1,
   });
 
-  /// Calculate price breakdown using configurable platform rates.
-  /// Defaults mirror the legacy hardcoded values so existing call-sites
-  /// continue to work without changes. Pass values from
-  /// PlatformSettingsProvider for live server-driven pricing.
+  /// Calculate price breakdown:
+  /// - Storage fee: AED 100 per shelf / month × duration (months)
+  /// - Worker fee: AED 50 flat per worker for drop-off / intake
   PriceBreakdown calculateBreakdown({
     double shelfBasePriceAed = 100.0,
     double workerFeePerUnit = 50.0,
     double platformFeeRate = 0.05,
     double vatRate = 0.05,
   }) {
-    final double baseCost = shelfBasePriceAed * shelves * durationMonths;
+    final double baseMonthly = shelfBasePriceAed * shelves;
+    final double baseCost = baseMonthly * durationMonths;
     final double workerFee = addWorkers ? (workerFeePerUnit * workerCount) : 0.0;
     final double subtotal = baseCost + workerFee;
     final double platformFee = subtotal * platformFeeRate;
@@ -80,7 +80,11 @@ class BookingConfig {
     final double total = subtotal + platformFee + vat;
 
     return PriceBreakdown(
-        subtotal: subtotal, platformFee: platformFee, vat: vat, total: total);
+      subtotal: subtotal,
+      platformFee: platformFee,
+      vat: vat,
+      total: total,
+    );
   }
 }
 
@@ -104,7 +108,7 @@ class _BookingPageState extends State<BookingPage> {
       subtitleEn: 'Al Quoz Logistics Hub',
       subtitleAr: 'منطقة القوز اللوجستية',
       totalShelves: 200,
-      storageTags: ['Fast Dispatch', '24/7 Access', 'Secured'],
+      storageTags: ['Fast Dispatch', '24/7 System Tracking', 'Secured'],
       icon: Icons.business_outlined,
     ),
     const PrimeWarehouse(
@@ -444,13 +448,9 @@ class _HeaderBadge extends StatelessWidget {
 // ── Section Title ──────────────────────────────────────────────────────────────
 class _SectionTitle extends StatelessWidget {
   final String title;
-  final String? actionText;
-  final VoidCallback? onAction;
 
   const _SectionTitle({
     required this.title,
-    this.actionText,
-    this.onAction,
   });
 
   @override
@@ -480,23 +480,6 @@ class _SectionTitle extends StatelessWidget {
             ),
           ],
         ),
-        if (actionText != null)
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              actionText!,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.bluePrimary,
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -1467,8 +1450,8 @@ class _VisualWarehouseShowcase extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       isAr
-                          ? 'موقع استراتيجي بالقرب من شارع الشيخ زايد مع مراقبة أمنية 24/7 ورفوف تخزين عالية التحمل'
-                          : 'Prime location off SZR with 24/7 CCTV, high-capacity shelving & instant gate pass entry.',
+                          ? 'موقع استراتيجي بالقرب من شارع الشيخ زايد مع مراقبة أمنية 24/7 ورفوف تخزين عالية التحمل واستقبال مباشر'
+                          : 'Prime location off SZR with 24/7 CCTV, high-capacity shelving & reception drop-off desk.',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.82),
                         fontSize: 12,

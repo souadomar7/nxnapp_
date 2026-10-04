@@ -34,6 +34,9 @@ class SmartInventoryStageEN extends StatefulWidget {
   State<SmartInventoryStageEN> createState() => _SmartInventoryStageENState();
 }
 
+typedef SmartInventoryStage = SmartInventoryStageEN;
+
+
 class _SmartInventoryStageENState extends State<SmartInventoryStageEN> {
   String _searchQuery = '';
   String _selectedFilter = 'all';

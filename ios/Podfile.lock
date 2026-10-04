@@ -1,7 +1,5 @@
 PODS:
   - Flutter (1.0.0)
-  - isar_flutter_libs (1.0.0):
-    - Flutter
   - printing (1.0.0):
     - Flutter
   - Stripe (23.27.6):
@@ -43,7 +41,6 @@ PODS:
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
-  - isar_flutter_libs (from `.symlinks/plugins/isar_flutter_libs/ios`)
   - printing (from `.symlinks/plugins/printing/ios`)
   - stripe_ios (from `.symlinks/plugins/stripe_ios/ios`)
 
@@ -61,8 +58,6 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
-  isar_flutter_libs:
-    :path: ".symlinks/plugins/isar_flutter_libs/ios"
   printing:
     :path: ".symlinks/plugins/printing/ios"
   stripe_ios:
@@ -70,7 +65,6 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
-  isar_flutter_libs: 9fc2cfb928c539e1b76c481ba5d143d556d94920
   printing: 54ff03f28fe9ba3aa93358afb80a8595a071dd07
   Stripe: 9fec845645e39f371e6898926d096fd9c2feb5a5
   stripe_ios: 5accba1ff472f89300e1676c351166f29dc93ced

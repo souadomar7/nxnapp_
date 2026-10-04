@@ -11,8 +11,8 @@ List<Warehouse> demoWarehouses = [
     lng: 55.3030,
     shelvesAvailable: 50,
     pricePerShelf: 100.0, // Fixed price
-    amenities: ['24/7 Access', 'CCTV', 'Fast Dispatch'],
-    amenitiesAr: ['دخول 24/7', 'كاميرات مراقبة', 'شحن سريع'],
+    amenities: ['24/7 System Access', 'CCTV', 'Fast Dispatch'],
+    amenitiesAr: ['تتبع ونظام 24/7', 'كاميرات مراقبة', 'شحن سريع'],
     is24h: true,
   ),
   Warehouse(

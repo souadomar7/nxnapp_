@@ -3,19 +3,20 @@ import 'package:provider/provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
-import '../../core/auth/session_provider.dart';
-import '../../core/auth/user_role.dart';
 import 'public_product_detail_page.dart';
 import '../smart_inventory_stage.dart';
-import '../receive_goods_stage.dart';
 import '../request_delivery_page.dart';
+import '../create_shipment_page.dart';
 import '../settings/notification_settings_page.dart';
 import 'create_shop_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/marketplace_models.dart';
 import 'seller_orders_page.dart';
 import 'seller_products_page.dart';
-import '../operations/pick_pack_screen.dart';
+import 'home_seller_marketplace_hub.dart';
+import '../booking_page.dart';
+import '../copilot_page.dart';
+import '../notifications_page.dart';
 
 
 /// The Store tab root. Automatically routes to:
@@ -26,11 +27,6 @@ class SellerHub extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = SessionProvider.of(context);
-
-    if (session.role == UserRole.guest) {
-      return const _GuestMarketplaceView();
-    }
     return const _MerchantDashboardView();
   }
 }
@@ -620,20 +616,40 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                     },
                   ),
                   const SizedBox(width: 6),
-                  IconButton(
-                    icon: const Icon(Icons.settings_outlined,
-                        color: Colors.white, size: 26),
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                const NotificationSettingsPage())),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ),
+                    IconButton(
+                      icon: const Icon(Icons.auto_awesome,
+                          color: Colors.white, size: 22),
+                      tooltip: isAr ? 'المساعد الذكي Copilot' : 'Logistics Copilot AI',
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  const CopilotPage())),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined,
+                          color: Colors.white, size: 24),
+                      tooltip: isAr ? 'الإشعارات' : 'Notifications',
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  const NotificationsPage())),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined,
+                          color: Colors.white, size: 24),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  const NotificationSettingsPage())),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
 
-              // ─── Setup Pending Banner ──────────────────────────────
+              // ─── Setup Pending Banner (if applicable) ──────────────
               if (!isLoading && storeSetupPending)
                 SliverToBoxAdapter(
                   child: _SetupPendingCard(
@@ -641,14 +657,8 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                   ),
                 ),
 
-              // ─── When store setup is pending: locked promo ─────────
-              if (!isLoading && storeSetupPending)
-                SliverToBoxAdapter(
-                  child: _LockedStorePromo(),
-                )
-              else ...[
-                // ─── Live Stats Section ────────────────────────────
-                SliverToBoxAdapter(
+              // ─── Live Stats & Operations Section ────────────────────
+              SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
@@ -764,6 +774,30 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                           childAspectRatio: 1.02,
                           children: [
                             _ActionCard(
+                              title: isAr ? 'حجز مساحات ورفوف' : 'Rent Shelves',
+                              subtitle: isAr ? 'استئجار رفوف قياسية بـ 100 درهم شهرياً' : 'Book standard warehouse shelves at 100 AED/mo',
+                              badge: isAr ? '100 درهم' : '100 AED',
+                              icon: Icons.view_in_ar_rounded,
+                              color: const Color(0xFF003C8E),
+                              onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const BookingPage())),
+                            ),
+                            _ActionCard(
+                              title: isAr ? 'مساعد الذكاء الاصطناعي' : 'Logistics Copilot AI',
+                              subtitle: isAr ? 'استعلام المخزون والعمليات عبر الذكاء الاصطناعي' : 'Ask questions about stock, shelves & orders',
+                              badge: 'AI',
+                              icon: Icons.auto_awesome_rounded,
+                              color: const Color(0xFF6C5CE7),
+                              onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const CopilotPage())),
+                            ),
+                            _ActionCard(
                               title: isAr ? 'مخزوني ومواقع الأرفف' : 'My Inventory',
                               subtitle: isAr ? 'متابعة الأصناف والكميات وحالة التخزين' : 'Live stock audit, shelf positions & SKU breakdown',
                               badge: '$totalItems ${isAr ? "صنف" : "Units"}',
@@ -791,16 +825,17 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                               },
                             ),
                             _ActionCard(
-                              title: isAr ? 'حجز تسليم البضائع' : 'Book Drop-off',
-                              subtitle: isAr ? 'جدولة توريد المرفق والتفريغ وبوابة الدخول' : 'Schedule warehouse intake, unloading bay & worker gate pass',
+                              title: isAr ? 'حجز موعد توريد البضائع' : 'Book Cargo Drop-off',
+                              subtitle: isAr ? 'حجز موعد تسليم البضائع بمكتب الاستقبال وإصدار رمز ASN' : 'Schedule cargo drop-off at reception desk with ASN QR',
                               badge: isAr ? 'التوريد' : 'Inbound',
                               icon: Icons.move_to_inbox_rounded,
                               color: const Color(0xFFFF9F43),
                               onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const ReceiveGoodsStagePageEN())),
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CreateShipmentPage(initialIsDropOff: true),
+                                ),
+                              ),
                             ),
                             _ActionCard(
                               title: isAr ? 'الطلبات الواردة' : 'Incoming Orders',
@@ -820,22 +855,22 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                               icon: Icons.local_shipping_rounded,
                               color: const Color(0xFF8B5CF6),
                               onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const RequestDeliveryPage())),
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RequestDeliveryPage(),
+                                ),
+                              ),
                             ),
                             _ActionCard(
-                              title: isAr ? 'سحب وتغليف' : 'Pick & Pack',
-                              subtitle: isAr ? 'سحب الأصناف من الأرفف وتجهيز الطلبات' : 'Pick items from shelves & pack orders',
-                              badge: isAr ? 'العمليات' : 'Operations',
-                              icon: Icons.route_rounded,
-                              color: const Color(0xFF8E44AD),
+                              title: isAr ? 'منصة الأسر والشركات الصغيرة' : 'Home Seller Sales Hub',
+                              subtitle: isAr ? 'أرفف قياسية بـ 100 درهم وبوابة دفع Fintx المعتمدة' : '100 AED standard shelves, Fintx gateway & transparent pricing',
+                              badge: isAr ? 'قناة جديدة' : 'New Channel',
+                              icon: Icons.storefront_rounded,
+                              color: const Color(0xFF1E3A8A),
                               onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const PickPackScreen(warehouseId: 'dxb'))),
+                                context,
+                                MaterialPageRoute(builder: (_) => const HomeSellerMarketplaceHubPage()),
+                              ),
                             ),
                           ],
                         ),
@@ -844,7 +879,6 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                     ),
                   ),
                 ),
-              ],
 
               if (isLoading)
                 const SliverFillRemaining(
@@ -1139,181 +1173,6 @@ class _SetupPendingCard extends StatelessWidget {
   }
 }
 
-// ─── Locked Promo (replaces all dashboard content when store is pending) ───────
-
-class _LockedStorePromo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final isAr = Localizations.localeOf(context).languageCode == 'ar';
-    final features = [
-      (
-        Icons.warehouse_rounded,
-        isAr ? 'تخزين آمن' : 'Secure Warehousing',
-        isAr ? 'تخزين البضائع في 4 مراكز بالدولة مراقبة 24/7.' : 'Store inventory in 4 UAE locations with 24/7 monitoring.',
-        const Color(0xFF2E86DE),
-      ),
-      (
-        Icons.local_shipping_rounded,
-        isAr ? 'توصيل في نفس اليوم' : 'Same-Day Delivery',
-        isAr ? 'خدمات لوجستية للميل الأخير عبر دبي، أبوظبي، الشارقة والعين.' : 'Last-mile logistics across Dubai, Abu Dhabi, Sharjah & Al Ain.',
-        const Color(0xFF10AC84),
-      ),
-      (
-        Icons.analytics_rounded,
-        isAr ? 'مخزون مباشر' : 'Real-Time Inventory',
-        isAr ? 'متابعة مستويات المخزون، صلاحية المنتجات وتتبع الحركة.' : 'Track stock levels, expiry dates, and item movement live.',
-        const Color(0xFF5F27CD),
-      ),
-      (
-        Icons.verified_rounded,
-        isAr ? 'شارة تاجر معتمد' : 'Verified Seller Badge',
-        isAr ? 'أكمل إجراءات التحقق للحصول على شارة تاجر معتمد.' : 'Complete KYC to get the NXN Verified badge on your store.',
-        const Color(0xFFFF9F43),
-      ),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section title
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: AppColors.bluePrimary,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                isAr ? 'لماذا تبيع على NXN؟' : 'Why Sell on NXN?',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Feature cards
-          ...features.map(
-            (f) => Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color:
-                        const Color(0xFF9DA8C4).withValues(alpha: 0.07),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: f.$4.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(f.$1, color: f.$4, size: 18),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          f.$2,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          f.$3,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Stats row
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _PromoStat(value: '500+', label: isAr ? 'التجار' : 'Merchants'),
-                Container(
-                    width: 1, height: 36, color: Colors.white24),
-                _PromoStat(value: '4', label: isAr ? 'المستودعات' : 'Warehouses'),
-                Container(
-                    width: 1, height: 36, color: Colors.white24),
-                _PromoStat(value: isAr ? 'كافة الإمارات' : 'UAE-wide', label: isAr ? 'التوصيل' : 'Delivery'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PromoStat extends StatelessWidget {
-  final String value;
-  final String label;
-  const _PromoStat({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value,
-            style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 18)),
-        const SizedBox(height: 4),
-        Text(label,
-            style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-                fontWeight: FontWeight.w500)),
-      ],
-    );
-  }
-}
-
 // ─── Reusable stat / action card widgets ─────────────────────────────────────
 
 class _StatCard extends StatelessWidget {
@@ -1466,39 +1325,46 @@ class _ActionCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, size: 18, color: color),
+                  child: Icon(icon, size: 17, color: color),
                 ),
-                Row(
-                  children: [
-                    if (badge != null && badge!.isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          badge!,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                            color: color,
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (badge != null && badge!.isNotEmpty) ...[
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              badge!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 4),
+                      ],
+                      Icon(
+                        isAr ? Icons.arrow_back_ios_new_rounded : Icons.arrow_forward_ios_rounded,
+                        size: 11,
+                        color: color.withValues(alpha: 0.7),
                       ),
-                      const SizedBox(width: 6),
                     ],
-                    Icon(
-                      isAr ? Icons.arrow_back_ios_new_rounded : Icons.arrow_forward_ios_rounded,
-                      size: 12,
-                      color: color.withValues(alpha: 0.7),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),

@@ -26,9 +26,9 @@ class CartProvider extends ChangeNotifier {
 
   String? get appliedPromoCode => _appliedPromoCode;
 
-  double get subtotal => _items.fold<double>(0.0, (sum, item) => sum + item.totalPrice);
+  double get subtotal => double.parse(_items.fold<double>(0.0, (sum, item) => sum + item.totalPrice).toStringAsFixed(2));
 
-  double get vatAmount => subtotal * 0.05;
+  double get vatAmount => double.parse((subtotal * 0.05).toStringAsFixed(2));
 
   double get deliveryFee {
     if (_items.isEmpty) return 0.0;

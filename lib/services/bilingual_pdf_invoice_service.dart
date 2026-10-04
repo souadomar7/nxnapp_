@@ -17,8 +17,13 @@ class BilingualPdfInvoiceService {
     final String trn = invoice.trnNumber ?? '100492817300003';
     final String dateStr = invoice.formattedDate;
 
+    // Load full Unicode Cairo font to support bilingual English/Arabic text cleanly
+    final font = await PdfGoogleFonts.cairoRegular();
+    final fontBold = await PdfGoogleFonts.cairoBold();
+
     pdf.addPage(
       pw.Page(
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {

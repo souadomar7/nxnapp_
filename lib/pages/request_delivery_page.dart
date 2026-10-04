@@ -433,10 +433,10 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
   // ─── Step 1: Courier Choice & Speed ──────────────────────────────────────
   Widget _buildStep1CourierAndOptions(bool isAr) {
     final warehouses = [
-      isAr ? 'مستودع دبي المركزي' : 'Dubai Central Warehouse',
-      isAr ? 'مستودع أبوظبي المركزي' : 'Abu Dhabi Central Hub',
-      isAr ? 'مستودع الشارقة الإقليمي' : 'Sharjah Regional Hub',
-      isAr ? 'مركز تجميع العين' : 'Al Ain Fulfillment Center',
+      {'id': 'Dubai Central Warehouse', 'name': isAr ? 'مستودع دبي المركزي' : 'Dubai Central Warehouse'},
+      {'id': 'Abu Dhabi Central Hub', 'name': isAr ? 'مستودع أبوظبي المركزي' : 'Abu Dhabi Central Hub'},
+      {'id': 'Sharjah Regional Hub', 'name': isAr ? 'مستودع الشارقة الإقليمي' : 'Sharjah Regional Hub'},
+      {'id': 'Al Ain Fulfillment Center', 'name': isAr ? 'مركز تجميع العين' : 'Al Ain Fulfillment Center'},
     ];
 
     final couriers = [
@@ -487,8 +487,18 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
           initialValue: _dispatchWarehouse,
           decoration: _inputDeco(),
           dropdownColor: Colors.white,
-          items: warehouses.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
-          onChanged: (v) => setState(() => _dispatchWarehouse = v!),
+          items: warehouses.map((w) => DropdownMenuItem(
+            value: w['id'] as String,
+            child: Text(
+              w['name'] as String,
+              textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            ),
+          )).toList(),
+          onChanged: (v) {
+            if (v != null) {
+              setState(() => _dispatchWarehouse = v);
+            }
+          },
         ),
 
         const SizedBox(height: 20),

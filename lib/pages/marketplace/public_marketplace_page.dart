@@ -463,6 +463,7 @@ class _PublicMarketplacePageState extends State<PublicMarketplacePage>
 
               if (snapshot.hasError) {
                 return SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -488,29 +489,35 @@ class _PublicMarketplacePageState extends State<PublicMarketplacePage>
 
               if (snapshot.data == null || snapshot.data!.isEmpty) {
                 return SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.storefront_rounded, size: 56, color: Color(0xFF2563EB)),
                           ),
-                          child: const Icon(Icons.storefront_rounded, size: 56, color: Color(0xFF2563EB)),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          isAr ? 'السوق يتجهز قريباً! 🚀' : 'Marketplace opening soon! 🚀',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          isAr ? 'لا تتوفر منتجات حالياً. كن أول بائع!' : 'No products yet. Be the first seller!',
-                          style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
-                        ),
-                      ],
+                          const SizedBox(height: 20),
+                          Text(
+                            isAr ? 'السوق يتجهز قريباً! 🚀' : 'Marketplace opening soon! 🚀',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            isAr ? 'لا تتوفر منتجات حالياً. كن أول بائع!' : 'No products yet. Be the first seller!',
+                            style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -520,28 +527,33 @@ class _PublicMarketplacePageState extends State<PublicMarketplacePage>
 
               if (products.isEmpty) {
                 return SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.search_off_rounded, size: 56, color: Color(0xFF94A3B8)),
-                        const SizedBox(height: 12),
-                        Text(
-                          isAr ? 'لا توجد نتائج لـ "$_searchQuery"' : 'No results for "$_searchQuery"',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            setState(() {
-                              _searchQuery = '';
-                              _selectedCategory = 'All';
-                            });
-                          },
-                          child: Text(isAr ? 'مسح البحث' : 'Clear Search'),
-                        ),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.search_off_rounded, size: 56, color: Color(0xFF94A3B8)),
+                          const SizedBox(height: 12),
+                          Text(
+                            isAr ? 'لا توجد نتائج لـ "$_searchQuery"' : 'No results for "$_searchQuery"',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() {
+                                _searchQuery = '';
+                                _selectedCategory = 'All';
+                              });
+                            },
+                            child: Text(isAr ? 'مسح البحث' : 'Clear Search'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -886,6 +898,7 @@ class _ProductCardState extends State<_ProductCard>
                         // Product name
                         Text(
                           isAr ? _getArabicProductName(product.name, product.nameAr) : product.name,
+                          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,

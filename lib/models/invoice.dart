@@ -8,6 +8,7 @@ class Invoice {
   final String id;
   final String number;
   final String warehouseName;
+  final String? warehouseNameAr;
   final DateTime date;
   final double amount; // AED (subtotal)
   final double vat;    // AED (e.g., 5% of subtotal)
@@ -25,6 +26,7 @@ class Invoice {
     required this.id,
     required this.number,
     required this.warehouseName,
+    this.warehouseNameAr,
     required this.date,
     required this.amount,
     required this.vat,
@@ -37,6 +39,49 @@ class Invoice {
     this.bilingualSupplierNameAr = 'الشبكة الوطنية للخدمات اللوجستية ش.ذ.م.م',
   });
 
+  String getWarehouseName(bool isAr) {
+    if (warehouseNameAr != null && warehouseNameAr!.trim().isNotEmpty && isAr) {
+      return warehouseNameAr!;
+    }
+    final raw = warehouseName.toLowerCase();
+    
+    if (raw == 'auh' || raw == 'wh-auh' || raw.contains('abu dhabi') || raw.contains('auh') || raw.contains('أبوظبي') || raw.contains('أبو ظبي')) {
+      return isAr ? 'مستودع أبوظبي المركزي (كيزاد)' : 'Abu Dhabi Central Warehouse (KIZAD)';
+    }
+    if (raw == 'shj' || raw == 'wh-shj' || raw.contains('sharjah') || raw.contains('shj') || raw.contains('الشارقة')) {
+      return isAr ? 'مستودع الشارقة الإقليمي (المنطقة 4)' : 'Sharjah Regional Hub (Industrial 4)';
+    }
+    if (raw == 'aln' || raw == 'wh-aln' || raw.contains('al ain') || raw.contains('aln') || raw.contains('العين')) {
+      return isAr ? 'مستودع العين اللوجستي (الصناعية)' : 'Al Ain Logistics Oasis (Sanaiya)';
+    }
+    if (raw == 'dxb' || raw == 'wh-dxb' || raw.contains('dubai') || raw.contains('dxb') || raw.contains('دبي')) {
+      return isAr ? 'مستودع دبي المركزي (القوز)' : 'Dubai Central Warehouse (Al Quoz)';
+    }
+    if (raw.contains('marketplace dispatch') || raw.contains('nxn marketplace dispatch')) {
+      return isAr ? 'خدمة شحن سوق NXN' : 'NXN Marketplace Dispatch';
+    }
+    if (raw.contains('marketplace') || raw.contains('nxn marketplace')) {
+      return isAr ? 'سوق NXN للتجارة' : 'NXN Marketplace';
+    }
+    if (raw.contains('single/multi warehouse booking') || raw.contains('warehouse booking')) {
+      return isAr ? 'حجز مساحات تخزين متعددة' : 'Warehouse Space Lease';
+    }
+    if (raw.contains('shop verification setup fee')) {
+      return isAr ? 'رسوم توثيق وتفعيل المتجر' : 'Shop Verification Setup Fee';
+    }
+    if (raw.contains('delivery service')) {
+      return isAr ? 'خدمة توصيل الطلبات' : 'Delivery Service';
+    }
+    if (raw.contains('iban settlement payout')) {
+      return isAr ? 'سحب تسوية الحساب المصرفي (IBAN)' : 'IBAN Settlement Payout';
+    }
+
+    if (isAr) {
+      return warehouseName.replaceAll('Warehouse', 'مستودع').replaceAll('Hub', 'مركز');
+    }
+    return warehouseName;
+  }
+
   double get total => amount + vat + workerFee;
 
   String get formattedDate =>
@@ -48,6 +93,7 @@ class Invoice {
       'id': id,
       'invoice_number': number,
       'warehouse_name': warehouseName,
+      'warehouse_name_ar': warehouseNameAr,
       'amount': amount,
       'vat': vat,
       'worker_fee': workerFee,
@@ -63,6 +109,7 @@ class Invoice {
       id: (json['id'] as String?) ?? 'INV-${DateTime.now().millisecondsSinceEpoch}',
       number: (json['invoice_number'] as String?) ?? (json['number'] as String?) ?? 'INV-001',
       warehouseName: (json['warehouse_name'] as String?) ?? 'DXB Central Hub',
+      warehouseNameAr: json['warehouse_name_ar'] as String?,
       date: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       vat: (json['vat'] as num?)?.toDouble() ?? 0.0,

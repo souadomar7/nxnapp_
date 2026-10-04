@@ -3,10 +3,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../theme.dart';
 import '../services/marketplace_service.dart';
+import '../models/invoice.dart';
 import '../core/utils/validators.dart';
+import 'booking_page.dart';
 
 class CreateShipmentPage extends StatefulWidget {
-  const CreateShipmentPage({super.key});
+  final bool initialIsDropOff;
+  final int? initialItemCount;
+  final String? initialWarehouseId;
+  final String? initialGoodsType;
+  final String? initialPickupLocation;
+  final String? initialPickupAddress;
+
+  const CreateShipmentPage({
+    super.key,
+    this.initialIsDropOff = true,
+    this.initialItemCount,
+    this.initialWarehouseId,
+    this.initialGoodsType,
+    this.initialPickupLocation,
+    this.initialPickupAddress,
+  });
 
   @override
   State<CreateShipmentPage> createState() => _CreateShipmentPageState();
@@ -17,21 +34,22 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
   final _supabase = Supabase.instance.client;
   
   // Shipment type — Drop-off is default
-  bool _isDropOff = true;
+  late bool _isDropOff;
   
   // Common fields
   String? _selectedWarehouseId;
   List<Map<String, dynamic>> _warehouses = [];
-  final _itemCountCtrl = TextEditingController();
+  late final TextEditingController _itemCountCtrl;
   final _notesCtrl = TextEditingController();
   DateTime? _selectedDate;
   bool _isLoading = false;
   bool _isLoadingWarehouses = true;
+  bool _hasActiveLease = true;
 
   // Pick-up only fields
-  final _pickupLocationNameCtrl = TextEditingController();
-  final _pickupAddressCtrl = TextEditingController();
-  String _goodsType = 'General Merchandise';
+  late final TextEditingController _pickupLocationNameCtrl;
+  late final TextEditingController _pickupAddressCtrl;
+  late String _goodsType;
   final _contactNameCtrl = TextEditingController();
   final _contactPhoneCtrl = TextEditingController();
 
@@ -50,19 +68,150 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
   @override
   void initState() {
     super.initState();
+    _isDropOff = widget.initialIsDropOff;
+    _itemCountCtrl = TextEditingController(text: widget.initialItemCount?.toString() ?? '');
+    _pickupLocationNameCtrl = TextEditingController(text: widget.initialPickupLocation ?? '');
+    _pickupAddressCtrl = TextEditingController(text: widget.initialPickupAddress ?? '');
+    _goodsType = widget.initialGoodsType ?? 'General Merchandise';
+    _selectedWarehouseId = widget.initialWarehouseId;
     _loadWarehouses();
+    _checkActiveLease();
+  }
+
+  Future<void> _checkActiveLease() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      final invoices = await MarketplaceService().getInvoices();
+      final hasRental = invoices.any((i) => i.paid && i.type == InvoiceType.rental);
+      if (mounted) setState(() => _hasActiveLease = hasRental);
+      return;
+    }
+    try {
+      final res = await _supabase
+          .from('sme_subscriptions')
+          .select('id')
+          .eq('seller_id', user.id)
+          .eq('is_active', true)
+          .limit(1);
+      final hasActive = (res as List).isNotEmpty;
+      if (mounted) setState(() => _hasActiveLease = hasActive);
+    } catch (_) {}
   }
 
   Future<void> _loadWarehouses() async {
+    setState(() => _isLoadingWarehouses = true);
+    final List<Map<String, dynamic>> list = [];
+    final user = _supabase.auth.currentUser;
+
+    // 1. Prioritize active leased warehouses for the logged-in merchant
+    if (user != null) {
+      try {
+        final subs = await _supabase
+            .from('sme_subscriptions')
+            .select('warehouse_id, shelves_count, warehouses(id, name, name_ar, emirate, address)')
+            .eq('seller_id', user.id)
+            .eq('is_active', true);
+
+        for (var sub in (subs as List)) {
+          final wh = sub['warehouses'] as Map<String, dynamic>?;
+          final whId = wh?['id']?.toString() ?? sub['warehouse_id']?.toString();
+          if (whId != null) {
+            final shelves = (sub['shelves_count'] as num?)?.toInt() ?? 1;
+            final existingIdx = list.indexWhere((w) => w['id'] == whId);
+            if (existingIdx != -1) {
+              list[existingIdx]['shelves_count'] = (list[existingIdx]['shelves_count'] as int) + shelves;
+            } else {
+              list.add({
+                'id': whId,
+                'name': wh?['name'] ?? 'Warehouse Hub ($whId)',
+                'name_ar': wh?['name_ar'] ?? wh?['name'] ?? 'مستودع ($whId)',
+                'emirate': wh?['emirate'] ?? 'Dubai',
+                'is_active_lease': true,
+                'shelves_count': shelves,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading active user leases: $e');
+      }
+    }
+
+    // 2. Query all general warehouses from Supabase
     try {
       final data = await _supabase.from('warehouses').select();
+      for (var w in (data as List)) {
+        if (!list.any((item) => item['id'] == w['id'])) {
+          list.add({
+            'id': w['id'].toString(),
+            'name': w['name'] ?? 'Warehouse',
+            'name_ar': w['name_ar'] ?? w['name'] ?? 'مستودع',
+            'emirate': w['emirate'] ?? 'Dubai',
+            'is_active_lease': false,
+            'shelves_count': 0,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error querying general warehouses: $e');
+    }
+
+    // 3. Fallback standard UAE Hubs if offline or empty so dropdown is NEVER blank
+    if (list.isEmpty) {
+      list.addAll([
+        {
+          'id': 'dxb',
+          'name': 'Dubai Central Warehouse (Al Quoz)',
+          'name_ar': 'مستودع دبي المركزي (القوز)',
+          'emirate': 'Dubai',
+          'is_active_lease': true,
+          'shelves_count': 2,
+        },
+        {
+          'id': 'dxb-2',
+          'name': 'Dubai South Logistics Hub',
+          'name_ar': 'مستودع دبي الجنوب اللوجستي',
+          'emirate': 'Dubai',
+          'is_active_lease': false,
+          'shelves_count': 0,
+        },
+        {
+          'id': 'auh',
+          'name': 'Abu Dhabi Central Hub (KIZAD)',
+          'name_ar': 'مستودع أبوظبي المركزي (كيزاد)',
+          'emirate': 'Abu Dhabi',
+          'is_active_lease': false,
+          'shelves_count': 0,
+        },
+        {
+          'id': 'shj',
+          'name': 'Sharjah Regional Hub (Industrial Area)',
+          'name_ar': 'مستودع الشارقة الإقليمي (المنطقة الصناعية)',
+          'emirate': 'Sharjah',
+          'is_active_lease': false,
+          'shelves_count': 0,
+        },
+        {
+          'id': 'aln',
+          'name': 'Al Ain Central Hub (Sanaiya)',
+          'name_ar': 'مستودع العين المركزي (الصناعية)',
+          'emirate': 'Al Ain',
+          'is_active_lease': false,
+          'shelves_count': 0,
+        },
+      ]);
+    }
+
+    if (mounted) {
       setState(() {
-        _warehouses = List<Map<String, dynamic>>.from(data);
-        if (_warehouses.isNotEmpty) _selectedWarehouseId = _warehouses.first['id'];
+        _warehouses = list;
+        // Prioritize active lease if selected id is null or invalid
+        if (_selectedWarehouseId == null || !list.any((w) => w['id'] == _selectedWarehouseId)) {
+          final firstActive = list.firstWhere((w) => w['is_active_lease'] == true, orElse: () => list.first);
+          _selectedWarehouseId = firstActive['id'] as String;
+        }
         _isLoadingWarehouses = false;
       });
-    } catch (e) {
-      setState(() => _isLoadingWarehouses = false);
     }
   }
 
@@ -151,7 +300,7 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  isAr ? 'تم إنشاء تصريح الدخول! 🎫' : 'Dock Gate-Pass Generated! 🎫',
+                  isAr ? 'تم تأكيد موعد التوريد! 📦' : 'Inbound Intake Receipt Generated! 📦',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   textAlign: TextAlign.center,
                 ),
@@ -162,8 +311,8 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
               children: [
                 Text(
                   isAr
-                      ? 'تم تسجيل طلب الشحن وتوليد تصريح الدخول الذكي للبوابة. أظهر هذا الرمز عند وصول الشاحنة للمستودع.'
-                      : 'Shipment registered successfully. Present this digital gate-pass at the warehouse dock gate for instant check-in.',
+                      ? 'تم تسجيل طلب التوريد بنجاح. أظهر رمز الاستجابة السريعة (QR) وبطاقة الهوية في مكتب استقبال NXN لإتمام استلام البضائع.'
+                      : 'Inbound shipment registered. Present this digital intake QR code with your Emirates ID at the NXN Office Reception desk.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12, height: 1.4),
                 ),
@@ -188,7 +337,7 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                         width: 140,
                         height: 140,
                         child: QrImageView(
-                          data: 'NXN-GATEPASS:$gatePassCode|WH:$_selectedWarehouseId',
+                          data: 'NXN-INBOUND-ASN:$gatePassCode|WH:$_selectedWarehouseId',
                           version: QrVersions.auto,
                           size: 140.0,
                           eyeStyle: const QrEyeStyle(
@@ -305,6 +454,54 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (!_hasActiveLease)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isAr ? 'تنبيه: يلزم حجز مساحة تخزينية أولاً' : 'Active Shelf Lease Required',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF92400E)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              isAr
+                                  ? 'يجب استئجار مساحة رفوف في المستودع قبل إرسال شحنات البضائع.'
+                                  : 'You must lease warehouse shelf space before creating inbound drop-off shipments.',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFFB45309), height: 1.4),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const BookingPage()),
+                              ),
+                              icon: const Icon(Icons.shelves, size: 16),
+                              label: Text(isAr ? 'احجز مساحة الآن (100 د.إ/شهر)' : 'Lease Shelves Now (AED 100/mo)'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD97706),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // ── Drop-off / Pick-up Toggle ──────────────────────
                     Text(
                       isAr ? 'طريقة الشحن' : 'Shipment Method',
@@ -368,7 +565,19 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => _isDropOff = false),
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: const Color(0xFFD97706),
+                                  content: Text(
+                                    isAr
+                                        ? '⚠️ خدمة الاستلام من الموقع (Collection) محدودة الأسطول حالياً، يُنصح باختيار التسليم المباشر (Drop-off).'
+                                        : '⚠️ Collection fleet is currently limited. We recommend Drop-off for fastest intake.',
+                                  ),
+                                ),
+                              );
+                              setState(() => _isDropOff = false);
+                            },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.all(16),
@@ -396,9 +605,21 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    isAr ? 'استلام من موقعك' : 'We collect from you',
+                                    isAr ? 'استلام من موقعك (محدود)' : 'Collection (Limited)',
                                     style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                                     textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade100,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      isAr ? 'أسطول محدود' : 'Limited Fleet',
+                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -417,8 +638,8 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                       ),
                       child: Text(
                         _isDropOff
-                          ? (isAr ? '🏭 ستحضر بضاعتك إلى المستودع بنفسك.' : '🏭 You will bring your goods to the warehouse yourself.')
-                          : (isAr ? '🚛 سيقوم فريقنا باستلام بضاعتك من موقعك المحدد.' : '🚛 Our team will pick up your goods from your specified location.'),
+                          ? (isAr ? '🏭 التسليم المباشر (Drop-off): أحضر بضاعتك للمستودع، ويتم الاستلام فوراً بالعدد وفحص التلف.' : '🏭 Drop-off: Bring your cargo to our warehouse dock for instant count & inspection.')
+                          : (isAr ? '⚠️ تنبيه: الاستلام من الموقع يخضع لجدول مواعيد الأسطول المحدود حالياً.' : '⚠️ Note: Collection pickup is subject to limited fleet scheduling.'),
                         style: TextStyle(
                           color: _isDropOff ? AppColors.bluePrimary : const Color(0xFFE67E22),
                           fontSize: 13,
@@ -434,14 +655,61 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedWarehouseId,
+                      isExpanded: true,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        prefixIcon: const Icon(Icons.warehouse_outlined),
+                        prefixIcon: const Icon(Icons.warehouse_outlined, color: AppColors.bluePrimary),
+                        hintText: isAr ? 'اختر المستودع' : 'Select warehouse',
                       ),
-                      items: _warehouses.map((w) => DropdownMenuItem(
-                        value: w['id'] as String,
-                        child: Text(isAr ? (w['name_ar'] ?? w['name']) : w['name']),
-                      )).toList(),
+                      items: _warehouses.map((w) {
+                        final isActiveLease = w['is_active_lease'] == true;
+                        final name = isAr ? (w['name_ar'] ?? w['name']) : w['name'];
+                        final shelves = w['shelves_count'] ?? 0;
+
+                        return DropdownMenuItem<String>(
+                          value: w['id'] as String,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name.toString(),
+                                  style: TextStyle(
+                                    fontWeight: isActiveLease ? FontWeight.bold : FontWeight.w500,
+                                    fontSize: 13,
+                                    color: isActiveLease ? AppColors.bluePrimary : AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isActiveLease)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.check_circle, size: 11, color: Color(0xFF059669)),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        isAr ? 'مستودعك المؤجر ($shelves رف)' : 'Active Lease ($shelves Shelves)',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF059669),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                       onChanged: (v) => setState(() => _selectedWarehouseId = v),
                       validator: (v) => v == null ? (isAr ? 'يرجى اختيار مستودع' : 'Please select a warehouse') : null,
                     ),
@@ -690,20 +958,36 @@ class _CreateShipmentPageState extends State<CreateShipmentPage> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                            dense: true,
-                            activeColor: const Color(0xFF16A34A),
-                            value: _declaredNonHazardous,
-                            onChanged: (val) => setState(() => _declaredNonHazardous = val ?? false),
-                            title: Text(
-                              isAr
-                                  ? 'أقر بأن جميع البضائع الواردة متوافقة مع اشتراطات السلامة وخالية من أي مواد خطرة أو محظورة قانوناً.'
-                                  : 'I declare that this cargo strictly complies with UAE safety laws and contains zero hazardous or prohibited materials.',
-                              style: const TextStyle(fontSize: 12, height: 1.3, fontWeight: FontWeight.w600),
+                          InkWell(
+                            onTap: () => setState(() => _declaredNonHazardous = !_declaredNonHazardous),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: Checkbox(
+                                      value: _declaredNonHazardous,
+                                      activeColor: const Color(0xFF16A34A),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                      onChanged: (val) => setState(() => _declaredNonHazardous = val ?? false),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      isAr
+                                          ? 'أقر بأن جميع البضائع الواردة متوافقة مع اشتراطات السلامة وخالية من أي مواد خطرة أو محظورة قانوناً.'
+                                          : 'I declare that this cargo strictly complies with UAE safety laws and contains zero hazardous or prohibited materials.',
+                                      style: const TextStyle(fontSize: 12, height: 1.3, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            controlAffinity: ListTileControlAffinity.leading,
                           ),
                         ],
                       ),

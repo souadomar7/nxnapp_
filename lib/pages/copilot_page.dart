@@ -5,6 +5,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../theme.dart';
 import '../providers/locale_provider.dart';
 import 'payment_page.dart';
+import 'checkout_page.dart';
+import '../models/invoice.dart';
 import '../services/ai_agent_service.dart';
 import 'create_shipment_page.dart';
 import 'marketplace/add_product_page.dart';
@@ -16,6 +18,9 @@ import 'smart_inventory_stage.dart';
 import 'operations/tracking_page.dart';
 import 'registration_page.dart';
 import 'marketplace/seller_products_page.dart';
+import 'marketplace/home_seller_marketplace_hub.dart';
+import 'operations/outbound_order_creation_page.dart';
+import 'operations/inbound_intake_inspection_page.dart';
 enum ChatCardType { none, inventoryAlert, bookingQuote, gatePass, deliveryTracker, damagedQuarantineAlert }
 
 class ChatMessage {
@@ -347,6 +352,28 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
       ),
       child: Row(
         children: [
+          // Voice Note Taker Button
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _showVoiceNoteModal,
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF5252).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.3)),
+                ),
+                child: const Icon(
+                  Icons.mic_rounded,
+                  color: Color(0xFFFF5252),
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -361,8 +388,8 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
                       controller: _textController,
                       style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        hintText: isAr ? "اكتب سؤالك عن الخدمات اللوجستية والتخزين..." : "Type a logistics question or command...",
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        hintText: isAr ? "تحدث أو اكتب أمرك اللوجستي..." : "Speak or type logistics command...",
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
@@ -381,6 +408,22 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showVoiceNoteModal() {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _VoiceNoteSheet(
+        isAr: isAr,
+        onTranscriptSubmitted: (text) {
+          Navigator.pop(ctx);
+          _handleSendMessage(text);
+        },
       ),
     );
   }
@@ -466,56 +509,85 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
                     _buildRichCard(message.cardType, message.cardData),
                   ],
                   if (message.agentAction != null) ...[
-                    const SizedBox(height: 8),
-                    Builder(
-                      builder: (ctx) {
-                        final isAr = Localizations.localeOf(context).languageCode == 'ar';
-                        String btnText = isAr ? 'تنفيذ الإجراء' : 'Take Action';
-                        Widget page = Container();
-                        if (message.agentAction!.type == 'open_booking') {
-                          btnText = isAr ? 'احجز مساحة الآن' : 'Book Space Now';
-                          page = const BookingPage();
-                        } else if (message.agentAction!.type == 'create_shipment') {
-                          btnText = isAr ? 'إنشاء شحنة جديدة' : 'Create Shipment';
-                          page = const CreateShipmentPage();
-                        } else if (message.agentAction!.type == 'add_product') {
-                          btnText = isAr ? 'إضافة منتج للسوق' : 'Add Product';
-                          page = const AddProductPage();
-                        } else if (message.agentAction!.type == 'view_orders') {
-                          btnText = isAr ? 'عرض الطلبات' : 'View Orders';
-                          page = const SellerOrdersPage();
-                        } else if (message.agentAction!.type == 'view_inventory') {
-                          btnText = isAr ? 'لوحة المخزون' : 'View Inventory';
-                          page = const SmartInventoryStageEN();
-                        } else if (message.agentAction!.type == 'open_kyc') {
-                          btnText = isAr ? 'التحقق من الهوية والترخيص' : 'Verify KYC Documents';
-                          page = const KYCPage();
-                        } else if (message.agentAction!.type == 'open_wallet') {
-                          btnText = isAr ? 'فتح المحفظة' : 'Open Wallet';
-                          page = const WalletPage();
-                        } else if (message.agentAction!.type == 'track_order') {
-                          btnText = isAr ? 'تتبع الشحنة مباشرة' : 'Live Order Tracking';
-                          page = const TrackingPage();
-                        } else if (message.agentAction!.type == 'start_uae_pass') {
-                          btnText = isAr ? 'التسجيل عبر الهوية الرقمية' : 'Register with UAE PASS';
-                          page = const RegistrationPage();
-                        } else if (message.agentAction!.type == 'edit_price' || message.agentAction!.type == 'manage_pricing') {
-                          btnText = isAr ? 'إدارة المنتجات والأسعار' : 'Manage Product Prices';
-                          page = const SellerProductsPage();
+                    if (message.agentAction!.type == 'direct_checkout')
+                      _buildDirectCheckoutCard(message.agentAction!.payload)
+                    else if (message.agentAction!.type == 'direct_gate_pass')
+                      _buildGatePassCard(message.agentAction!.payload)
+                    else ...[
+                      const SizedBox(height: 8),
+                      Builder(
+                        builder: (ctx) {
+                          final isAr = Localizations.localeOf(context).languageCode == 'ar';
+                          final actionType = message.agentAction!.type;
+                          final payload = message.agentAction!.payload;
+                          String btnText = isAr ? 'تنفيذ الإجراء' : 'Take Action';
+                          Widget page = Container();
+
+                          if (actionType == 'direct_shipment' || actionType == 'create_shipment') {
+                            btnText = isAr ? 'تأكيد طلب التوريد والشحن 🚚' : 'Confirm Inbound Shipment 🚚';
+                            page = CreateShipmentPage(
+                              initialIsDropOff: payload['is_drop_off'] ?? true,
+                              initialItemCount: payload['item_count'],
+                              initialWarehouseId: payload['warehouse_id'],
+                              initialPickupLocation: payload['pickup_location'],
+                              initialGoodsType: payload['goods_type'],
+                            );
+                          } else if (actionType == 'direct_add_product' || actionType == 'add_product') {
+                            btnText = isAr ? 'إكمال ونشر المنتج بالسوق 🛍️' : 'Complete & Publish Listing 🛍️';
+                            page = AddProductPage(
+                              initialName: payload['name'],
+                              initialPrice: (payload['price'] as num?)?.toDouble(),
+                              initialQty: payload['quantity'],
+                              initialCategory: payload['category'],
+                            );
+                          } else if (actionType == 'direct_edit_price' || actionType == 'edit_price' || actionType == 'manage_pricing') {
+                            btnText = isAr ? 'تأكيد وتطبيق السعر الجديد 🏷️' : 'Confirm & Apply Price 🏷️';
+                            page = const SellerProductsPage();
+                          } else if (actionType == 'direct_track_order' || actionType == 'track_order') {
+                            btnText = isAr ? 'فتح خريطة التتبع المباشرة 📍' : 'Open Live Map Tracking 📍';
+                            page = const TrackingPage();
+                          } else if (actionType == 'direct_wallet_payout' || actionType == 'open_wallet') {
+                            btnText = isAr ? 'تأكيد السحب البنكي (IBAN) 🏦' : 'Confirm Bank Withdrawal (IBAN) 🏦';
+                            page = const WalletPage();
+                          } else if (actionType == 'open_booking') {
+                            btnText = isAr ? 'احجز مساحة الآن' : 'Book Space Now';
+                            page = const BookingPage();
+                          } else if (actionType == 'view_orders') {
+                            btnText = isAr ? 'عرض الطلبات' : 'View Orders';
+                            page = const SellerOrdersPage();
+                          } else if (actionType == 'view_inventory') {
+                            btnText = isAr ? 'لوحة المخزون' : 'View Inventory';
+                            page = const SmartInventoryStageEN();
+                          } else if (actionType == 'open_kyc') {
+                            btnText = isAr ? 'التحقق من الهوية والترخيص' : 'Verify KYC Documents';
+                            page = const KYCPage();
+                          } else if (actionType == 'open_home_seller_hub' || actionType == 'sme_marketplace') {
+                            btnText = isAr ? 'فتح منصة الأسر والشركات 🛍️' : 'Open Home Seller Hub 🛍️';
+                            page = const HomeSellerMarketplaceHubPage();
+                          } else if (actionType == 'create_outbound_order' || actionType == 'outbound_dispatch') {
+                            btnText = isAr ? 'إنشاء أمر شحن وتوزيع 🚀' : 'Create Outbound Order 🚀';
+                            page = const OutboundOrderCreationPage();
+                          } else if (actionType == 'open_intake_inspection' || actionType == 'intake_inspection') {
+                            btnText = isAr ? 'فحص واستلام البضائع 📦' : 'Inspect & Receive Intake 📦';
+                            page = const InboundIntakeInspectionPage();
+                          } else if (actionType == 'start_uae_pass') {
+                            btnText = isAr ? 'التسجيل عبر الهوية الرقمية' : 'Register with UAE PASS';
+                            page = const RegistrationPage();
+                          }
+                          return ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.bluePrimary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Text(btnText),
+                          );
                         }
-                        return ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => page));
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.bluePrimary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          child: Text(btnText),
-                        );
-                      }
-                    ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -531,6 +603,208 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDirectCheckoutCard(Map<String, dynamic> payload) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final warehouseName = isAr
+        ? (payload['warehouse_name_ar'] ?? payload['warehouse_name'] ?? 'مستودع دبي المركزي')
+        : (payload['warehouse_name'] ?? 'Dubai Central Warehouse');
+    final int shelves = (payload['shelves_count'] as num?)?.toInt() ?? 39;
+    final int months = (payload['duration_months'] as num?)?.toInt() ?? 5;
+    final double amount = (payload['amount'] as num?)?.toDouble() ?? (shelves * 100.0 * months);
+    final double vat = (payload['vat'] as num?)?.toDouble() ?? (amount * 0.05);
+    final double total = (payload['total'] as num?)?.toDouble() ?? (amount + vat);
+    final String invNum = payload['invoice_number'] ?? 'INV-RENT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.35), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.bluePrimary.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.bluePrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.warehouse_rounded, color: AppColors.bluePrimary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isAr ? "⚡ طلب حجز جاهز للدفع" : "⚡ Instant Booking Ready",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.bluePrimary),
+                    ),
+                    Text(
+                      warehouseName,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Text(
+                  isAr ? "حساب فوري" : "Instant Quote",
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20, thickness: 1),
+          // Specs Grid
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildCheckoutSpecItem(
+                  icon: Icons.shelves,
+                  label: isAr ? "الأرفف" : "Shelves",
+                  val: "$shelves ${isAr ? 'رف' : 'Units'}",
+                ),
+                Container(width: 1, height: 30, color: Colors.grey.shade300),
+                _buildCheckoutSpecItem(
+                  icon: Icons.calendar_month_rounded,
+                  label: isAr ? "المدة" : "Duration",
+                  val: "$months ${isAr ? 'شهور' : 'Mos'}",
+                ),
+                Container(width: 1, height: 30, color: Colors.grey.shade300),
+                _buildCheckoutSpecItem(
+                  icon: Icons.fitness_center_rounded,
+                  label: isAr ? "الحمولة" : "Max Load",
+                  val: "${(shelves * 0.5).toStringAsFixed(1)} ${isAr ? 'طن' : 'Tons'}",
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Cost Rows
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isAr ? "الإيجار الأساسي ($shelves رف × $months شهور):" : "Base Rental ($shelves shelves × $months mos):",
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              Text(
+                "AED ${amount.toStringAsFixed(2)}",
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isAr ? "ضريبة القيمة المضافة (5% VAT):" : "UAE VAT (5%):",
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              Text(
+                "AED ${vat.toStringAsFixed(2)}",
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isAr ? "الإجمالي المستحق للدفع:" : "Total Payable:",
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              Text(
+                "AED ${total.toStringAsFixed(2)}",
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.bluePrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final invoice = Invoice(
+                  id: invNum,
+                  number: invNum,
+                  warehouseName: payload['warehouse_name'] ?? 'Dubai Central Warehouse',
+                  warehouseNameAr: payload['warehouse_name_ar'] ?? 'مستودع دبي المركزي',
+                  date: DateTime.now(),
+                  amount: amount,
+                  vat: vat,
+                  workerFee: (payload['worker_fee'] as num?)?.toDouble() ?? 0.0,
+                  type: InvoiceType.rental,
+                  metaData: {
+                    'shelves': shelves,
+                    'months': months,
+                    'warehouse_id': payload['warehouse_id'] ?? 'dxb',
+                    'source': 'ai_voice_direct_booking',
+                  },
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CheckoutPage(invoice: invoice)),
+                );
+              },
+              icon: const Icon(Icons.payment_rounded, color: Colors.white, size: 20),
+              label: Text(
+                isAr
+                    ? "انتقل للدفع الآن (${total.toStringAsFixed(2)} درهم) 💳"
+                    : "Proceed to Payment (AED ${total.toStringAsFixed(2)}) 💳",
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.bluePrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckoutSpecItem({required IconData icon, required String label, required String val}) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: AppColors.bluePrimary),
+        const SizedBox(height: 4),
+        Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+      ],
     );
   }
 
@@ -1067,3 +1341,342 @@ class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMi
     );
   }
 }
+
+class _VoiceNoteSheet extends StatefulWidget {
+  final bool isAr;
+  final ValueChanged<String> onTranscriptSubmitted;
+
+  const _VoiceNoteSheet({
+    required this.isAr,
+    required this.onTranscriptSubmitted,
+  });
+
+  @override
+  State<_VoiceNoteSheet> createState() => _VoiceNoteSheetState();
+}
+
+class _VoiceNoteSheetState extends State<_VoiceNoteSheet> with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  final TextEditingController _voiceNoteCtrl = TextEditingController();
+  int _selectedDialectIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDialectIndex = widget.isAr ? 0 : 3;
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _voiceNoteCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submitVoiceText(String text) {
+    if (text.trim().isEmpty) return;
+    widget.onTranscriptSubmitted(text.trim());
+  }
+
+  List<String> _getDialectPrompts() {
+    switch (_selectedDialectIndex) {
+      case 0: // Emirati & Gulf
+        return [
+          "ابغي ااجر 39 رف في دبي حق 5 شهور ودني للدفع",
+          "أريد توريد 25 طرد لمستودع دبي غداً تسليم مباشر (Drop-off)",
+          "أضف منتج قهوة كولد برو 250 مل بسعر 18 درهم والكمية 50",
+          "عدل سعر العسل الإماراتي إلى 120 درهم",
+          "وين وصل طلبي الأخير رقم #ORD-1002",
+          "اسحبلي 3500 درهم من المحفظة إلى حسابي البنكي (IBAN)",
+          "أصدر تصريح دخول فوري (Gate Pass) لمستودع دبي المركزي",
+        ];
+      case 1: // Egyptian
+        return [
+          "عايز ااجر 39 رف في مخزن دبي لمده 5 شهور وادخلني على الدفع",
+          "عاوز ابعت 30 كرتونه لمستودع الشارقه دروب اوف",
+          "ضيفلي منتج قهوة كولد برو بتمن 18 درهم والكمية 50",
+          "غيرلي سعر العسل الإماراتي ل 120 درهم",
+          "شوفلي الاوردر بتاعي #ORD-1002 وصل فين دلوقتي",
+          "عايز اسحب 3500 درهم على حسابي البنكي",
+          "طلعلي تصريح بوابة لمستودع دبي",
+        ];
+      case 2: // Levantine
+        return [
+          "بدي استأجر 39 رف بمستودع دبي ل 5 اشهر وخدني للدفع دغري",
+          "بدي ابعت 20 كرتونة لمستودع الشارقة تسليم مباشر",
+          "ضيف منتج قهوة كولد برو بسعر 18 درهم",
+          "عدل سعر العسل ل 120 درهم",
+          "وين صار طلبي رقم #ORD-1002",
+          "بدي اسحب 3500 درهم عالبنك",
+          "اعملي تصريح دخول لمستودع دبي",
+        ];
+      case 3: // English & Arabizi
+      default:
+        return [
+          "Rent 39 shelves in Dubai warehouse for 5 months and take me to payment",
+          "Send 25 boxes to Dubai warehouse tomorrow via Drop-off",
+          "baddi a2ajjer 39 raf b dxb la 5 months w khodni 3al payment",
+          "Add product Cold Brew Coffee 250ml priced at 18 AED with 50 units",
+          "Update price of Emirati Honey to 120 AED",
+          "Track my latest order #ORD-1002 live status",
+          "Withdraw 3500 AED from my wallet to my UAE bank IBAN",
+          "Generate instant Gate Pass (STO) for Dubai Central Warehouse",
+        ];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final quickVoiceNotes = _getDialectPrompts();
+    final dialectTabs = [
+      {"label": "🇦🇪 إماراتي وخليجي", "index": 0},
+      {"label": "🇪🇬 مصري", "index": 1},
+      {"label": "🇸🇾 شامي", "index": 2},
+      {"label": "🌐 English & Arabizi", "index": 3},
+    ];
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        top: 24,
+        left: 20,
+        right: 20,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.record_voice_over_rounded, color: AppColors.bluePrimary, size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  widget.isAr ? "المسجل والمساعد الصوتي الذكي" : "AI Voice Note Assistant",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.isAr
+                  ? "تحدث مباشرة لتنفيذ طلبات التخزين والشحن والدفع الفوري"
+                  : "Speak to execute storage quotes, bookings, and instant checkout",
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+
+            // Pulsing Mic Visualizer
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 90 * _pulseAnimation.value,
+                      height: 90 * _pulseAnimation.value,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFFF5252).withValues(alpha: 0.15 / _pulseAnimation.value),
+                      ),
+                    ),
+                    Container(
+                      width: 75,
+                      height: 75,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFF5252), Color(0xFFFF7675)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0x66FF5252),
+                            blurRadius: 16,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 36),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  widget.isAr ? "جارٍ الاستماع للصوت والترجمة الفورية..." : "Listening to your voice command...",
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF5252)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // Dialect / Accent Selector Tabs
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: dialectTabs.map((tab) {
+                  final idx = tab["index"] as int;
+                  final label = tab["label"] as String;
+                  final isSelected = _selectedDialectIndex == idx;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: AppColors.bluePrimary,
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: isSelected ? AppColors.bluePrimary : Colors.grey.shade300,
+                        ),
+                      ),
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedDialectIndex = idx;
+                          });
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Quick Spoken Command Presets
+            Align(
+              alignment: widget.isAr ? Alignment.centerRight : Alignment.centerLeft,
+              child: Text(
+                widget.isAr ? "أوامر صوتية جاهزة للاختبار بنقرة واحدة:" : "Quick Spoken Commands (1-Tap Test):",
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...quickVoiceNotes.map((prompt) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: InkWell(
+                  onTap: () => _submitVoiceText(prompt),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.bluePrimary.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.graphic_eq_rounded, color: AppColors.bluePrimary, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "\"$prompt\"",
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.bluePrimary, size: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+            const SizedBox(height: 12),
+            // Custom spoken input box
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _voiceNoteCtrl,
+                    decoration: InputDecoration(
+                      hintText: widget.isAr ? "أو اكتب النص الصوتي هنا..." : "Or type custom spoken text here...",
+                      hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onSubmitted: _submitVoiceText,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => _submitVoiceText(_voiceNoteCtrl.text),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.bluePrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(widget.isAr ? "إرسال" : "Send"),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

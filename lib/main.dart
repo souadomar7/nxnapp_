@@ -8,6 +8,7 @@ import 'package:app_links/app_links.dart';
 import 'pages/onboarding/profile_setup_page.dart';
 import 'services/uae_pass_service.dart';
 import 'services/gate_pass_sync_service.dart';
+import 'services/marketplace_service.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:nxnapp/l10n/app_localizations.dart';
@@ -27,6 +28,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'providers/cart_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/platform_settings_provider.dart';
+import 'providers/merchant_data_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,6 +57,11 @@ void main() async {
     url: supabaseUrl!,
     anonKey: supabaseAnonKey!,
   );
+
+  // Clear any cached local demo data / stale storage on launch
+  try {
+    await MarketplaceService().clearAllData();
+  } catch (_) {}
 
   try {
     await Hive.initFlutter();
@@ -114,6 +121,7 @@ class WarehouseApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => PlatformSettingsProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => MerchantDataProvider()..initialize()),
         ChangeNotifierProvider(
           create: (_) => InventoryController(SupabaseInventoryService()),
         ),

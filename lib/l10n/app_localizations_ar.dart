@@ -378,7 +378,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get access247 => 'دخول 24/7';
+  String get access247 => 'تتبع رقمي 24/7';
 
   @override
   String get businessHours => 'ساعات العمل';

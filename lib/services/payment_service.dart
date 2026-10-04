@@ -4,8 +4,10 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import '../models/invoice.dart';
+import 'marketplace_service.dart';
+import 'fintx_payment_service.dart';
 
-enum PaymentMethod { card, applePay, cash }
+enum PaymentMethod { card, applePay, cash, fintx, wallet }
 
 class PaymentException implements Exception {
   final String message;
@@ -44,6 +46,33 @@ class PaymentService {
     required Invoice invoice,
   }) async {
     switch (method) {
+      case PaymentMethod.fintx:
+        final result = await FintxPaymentService().initiateCheckout(
+          invoice: invoice,
+          method: FintxPaymentMethod.card,
+        );
+        if (!result.success) {
+          throw PaymentException(result.errorMessage ?? 'Fintx gateway transaction declined.');
+        }
+        return;
+      case PaymentMethod.wallet:
+        // Direct in-app wallet balance deduction
+        await MarketplaceService().createInvoice(
+          Invoice(
+            id: invoice.id,
+            number: invoice.number,
+            amount: invoice.amount,
+            vat: invoice.vat,
+            type: invoice.type,
+            paid: true,
+            warehouseName: invoice.warehouseName,
+            warehouseNameAr: invoice.warehouseNameAr,
+            date: invoice.date,
+            workerFee: invoice.workerFee,
+            metaData: invoice.metaData,
+          ),
+        );
+        return;
       case PaymentMethod.card:
         return payWithCard(invoice: invoice);
       case PaymentMethod.applePay:
@@ -115,9 +144,8 @@ class PaymentService {
     } on StripeException catch (e) {
       final msg = e.error.localizedMessage ?? e.error.message ?? 'Payment cancelled.';
       throw PaymentException(msg);
-    } on PaymentException {
-      rethrow;
     } catch (e) {
+      if (e is PaymentException) rethrow;
       // Network errors, server unreachable, etc.
       debugPrint('PaymentService card error: $e');
       throw PaymentException(

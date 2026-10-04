@@ -35,7 +35,7 @@ class _ReceiveGoodsStagePageENState extends State<ReceiveGoodsStagePageEN> {
 
   // Step 1: Warehouse Hub
   String _selectedWarehouse = 'Dubai Central Warehouse';
-  String _selectedStorageMode = 'Standard Shelving';
+  final String _selectedStorageMode = 'Standard Shelving';
 
   // Step 2: Schedule & Freight Info
   DateTime? _scheduledDate;

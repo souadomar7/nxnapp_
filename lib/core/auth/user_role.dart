@@ -15,6 +15,10 @@ enum UserRole {
   /// Can list and manage products on the marketplace.
   vendor,
 
+  /// Logistics Courier / Field Driver.
+  /// Can view assigned deliveries, capture PoD, and verify gate passes.
+  driver,
+
   /// Warehouse Operations Staff (internal credentials).
   /// Can update stock, conduct intake, upload damage photos, manage workers.
   whAdmin,

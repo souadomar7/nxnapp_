@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProvider extends ChangeNotifier {
   String? _businessName;
@@ -38,13 +39,28 @@ class UserProvider extends ChangeNotifier {
   }
 
   /// Call this when the user accepts the Terms & Conditions.
-  /// Persists the flag so T&C are never shown again on this device.
+  /// Persists locally and synchronizes a digital audit record to Supabase.
   Future<void> acceptTerms() async {
     _termsAccepted = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('terms_accepted', true);
+      await prefs.setString('terms_accepted_at', DateTime.now().toIso8601String());
     } catch (_) {}
+
+    // Persist server-side consent audit record if user is authenticated
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await Supabase.instance.client.from('profiles').update({
+          'terms_accepted_at': DateTime.now().toIso8601String(),
+          'terms_version': '1.0.2',
+        }).eq('id', user.id);
+      }
+    } catch (e) {
+      debugPrint('Terms server audit update note: $e');
+    }
+
     notifyListeners();
   }
 

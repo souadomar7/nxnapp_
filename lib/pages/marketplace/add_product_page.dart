@@ -7,10 +7,23 @@ import '../../providers/locale_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
 import '../../models/marketplace_models.dart';
+import '../../providers/merchant_data_provider.dart';
 
 class AddProductPage extends StatefulWidget {
   final SmeProduct? product;
-  const AddProductPage({super.key, this.product});
+  final String? initialName;
+  final double? initialPrice;
+  final int? initialQty;
+  final String? initialCategory;
+
+  const AddProductPage({
+    super.key,
+    this.product,
+    this.initialName,
+    this.initialPrice,
+    this.initialQty,
+    this.initialCategory,
+  });
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -53,6 +66,11 @@ class _AddProductPageState extends State<AddProductPage> {
       _qtyController.text = widget.product!.quantity.toString();
       _existingPhotoUrl = widget.product!.photoUrl;
       _selectedCategory = widget.product!.category ?? 'General';
+    } else {
+      if (widget.initialName != null) _nameController.text = widget.initialName!;
+      if (widget.initialPrice != null) _priceController.text = widget.initialPrice!.toStringAsFixed(2);
+      if (widget.initialQty != null) _qtyController.text = widget.initialQty!.toString();
+      if (widget.initialCategory != null) _selectedCategory = widget.initialCategory!;
     }
   }
 
@@ -199,18 +217,20 @@ class _AddProductPageState extends State<AddProductPage> {
       final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
       if (_isEditMode) {
-        final supabase = Supabase.instance.client;
-        await supabase.from('sme_products').update({
-          'name': _nameController.text.trim(),
-          'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
-          'description': _descController.text.trim(),
-          'price': price,
-          'quantity': qty,
-          'category': _selectedCategory,
-          if (photoUrl.isNotEmpty) 'photo_url': photoUrl,
-        }).eq('id', widget.product!.id);
+        await _service.updateProduct(
+          widget.product!.id,
+          _nameController.text.trim(),
+          _descController.text.trim(),
+          price,
+          photoUrl,
+          quantity: qty,
+          category: _selectedCategory,
+          nameAr: _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
+        );
 
-        MarketplaceService.updateNotifier.value++;
+        if (mounted) {
+          context.read<MerchantDataProvider>().refreshProducts();
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -232,12 +252,23 @@ class _AddProductPageState extends State<AddProductPage> {
         try {
           final user = Supabase.instance.client.auth.currentUser;
           if (user != null) {
-            await Supabase.instance.client.from('sme_products').update({
-              'category': _selectedCategory,
-              'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
-            }).eq('seller_id', user.id).order('created_at', ascending: false).limit(1);
+            try {
+              await Supabase.instance.client.from('sme_products').update({
+                'category': _selectedCategory,
+                'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
+              }).eq('seller_id', user.id).order('created_at', ascending: false).limit(1);
+            } catch (inner) {
+              // If category column is not in schema cache, try name_ar only
+              await Supabase.instance.client.from('sme_products').update({
+                'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
+              }).eq('seller_id', user.id).order('created_at', ascending: false).limit(1);
+            }
           }
         } catch (_) {}
+
+        if (mounted) {
+          context.read<MerchantDataProvider>().refreshProducts();
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -724,7 +755,10 @@ class _AddProductPageState extends State<AddProductPage> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -737,7 +771,6 @@ class _AddProductPageState extends State<AddProductPage> {
                                         style: const TextStyle(fontSize: 10, color: AppColors.bluePrimary, fontWeight: FontWeight.bold),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
                                     Text(
                                       '${_qtyController.text} in stock',
                                       style: TextStyle(fontSize: 11, color: Colors.grey.shade600),

@@ -5,10 +5,9 @@ import '../../providers/cart_provider.dart';
 import '../../models/marketplace_models.dart';
 import '../../services/marketplace_service.dart';
 import '../../theme.dart';
-import '../operations/order_tracking_page.dart';
-import '../../services/payment_service.dart';
 import '../../models/invoice.dart';
 import 'cart_page.dart';
+import '../checkout_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/validators.dart';
 
@@ -448,30 +447,26 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                                 setSheetState(() => isSubmitting = true);
 
                                 try {
-                                  // 1. Process payment with timeout safety
-                                  if (selectedPaymentMethod == 'card' || selectedPaymentMethod == 'apple_pay') {
-                                    try {
-                                      final invoice = Invoice(
-                                        id: 'mkt_${DateTime.now().millisecondsSinceEpoch}',
-                                        number: 'MKT-${DateTime.now().millisecondsSinceEpoch}',
-                                        warehouseName: 'Marketplace',
-                                        date: DateTime.now(),
-                                        amount: grandTotal,
-                                        vat: vat,
-                                      );
-                                      await PaymentService.pay(method: PaymentMethod.card, invoice: invoice)
-                                          .timeout(const Duration(seconds: 3));
-                                    } catch (_) {
-                                      // In development/test mode or if server is offline, simulate authorization smoothly
-                                      await Future.delayed(const Duration(milliseconds: 600));
-                                    }
-                                  } else {
-                                    await Future.delayed(const Duration(milliseconds: 400));
-                                  }
+                                  final invoice = Invoice(
+                                    id: 'mkt_${DateTime.now().millisecondsSinceEpoch}',
+                                    number: 'MKT-${DateTime.now().millisecondsSinceEpoch}',
+                                    warehouseName: 'NXN Marketplace',
+                                    warehouseNameAr: 'سوق NXN للتجارة',
+                                    date: DateTime.now(),
+                                    amount: subtotal,
+                                    vat: vat,
+                                    type: InvoiceType.generic,
+                                    metaData: {
+                                      'customerName': name,
+                                      'customerPhone': phone,
+                                      'customerAddress': fullAddress,
+                                      'productId': widget.product.id,
+                                      'productName': widget.product.name,
+                                      'quantity': _quantity,
+                                    },
+                                  );
 
-                                  // 2. Place order via MarketplaceService (handles local state & Supabase insert)
-                                  final orderId = 'ORD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-
+                                  // Place order in pending state
                                   await _service.createBuyerOrder(
                                     buyerName: name,
                                     buyerPhone: phone,
@@ -484,140 +479,26 @@ class _PublicProductDetailPageState extends State<PublicProductDetailPage> {
                                     Navigator.pop(ctx);
                                   }
 
-                                  await Future.delayed(const Duration(milliseconds: 150));
-
                                   if (mounted) {
-                                    showDialog(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (dialogCtx) => AlertDialog(
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                        title: Column(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(16),
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFFECFDF5),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(Icons.verified_rounded, color: Color(0xFF10AC84), size: 48),
-                                            ),
-                                            const SizedBox(height: 14),
-                                            Text(
-                                              isAr ? 'تم تأكيد طلبك بنجاح!' : 'Order Confirmed!',
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textPrimary),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
-                                        ),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(12),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF8FAFC),
-                                                borderRadius: BorderRadius.circular(14),
-                                              ),
-                                              child: Column(
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(isAr ? 'رقم الطلب' : 'Order Ref', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                                      Text('#$orderId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.bluePrimary)),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(isAr ? 'المبلغ المدفوع' : 'Total Paid', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                                      Text('AED ${grandTotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(isAr ? 'طريقة الدفع' : 'Payment Method', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                                      Text(
-                                                        selectedPaymentMethod == 'cod'
-                                                            ? (isAr ? 'عند الاستلام' : 'Cash on Delivery')
-                                                            : selectedPaymentMethod == 'apple_pay'
-                                                                ? 'Apple Pay'
-                                                                : (isAr ? 'بطاقة بنكية' : 'Card (Stripe)'),
-                                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.bluePrimary),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Text(isAr ? 'موعد التوصيل المتوقع' : 'Estimated Delivery', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                                      Text(isAr ? 'خلال 24-48 ساعة' : 'Within 24-48 hrs', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF10AC84))),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        actions: [
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.bluePrimary,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                            ),
-                                            onPressed: () {
-                                              Navigator.pop(dialogCtx);
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => OrderTrackingPage(
-                                                    productName: widget.product.name,
-                                                    currentStatus: 'confirmed',
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            child: Text(isAr ? 'تتبع مسار الشحنة' : 'Track Order Status'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(dialogCtx),
-                                            child: Text(isAr ? 'متابعة التسوق' : 'Continue Shopping'),
-                                          ),
-                                        ],
-                                      ),
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => CheckoutPage(invoice: invoice)),
                                     );
                                   }
-                                } catch (err) {
+                                } catch (e) {
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                      content: Text('Order error: $err'),
-                                      backgroundColor: Colors.red,
-                                    ));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                    );
                                   }
                                 } finally {
                                   if (ctx.mounted) setSheetState(() => isSubmitting = false);
                                 }
                               },
-                        child: isSubmitting
-                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.lock_outline_rounded, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    isAr ? 'دفع ${grandTotal.toStringAsFixed(2)} درهم وتأكيد الطلب' : 'Pay AED ${grandTotal.toStringAsFixed(2)} & Confirm',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                ],
-                              ),
+                        child: Text(
+                          isAr ? 'المتابعة إلى بوابة الدفع الآمنة' : 'Proceed to Secure Checkout',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ],

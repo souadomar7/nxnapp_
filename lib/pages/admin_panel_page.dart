@@ -34,27 +34,9 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
 
   List<DashboardActivity> _activities = [];
 
-  // Mock pending seller approvals
-  final List<Map<String, String>> _pendingSellers = [
-    {
-      'id': 'VEN-9918',
-      'shop': 'Emirates Coffee Roasters',
-      'owner': 'Ahmed Al-Mansoori',
-      'license': 'CN-2891048',
-      'trn': '100482910400003',
-      'emirate': 'Dubai',
-      'status': 'Pending Approval',
-    },
-    {
-      'id': 'VEN-4421',
-      'shop': 'Al Ain Organic Honey',
-      'owner': 'Fatima Al-Dhaheri',
-      'license': 'CN-1920491',
-      'trn': '100992817200003',
-      'emirate': 'Abu Dhabi',
-      'status': 'Pending Approval',
-    },
-  ];
+  // Pending seller approvals (clean fresh state)
+  final List<Map<String, String>> _pendingSellers = [];
+  final List<Map<String, dynamic>> _quarantineItems = [];
 
   @override
   void initState() {
@@ -293,7 +275,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                       Expanded(
                         child: _adminStatCard(
                           title: isAr ? 'إشغالات المستودعات' : 'Hub Occupancy',
-                          value: '78%',
+                          value: '0%',
                           unit: isAr ? 'سعة' : 'Cap',
                           icon: Icons.warehouse_rounded,
                           color: AdminPanelColors.accentGreen,
@@ -303,7 +285,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                       Expanded(
                         child: _adminStatCard(
                           title: isAr ? 'سحوبات معلقة' : 'Pending Payouts',
-                          value: 'AED 14.5k',
+                          value: 'AED 0.00',
                           unit: isAr ? 'مستحق' : 'IBAN Hold',
                           icon: Icons.account_balance_rounded,
                           color: AdminPanelColors.accentPurple,
@@ -659,10 +641,10 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   // ─── Tab 4: Hubs Capacity & IBAN Payouts ─────────────────────────────────
   Widget _buildHubsAndPayoutsTab(bool isAr) {
     final hubs = [
-      {'name': isAr ? 'مستودع دبي المركزي' : 'Dubai Central Hub', 'capacity': 85, 'shelves': '420 / 500 Shelves'},
-      {'name': isAr ? 'مستودع أبوظبي KIZAD' : 'Abu Dhabi KIZAD Hub', 'capacity': 70, 'shelves': '280 / 400 Shelves'},
-      {'name': isAr ? 'مستودع الشارقة الإقليمي' : 'Sharjah Regional Hub', 'capacity': 60, 'shelves': '180 / 300 Shelves'},
-      {'name': isAr ? 'مركز العين اللوجستي' : 'Al Ain Logistics Hub', 'capacity': 50, 'shelves': '100 / 200 Shelves'},
+      {'name': isAr ? 'مستودع دبي المركزي' : 'Dubai Central Hub', 'capacity': 0, 'shelves': '0 / 200 Shelves'},
+      {'name': isAr ? 'مستودع أبوظبي KIZAD' : 'Abu Dhabi KIZAD Hub', 'capacity': 0, 'shelves': '0 / 150 Shelves'},
+      {'name': isAr ? 'مستودع الشارقة الإقليمي' : 'Sharjah Regional Hub', 'capacity': 0, 'shelves': '0 / 100 Shelves'},
+      {'name': isAr ? 'مركز العين اللوجستي' : 'Al Ain Logistics Hub', 'capacity': 0, 'shelves': '0 / 100 Shelves'},
     ];
 
     return ListView(
@@ -837,31 +819,27 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
         ),
         const SizedBox(height: 14),
 
-        // Quarantine Item 1
-        _buildQuarantineCard(
-          isAr: isAr,
-          sku: 'SKU-DXB-002',
-          productName: 'Arabian Coffee Blend',
-          hub: 'DXB Hub (Bay 3 Hold Area)',
-          damagedQty: 2,
-          attribution: 'NXN Hub Ops (Forklift Relocation)',
-          compensation: 'AED 70.00 (Credited)',
-          notes: 'Unit dropped during forklift shelf relocation at Bay 3',
-        ),
-
-        const SizedBox(height: 12),
-
-        // Quarantine Item 2
-        _buildQuarantineCard(
-          isAr: isAr,
-          sku: 'SKU-AUH-994',
-          productName: 'Organic Olive Oil (500ml)',
-          hub: 'AUH Hub (Zone B Hold Area)',
-          damagedQty: 1,
-          attribution: 'Inbound Carrier Driver',
-          compensation: 'AED 0.00 (Carrier Claim)',
-          notes: 'Bottle seal broken upon arrival from driver truck',
-        ),
+        if (_quarantineItems.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Text(
+                isAr ? 'لا توجد بضائع تالفة أو محجوزة بالعزل حالياً.' : 'No damaged or quarantined items recorded.',
+                style: const TextStyle(color: AdminPanelColors.textSub, fontSize: 13),
+              ),
+            ),
+          )
+        else
+          ..._quarantineItems.map((item) => _buildQuarantineCard(
+                isAr: isAr,
+                sku: item['sku']?.toString() ?? 'SKU-001',
+                productName: item['name']?.toString() ?? 'Item',
+                hub: item['hub']?.toString() ?? 'Warehouse',
+                damagedQty: (item['qty'] as num?)?.toInt() ?? 1,
+                attribution: item['attribution']?.toString() ?? 'Inspection',
+                compensation: item['compensation']?.toString() ?? 'AED 0.00',
+                notes: item['notes']?.toString() ?? '',
+              )),
       ],
     );
   }
@@ -955,6 +933,17 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                   unitPrice: double.tryParse(priceController.text) ?? 35.0,
                   notes: notesController.text,
                 );
+                setState(() {
+                  _quarantineItems.add({
+                    'sku': skuController.text,
+                    'name': isAr ? 'صنف معزول' : 'Quarantined Unit',
+                    'hub': 'DXB Hub (Bay 3)',
+                    'qty': int.tryParse(qtyController.text) ?? 1,
+                    'attribution': faultAttribution == 'warehouse_ops' ? 'NXN Hub Ops' : faultAttribution,
+                    'compensation': 'AED ${res['compensation_amount']}',
+                    'notes': notesController.text,
+                  });
+                });
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

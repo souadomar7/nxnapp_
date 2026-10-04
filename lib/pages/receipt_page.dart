@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:nxnapp/l10n/app_localizations.dart';
 import 'package:nxnapp/models/invoice.dart';
 import 'package:nxnapp/theme.dart';
 import 'package:nxnapp/widgets/brand_logo.dart';
-import 'package:nxnapp/widgets/common.dart';
+import '../services/bilingual_pdf_invoice_service.dart';
 
 class ReceiptPage extends StatelessWidget {
   final Invoice invoice;
@@ -14,9 +14,10 @@ class ReceiptPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final aed = NumberFormat.currency(
       locale: 'en_AE',
-      symbol: 'AED ',
+      symbol: isAr ? 'درهم ' : 'AED ',
       decimalDigits: 2,
     );
 
@@ -134,7 +135,8 @@ class ReceiptPage extends StatelessWidget {
                             Expanded(
                               flex: 2,
                               child: Text(
-                               invoice.warehouseName,
+                               invoice.getWarehouseName(isAr),
+                               textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                               ),
                             ),
@@ -185,9 +187,33 @@ class ReceiptPage extends StatelessWidget {
             // Actions
             SizedBox(
               width: double.infinity,
-              child: PrimaryButton(
-                text: l10n.closeButton,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
+                label: Text(
+                  isAr ? 'تحميل / طباعة الفاتورة الضريبية الرسمية (PDF)' : 'Download / Print FTA Tax Invoice (PDF)',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.bluePrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  BilingualPdfInvoiceService.generateAndPrintTaxInvoice(invoice);
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
                 onPressed: () => Navigator.pop(context),
+                child: Text(l10n.closeButton),
               ),
             ),
           ],

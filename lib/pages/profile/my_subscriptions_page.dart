@@ -7,8 +7,6 @@ import '../request_delivery_page.dart';
 import '../booking_page.dart';
 import 'wallet_page.dart';
 
-enum RefundPolicyModel { strictNonRefundable, partialWithFee, recalculateStandard }
-
 class MySubscriptionsPage extends StatefulWidget {
   const MySubscriptionsPage({super.key});
 
@@ -46,27 +44,6 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
       }
     }
 
-    // Default active demo subscription for test user / demo merchant
-    if (list.isEmpty) {
-      list = [
-        {
-          'id': 'SUB-DXB-9921',
-          'warehouse_name': 'Dubai Central Hub (Dubai South)',
-          'shelves_count': 2,
-          'storage_mode': 'Ambient Storage (25°C)',
-          'monthly_fee': 200.0,
-          'total_paid': 600.0, // 3-month package @ 200 AED/mo for 2 shelves
-          'discounted_paid': 510.0, // 15% 3-month discount term
-          'duration_months': 3,
-          'start_date': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
-          'end_date': DateTime.now().add(const Duration(days: 60)).toIso8601String(),
-          'is_active': true,
-          'auto_renew': true,
-          'cancellation_pending': false,
-        },
-      ];
-    }
-
     if (mounted) {
       setState(() {
         _subscriptions = list;
@@ -75,28 +52,27 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
     }
   }
 
-  void _openCancellationPolicyModal(int index, bool isAr) {
+  void _openCancellationModal(int index, bool isAr) {
     final sub = _subscriptions[index];
     
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _CancellationPolicyModal(
+      builder: (ctx) => _CancellationModal(
         subscription: sub,
         isAr: isAr,
-        onConfirmCancel: (policyModel, refundAmount) async {
+        onConfirmCancel: (refundAmount) async {
           Navigator.pop(ctx);
-          await _processCancellationWithPolicy(index, sub['id'].toString(), policyModel, refundAmount, isAr);
+          await _processCancellation(index, sub['id'].toString(), refundAmount, isAr);
         },
       ),
     );
   }
 
-  Future<void> _processCancellationWithPolicy(
+  Future<void> _processCancellation(
     int index,
     String subId,
-    RefundPolicyModel policyModel,
     double refundAmount,
     bool isAr,
   ) async {
@@ -106,10 +82,9 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
       _subscriptions[index]['refund_amount'] = refundAmount;
     });
 
-    final policyStr = policyModel.toString().split('.').last;
     final res = await _marketplaceService.requestSubscriptionCancellation(
       subscriptionId: subId,
-      refundModel: policyStr,
+      cancellationReason: 'Cancelled by merchant before renewal',
       refundAmount: refundAmount,
     );
 
@@ -125,17 +100,17 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
     });
 
     // Log Activity
-    final policyName = policyModel == RefundPolicyModel.strictNonRefundable
-        ? 'Model A (Non-Refundable)'
-        : (policyModel == RefundPolicyModel.partialWithFee ? 'Model B (Partial Refund)' : 'Model C (Standard Rate Recalc)');
-
     await _marketplaceService.addActivity(
       DashboardActivity(
         id: 'ACT-SUB-CANCEL-${DateTime.now().millisecondsSinceEpoch}',
-        title: isAr ? 'تم طلب إلغاء الاشتراك ($policyName)' : 'Subscription Cancellation ($policyName)',
+        title: isAr ? 'طلب إلغاء الاشتراك' : 'Subscription Cancellation Requested',
         subtitle: isAr
-            ? 'تم إضافة استرداد بقيمة $refundAmount درهم إلى المحفظة. يرجى جدولة خروج المخزون.'
-            : 'AED ${refundAmount.toStringAsFixed(2)} credited to Merchant Wallet. Schedule inventory outbound.',
+            ? (refundAmount > 0
+                ? 'تم تسجيل طلب الإلغاء. استرداد متوقع: $refundAmount د.إ للأشهر المستقبلية المدفوعة مسبقاً.'
+                : 'تم إيقاف التجديد التلقائي للشهر القادم. الشهر الحالي غير قابل للاسترداد.')
+            : (refundAmount > 0
+                ? 'Cancellation requested. Estimated partial refund: AED $refundAmount for prepaid future months.'
+                : 'Auto-renewal stopped for next month. Current month is non-refundable.'),
         date: DateTime.now(),
         type: ActivityType.rental,
       ),
@@ -189,7 +164,6 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
     if (user != null) {
       try {
         await _supabase.from('sme_subscriptions').update({
-          'auto_renew': true,
           'is_active': true,
         }).eq('id', subId);
       } catch (e) {
@@ -297,7 +271,13 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
                   final sub = _subscriptions[index];
                   final bool isPendingCancel = sub['cancellation_pending'] == true || sub['auto_renew'] == false;
                   final bool isActive = sub['is_active'] == true && !isPendingCancel;
-                  final warehouseName = sub['warehouse_name'] ?? sub['warehouses']?['name'] ?? 'Dubai Central Hub';
+                  final rawName = sub['warehouse_name'] ?? sub['warehouses']?['name'] ?? 'Dubai Central Hub';
+                  final rawNameAr = sub['warehouse_name_ar'] ?? sub['warehouses']?['name_ar'];
+                  final warehouseName = isAr
+                      ? (rawNameAr != null && rawNameAr.toString().isNotEmpty
+                          ? rawNameAr.toString()
+                          : (rawName.toString().contains('Dubai') ? 'مستودع دبي المركزي' : (rawName.toString().contains('Sharjah') ? 'مستودع الشارقة الإقليمي' : 'مستودع لوجستي')))
+                      : rawName.toString();
                   final shelvesCount = sub['shelves_count'] ?? 2;
                   final storageMode = sub['storage_mode'] ?? 'Ambient Storage (25°C)';
                   final monthlyFee = (sub['monthly_fee'] as num?)?.toDouble() ?? 200.0;
@@ -330,6 +310,7 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
                             Expanded(
                               child: Text(
                                 warehouseName,
+                                textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
                               ),
                             ),
@@ -441,14 +422,14 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
                             if (isActive) ...[
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: () => _openCancellationPolicyModal(index, isAr),
+                                  onPressed: () => _openCancellationModal(index, isAr),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.red.shade700,
                                     side: BorderSide(color: Colors.red.shade300),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                   icon: const Icon(Icons.cancel_outlined, size: 16),
-                                  label: Text(isAr ? 'إلغاء واحتساب Refund' : 'Cancel & Calculate Refund', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                  label: Text(isAr ? 'إلغاء الاشتراك' : 'Cancel Subscription', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -522,61 +503,53 @@ class _MySubscriptionsPageState extends State<MySubscriptionsPage> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3 POLICY MODELS CANCELLATION MODAL
+// CLIENT-ALIGNED CANCELLATION & REFUND MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CancellationPolicyModal extends StatefulWidget {
+class _CancellationModal extends StatefulWidget {
   final Map<String, dynamic> subscription;
   final bool isAr;
-  final Function(RefundPolicyModel model, double refundAmount) onConfirmCancel;
+  final Function(double refundAmount) onConfirmCancel;
 
-  const _CancellationPolicyModal({
+  const _CancellationModal({
     required this.subscription,
     required this.isAr,
     required this.onConfirmCancel,
   });
 
   @override
-  State<_CancellationPolicyModal> createState() => _CancellationPolicyModalState();
+  State<_CancellationModal> createState() => _CancellationModalState();
 }
 
-class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
-  RefundPolicyModel _selectedModel = RefundPolicyModel.partialWithFee; // Recommended Model B
+class _CancellationModalState extends State<_CancellationModal> {
+  double get _paidAmount => (widget.subscription['total_paid'] as num?)?.toDouble() ?? 200.0;
+  int get _durationMonths => (widget.subscription['duration_months'] as num?)?.toInt() ?? 1;
+  int get _shelvesCount => (widget.subscription['shelves_count'] as num?)?.toInt() ?? 1;
+  double get _monthlyFee => (widget.subscription['monthly_fee'] as num?)?.toDouble() ?? (_shelvesCount * 100.0);
 
-  double get _paidAmount => (widget.subscription['total_paid'] as num?)?.toDouble() ?? 600.0;
-  double get _discountedPaid => (widget.subscription['discounted_paid'] as num?)?.toDouble() ?? 510.0;
-  int get _shelvesCount => (widget.subscription['shelves_count'] as num?)?.toInt() ?? 2;
-
+  // Client Rule: Current month is never refunded.
+  // If cancelled before next billing date, next month is not charged.
+  // If prepaid in advance for future months, partial refund applies to unused future months.
   double get _calculatedRefund {
-    switch (_selectedModel) {
-      case RefundPolicyModel.strictNonRefundable:
-        // Policy A: Remaining months forfeited -> 0 AED refund
-        return 0.0;
-
-      case RefundPolicyModel.partialWithFee:
-        // Policy B: Example (Paid 600 AED, Used 1 mo @ 200 AED = 400 AED unused - 100 AED fee = 300 AED)
-        const usedCost = 200.0;
-        const penaltyFee = 100.0;
-        final unused = _paidAmount - usedCost;
-        return (unused - penaltyFee).clamp(0.0, _paidAmount);
-
-      case RefundPolicyModel.recalculateStandard:
-        // Policy C: Paid 510 AED (15% 3-mo discount). 1-Mo Full Rate = 250 AED -> Refund = 260 AED
-        const fullOneMonthRate = 250.0;
-        return (_discountedPaid - fullOneMonthRate).clamp(0.0, _discountedPaid);
+    if (_durationMonths > 1) {
+      // 1 month has been used / active
+      final unusedMonths = _durationMonths - 1;
+      return (unusedMonths * _monthlyFee).clamp(0.0, _paidAmount);
     }
+    return 0.0;
   }
 
   @override
   Widget build(BuildContext context) {
     final isAr = widget.isAr;
+    final refund = _calculatedRefund;
 
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -600,10 +573,10 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: Colors.amber.shade50,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.red, size: 22),
+                child: const Icon(Icons.cancel_presentation_rounded, color: Colors.amber, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -611,11 +584,13 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isAr ? 'اختيار سياسة الإلغاء واحتساب الاسترداد' : 'Select Refund & Early Exit Policy',
+                      isAr ? 'سياسة وإجراءات إلغاء الاشتراك' : 'Subscription Cancellation Terms',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
                     ),
                     Text(
-                      isAr ? 'اختبار النماذج المالية والخصومات (Booking $_shelvesCount Shelves)' : 'Financial Models Breakdown ($_shelvesCount Shelves @ 100 AED/mo)',
+                      isAr
+                          ? 'إلغاء حجز $_shelvesCount أرفف • ${_monthlyFee.toStringAsFixed(0)} د.إ / شهرياً'
+                          : '$_shelvesCount Shelves • AED ${_monthlyFee.toStringAsFixed(0)} / mo',
                       style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                     ),
                   ],
@@ -626,47 +601,53 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
 
           const SizedBox(height: 20),
 
-          RadioGroup<RefundPolicyModel>(
-            groupValue: _selectedModel,
-            onChanged: (val) {
-              if (val != null) {
-                setState(() => _selectedModel = val);
-              }
-            },
+          // Policy Terms Box
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── POLICY A CARD ────────────────────────────────────────────────
-                _buildPolicyOptionTile(
-                  model: RefundPolicyModel.strictNonRefundable,
-                  badgeTitle: isAr ? 'نموذج أ: غير قابل للاسترداد (Standard SaaS)' : 'Model A: Strict Non-Refundable (Standard SaaS)',
-                  badgeColor: Colors.grey.shade700,
-                  financialImpact: isAr ? 'يتم مصادرة المدة المتبقية. لا يتم إصدار أي استرداد مالي.' : 'Remaining months are forfeited. No refund issued.',
-                  exampleBreakdown: isAr ? 'المبلغ المدفوع: 600 د.إ • الاسترداد: 0.00 د.إ' : 'Total Paid: 600 AED • Refund: 0.00 AED',
-                  calculatedRefundStr: '0.00 AED',
+                _buildPolicyRule(
+                  icon: Icons.block_rounded,
+                  color: Colors.red.shade700,
+                  title: isAr ? 'الشهر الحالي غير قابل للاسترداد' : 'Current Month Non-Refundable',
+                  subtitle: isAr
+                      ? 'رسوم إيجار الأرفف للشهر الحالي غير قابلة للاسترداد وفقاً لسياسة المستودع بعد بدء الفترة التشغيلية.'
+                      : 'Shelf fees for the current month are non-refundable once the billing period has commenced.',
                 ),
-
-                const SizedBox(height: 12),
-
-                // ── POLICY B CARD ────────────────────────────────────────────────
-                _buildPolicyOptionTile(
-                  model: RefundPolicyModel.partialWithFee,
-                  badgeTitle: isAr ? '⭐ نموذج ب: استرداد جزئي مع غرامة خروج (موصى به)' : '⭐ Model B: Partial Refund with Exit Fee (Recommended)',
-                  badgeColor: Colors.blue.shade800,
-                  financialImpact: isAr ? 'استرداد الأشهر غير المستعملة خصماً منها رسوم الغرامة (100 د.إ).' : 'Unused months refunded minus a cancellation penalty (100 AED fee).',
-                  exampleBreakdown: isAr ? 'المدفوع: 600 د.إ • المستخدم: 200 د.إ • الغرامة: 100 د.إ' : 'Paid: 600 AED • Used: 200 AED • Exit Fee: 100 AED',
-                  calculatedRefundStr: '300.00 AED',
+                const Divider(height: 20),
+                _buildPolicyRule(
+                  icon: Icons.check_circle_outline_rounded,
+                  color: Colors.green.shade700,
+                  title: isAr ? 'إيقاف التجديد للشهر القادم' : 'No Charge for Next Month',
+                  subtitle: isAr
+                      ? 'عند الإلغاء قبل تاريخ الفاتورة القادمة، لن يتم تجديد الاشتراك أو خصم أي مبالغ للشهر التالي.'
+                      : 'Cancelling prior to the next billing date ensures the upcoming month will not be renewed or charged.',
                 ),
-
-                const SizedBox(height: 12),
-
-                // ── POLICY C CARD ────────────────────────────────────────────────
-                _buildPolicyOptionTile(
-                  model: RefundPolicyModel.recalculateStandard,
-                  badgeTitle: isAr ? 'نموذج ج: إعادة الاحتساب بالسعر الشهري القياسي' : 'Model C: Recalculate to Standard Monthly Rate',
-                  badgeColor: Colors.purple.shade800,
-                  financialImpact: isAr ? 'إلغاء خصم الباقة متعددة الأشهُر واحتساب الشهر المستعمل بالسعر الكامل (250 د.إ).' : 'Discounted multi-month rates revert to standard monthly pricing for used months.',
-                  exampleBreakdown: isAr ? 'المدفوع بخصم 15%: 510 د.إ • سعر الشهر الكامل: 250 د.إ' : 'Paid (15% 3-mo discount): 510 AED • 1-Mo Full Rate: 250 AED',
-                  calculatedRefundStr: '260.00 AED',
+                if (_durationMonths > 1) ...[
+                  const Divider(height: 20),
+                  _buildPolicyRule(
+                    icon: Icons.account_balance_wallet_outlined,
+                    color: Colors.blue.shade700,
+                    title: isAr ? 'استرداد جزئي للأشهر المدفوعة مسبقاً' : 'Prepaid Future Months Partial Refund',
+                    subtitle: isAr
+                        ? 'نظراً لدفع باقة لعدة أشهر مسبقاً، يحق لك استرداد جزئي للأشهر المستقبلية غير المستعملة (${_durationMonths - 1} أشهر متبقية).'
+                        : 'Because future months were prepaid, unused future billing cycles qualify for partial refund (${_durationMonths - 1} months remaining).',
+                  ),
+                ],
+                const Divider(height: 20),
+                _buildPolicyRule(
+                  icon: Icons.local_shipping_outlined,
+                  color: Colors.orange.shade800,
+                  title: isAr ? 'جدولة سحب البضائع' : 'Schedule Inventory Outbound',
+                  subtitle: isAr
+                      ? 'يرجى التنسيق لسحب بضائعك من المستودع قبل تاريخ انتهاء فترة الحجز الحالية.'
+                      : 'Please arrange outbound pickup to clear your warehouse shelves before the current cycle ends.',
                 ),
               ],
             ),
@@ -674,7 +655,7 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
 
           const SizedBox(height: 20),
 
-          // FINANCIAL SUMMARY CALLOUT BANNER
+          // Financial Summary Card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -689,13 +670,17 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isAr ? 'الرصيد المالي المسترد للمحفظة:' : 'Refund Credit to Merchant Wallet:',
+                        isAr ? 'الاسترداد المالي المتوقع للمحفظة:' : 'Estimated Wallet Refund:',
                         style: const TextStyle(color: Colors.white70, fontSize: 11),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'AED ${_calculatedRefund.toStringAsFixed(2)}',
-                        style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 18),
+                        refund > 0 ? 'AED ${refund.toStringAsFixed(2)}' : (isAr ? '0.00 د.إ (لا يوجد رصيد متبقٍ)' : 'AED 0.00 (No prepaid excess)'),
+                        style: TextStyle(
+                          color: refund > 0 ? Colors.amber : Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                     ],
                   ),
@@ -703,16 +688,16 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
                 const SizedBox(width: 10),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.bluePrimary,
+                    backgroundColor: Colors.red.shade700,
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                   label: Text(
-                    isAr ? 'تأكيد الإلغاء 💰' : 'Confirm Exit 💰',
+                    isAr ? 'تأكيد الإلغاء' : 'Confirm Exit',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
-                  onPressed: () => widget.onConfirmCancel(_selectedModel, _calculatedRefund),
+                  onPressed: () => widget.onConfirmCancel(refund),
                 ),
               ],
             ),
@@ -722,84 +707,34 @@ class _CancellationPolicyModalState extends State<_CancellationPolicyModal> {
     );
   }
 
-  Widget _buildPolicyOptionTile({
-    required RefundPolicyModel model,
-    required String badgeTitle,
-    required Color badgeColor,
-    required String financialImpact,
-    required String exampleBreakdown,
-    required String calculatedRefundStr,
+  Widget _buildPolicyRule({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
   }) {
-    final bool isSelected = _selectedModel == model;
-
-    return InkWell(
-      onTap: () => setState(() => _selectedModel = model),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? badgeColor.withValues(alpha: 0.06) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? badgeColor : Colors.grey.shade200,
-            width: isSelected ? 2 : 1,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.35),
+              ),
+            ],
           ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Radio<RefundPolicyModel>(
-              value: model,
-              activeColor: badgeColor,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    badgeTitle,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: badgeColor),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    financialImpact,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, height: 1.3),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      exampleBreakdown,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text('Refund', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                Text(
-                  calculatedRefundStr,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: calculatedRefundStr == '0.00 AED' ? Colors.grey : Colors.green.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }

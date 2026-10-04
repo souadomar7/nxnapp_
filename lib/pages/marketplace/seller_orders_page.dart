@@ -4,7 +4,8 @@ import '../../services/marketplace_service.dart';
 import '../operations/order_tracking_page.dart';
 
 class SellerOrdersPage extends StatefulWidget {
-  const SellerOrdersPage({super.key});
+  final bool isBuyerMode;
+  const SellerOrdersPage({super.key, this.isBuyerMode = false});
 
   @override
   State<SellerOrdersPage> createState() => _SellerOrdersPageState();
@@ -24,7 +25,9 @@ class _SellerOrdersPageState extends State<SellerOrdersPage> {
   Future<void> _loadOrders() async {
     setState(() => _isLoading = true);
     try {
-      final orders = await _service.getOrdersForSeller();
+      final orders = widget.isBuyerMode
+          ? await _service.getOrdersForBuyer()
+          : await _service.getOrdersForSeller();
       setState(() { _orders = orders; _isLoading = false; });
     } catch (e) {
       setState(() => _isLoading = false);
@@ -99,8 +102,12 @@ class _SellerOrdersPageState extends State<SellerOrdersPage> {
       appBar: AppBar(
         backgroundColor: AppColors.bluePrimary,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(isAr ? 'الطلبات الواردة' : 'Incoming Orders',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(
+          widget.isBuyerMode
+              ? (isAr ? 'طلباتي ومشترياتي' : 'My Orders & Purchases')
+              : (isAr ? 'الطلبات الواردة' : 'Incoming Orders'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -141,6 +148,7 @@ class _SellerOrdersPageState extends State<SellerOrdersPage> {
                                   Expanded(
                                     child: Text(
                                       o['customer_name'] ?? (isAr ? 'مشتري' : 'Buyer'),
+                                      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
                                   ),
@@ -159,12 +167,16 @@ class _SellerOrdersPageState extends State<SellerOrdersPage> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'AED ${(o['total_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                isAr
+                                    ? '${(o['total_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'} درهم'
+                                    : 'AED ${(o['total_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.bluePrimary),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 o['customer_address'] ?? '',
+                                textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                                 maxLines: 1, overflow: TextOverflow.ellipsis,
                               ),
@@ -177,25 +189,31 @@ class _SellerOrdersPageState extends State<SellerOrdersPage> {
                                         builder: (_) => OrderTrackingPage(orderId: o['id'], currentStatus: status),
                                       )),
                                       icon: const Icon(Icons.track_changes, size: 16),
-                                      label: Text(isAr ? 'تتبع' : 'Track'),
-                                      style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: status != 'delivered' && status != 'cancelled'
-                                          ? () => _changeStatus(o['id'], status ?? 'pending')
-                                          : null,
-                                      icon: const Icon(Icons.update, size: 16),
-                                      label: Text(isAr ? 'تحديث' : 'Update'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.bluePrimary,
-                                        foregroundColor: Colors.white,
+                                      label: Text(isAr ? 'تتبع مسار الشحنة' : 'Track Shipment'),
+                                      style: OutlinedButton.styleFrom(
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
                                       ),
                                     ),
                                   ),
+                                  if (!widget.isBuyerMode) ...[
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: status != 'delivered' && status != 'cancelled'
+                                            ? () => _changeStatus(o['id'], status ?? 'pending')
+                                            : null,
+                                        icon: const Icon(Icons.update, size: 16),
+                                        label: Text(isAr ? 'تحديث' : 'Update'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.bluePrimary,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ],

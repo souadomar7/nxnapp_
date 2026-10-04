@@ -241,6 +241,21 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
       {
         'function_declarations': [
           {
+            'name': 'direct_checkout',
+            'description': 'Directly prepare shelf rental quote, create invoice and proceed to checkout/payment',
+            'parameters': {
+              'type': 'OBJECT',
+              'properties': {
+                'warehouse_id': {'type': 'STRING', 'description': 'Warehouse ID like dxb, auh, shj, aln'},
+                'warehouse_name': {'type': 'STRING', 'description': 'Dubai Central Warehouse, Abu Dhabi Central Warehouse, etc.'},
+                'shelves_count': {'type': 'INTEGER', 'description': 'Number of shelves to rent, e.g. 39'},
+                'duration_months': {'type': 'INTEGER', 'description': 'Rental duration in months, e.g. 5'},
+                'workers_count': {'type': 'INTEGER', 'description': 'Number of helper workers (optional)'},
+              },
+              'required': ['warehouse_name', 'shelves_count', 'duration_months'],
+            },
+          },
+          {
             'name': 'open_booking',
             'description': 'Open warehouse shelf rental booking interface',
             'parameters': {
@@ -359,6 +374,11 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
 
   String _normalizeText(String text) {
     String res = text.toLowerCase().trim();
+    // Convert Arabic-Indic numerals (٠-٩) to standard ASCII digits (0-9)
+    const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    for (int i = 0; i < arabicDigits.length; i++) {
+      res = res.replaceAll(arabicDigits[i], i.toString());
+    }
     // Remove Arabic diacritics (harakat) and tatweel
     res = res.replaceAll(RegExp(r'[\u064B-\u065F\u0640]'), '');
     // Normalize Arabic letter variants
@@ -366,6 +386,9 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
     res = res.replaceAll('ة', 'ه');
     res = res.replaceAll('ى', 'ي');
     res = res.replaceAll(RegExp(r'[ؤئ]'), 'ء');
+    // Normalize Arabizi phonetic numerals
+    res = res.replaceAll('3a', 'a'); // e.g. 3al -> al
+    res = res.replaceAll('2a', 'a'); // e.g. a2ajjer -> ajjer
     // Normalize punctuation & symbols
     res = res.replaceAll(RegExp(r'[؟?!\.,،:;\-_/\\()\[\]{}|<>]'), ' ');
     res = res.replaceAll(RegExp(r'\s+'), ' ');
@@ -482,51 +505,450 @@ Always detect the user's intent with 100% precision, disregard spelling errors, 
       );
     }
 
-    // 4. Warehouse Space Booking / Rental
+    // 3.1. Home Sellers & SME Sales Channel Hub
     if (_hasAny(norm, [
-      'book space', 'rent warehouse', 'rent shelf', 'storage space', 'warehouse in dubai',
-      'lease shelf', 'reserve shelf', 'i want a warehouse', 'i need storage', 'shelf booking',
-      // Gulf / Emirati
-      'ابغي احجز', 'ابي مستودع', 'ودي ااجر رف', 'ابى احط اغراضي', 'ابغي مساحه',
-      'تخزين بضاعه', 'حجز رف', 'استئجار مستودع', 'حجز مساحه', 'احجز لي', 'ااجر مخزن', 'استاجر مخزن',
-      // Egyptian
-      'عايز ااجر رف', 'عاوز مخزن', 'عايز ااجر مخزن', 'احجز ازاي', 'تخزين بضاعه', 'عايز مساحه', 'تاجير رفوف',
-      // Levantine
-      'بدي استاجر', 'بدي احجز رف', 'بدي مستودع', 'بدي خزن', 'بدي استاجر مخزن',
-      // Arabizi / Franco
-      'baddi este2jer', '3ayez makhzan', 'a7jez raf', 'book warehouse', 'rent shelf',
-      // Urdu / Hindi
-      'warehouse book karna', 'godown chahiye', 'shelf chahiye', 'jagah chahiye', 'storage chahiye'
+      'home seller', 'home business', 'sme marketplace', 'sales channel', 'commercial model',
+      'اسر منتجه', 'اسر منتجة', 'تاجره منزليه', 'مشروع منزلي', 'قناة بيع', 'باقات التخزين', 'خصم العقد'
     ])) {
       return AgentResponse(
         text: isAr
-            ? '📦 **حجز مساحات وأرفف التخزين في مستودعات NXN:**\n\n• يتوفر لدينا مستودعات مجهزة في **دبي (القوز وجافزا)، أبوظبي (مصفح)، الشارقة (المنطقة 10)، والعين**.\n• مساحة الرف القياسي: 1.2م × 1.0م × 1.5م بحمولة تصل إلى 500 كجم.\n• تبدأ الاشتراكات من شهر واحد وبمرونة كاملة للتجديد أو الإلغاء.\n\nاضغط على الزر أدناه لاختيار الإمارة وعدد الأرفف المطلوبة! 👇'
-            : '📦 **Booking Warehouse Storage at NXN:**\n\n• Certified facilities in **Dubai (Al Quoz & JAFZA), Abu Dhabi (Mussafah), Sharjah (Ind. 10), and Al Ain**.\n• Standard Shelf dimensions: 1.2m x 1.0m x 1.5m with up to 500kg load capacity.\n• Flexible subscriptions starting from 1 month with instant confirmation.\n\nTap below to select your preferred Emirate and shelf count! 👇',
-        action: AgentAction(type: 'open_booking', payload: {}),
+            ? '🛍️ **منصة الأسر المنتجة والشركات الصغيرة (SME Sales Channel):**\n\n• **نموذج تخزين مبسط**: 100 درهم / رف قياسي شهرياً (حتى 500 كجم).\n• **خصومات تدريجية حسب مدة العقد**:\n  - 3 أشهر: خصم 5% (95 درهم/شهر)\n  - 6 أشهر: خصم 10% (90 درهم/شهر)\n  - سنة كاملة: خصم 20% (80 درهم/شهر)\n• **بوابة الدفع Fintx**: تحصيل فوري عبر Apple Pay وبطاقات مدى وآني والتقسيط عبر تابي وتمارا.\n• **خدمات إضافية (VAS)**: تصوير منتجات احترافي 4K (15 درهم/منتج).\n\nاضغط أدناه لفتح لوحة تحكم الأسر المنتجة وحساب باقتك!'
+            : '🛍️ **NXN Home Sellers & SME Sales Hub:**\n\n• **Simplified Storage**: Flat AED 100 / standard shelf / month (500kg max load).\n• **Tiered Contract Discounts**:\n  - 3 Months: 5% OFF (AED 95/mo)\n  - 6 Months: 10% OFF (AED 90/mo)\n  - 12 Months: 20% OFF (AED 80/mo)\n• **Fintx Payment Gateway**: Instant Apple Pay, Card, Aani Central Bank Instant Pay, and Tabby/Tamara BNPL.\n• **Value-Added Service (VAS)**: 4K Studio Product Photography (AED 15/item).\n\nTap below to open the dedicated Home Seller Hub!',
+        action: AgentAction(type: 'open_home_seller_hub', payload: {}),
       );
     }
 
-    // 5. Inbound Transport: Drop-off vs. Pick-up
+    // 3.2. Outbound Order & Picking Dispatch
     if (_hasAny(norm, [
-      'drop-off', 'drop off', 'pick-up', 'pickup', 'how do i send goods', 'how to deliver goods',
-      'transport', 'inbound', 'collect goods', 'bring goods', 'cargo delivery', 'delivery to warehouse',
-      // Gulf / Emirati
-      'شلون اييب بضاعتي', 'اوديها بروحي', 'انتو تاخذونها', 'توصيل البضاعه', 'شحن', 'دريول',
-      'انقل البضاعه', 'استلام البضاعه', 'ارسال بضاعه', 'توريد', 'اييب سامان',
-      // Egyptian
-      'اجيب البضاعه ازاي', 'هتوصلوها انتو', 'ولا اجيبلكم', 'نقل البضاعه', 'شحن البضاعه', 'استلام البضاعه',
-      // Levantine
-      'كيف ببعت البضاعه', 'انتو بتيجوا بتاخدوها', 'ولا بجيبها انا', 'شحن', 'توريد',
-      // Arabizi / Franco
-      'drop off', 'pickup', 'shahn', 'keef jib el bida3a', 'tawseel', 'inbound',
-      // Urdu / Hindi
-      'samaan kaise bhejna', 'aap log aake loge', 'transport kaise hoga', 'cargo bhejna'
+      'outbound', 'dispatch order', 'pick item', 'deliver to customer', 'send to buyer',
+      'طلب شحن وتوزيع', 'تجهيز طلب زبون', 'سحب بضاعه للتوصيل', 'ارسل لعميل', 'وصل للزبون', 'اوت باوند'
     ])) {
       return AgentResponse(
         text: isAr
-            ? '🚚 **طرق توريد البضائع إلى مستودعات NXN:**\n\n🏭 **1. Drop-off (الخيار الافتراضي)**:\n• تحضر البضاعة بنفسك إلى المستودع المحدد.\n• تحصل فوراً على تصريح دخول رقمي (Gate Pass QR).\n• بدون أي تكاليف نقل إضافية.\n\n🚛 **2. Pick-up (خدمة الاستلام)**:\n• يقوم أسطول NXN باستلام الشحنة من موقعك أو مستودعك.\n• يتطلب تحديد: عنوان الموقع، اسم جهة الاتصال، رقم الهاتف، نوع البضاعة، وحجم المركبة (1 طن، 3 طن، أو شاحنة مبردة).\n\nاضغط أدناه لإنشاء طلب توريد وتحديد الخيار المناسب! 👇'
-            : '🚚 **Inbound Cargo Transport Options at NXN:**\n\n🏭 **1. Drop-off (Default Option)**:\n• You deliver goods directly to the selected NXN warehouse.\n• Instant digital Gate Pass QR is generated for security clearance.\n• Zero additional transport fees.\n\n🚛 **2. Pick-up (Collection Service)**:\n• NXN logistics fleet collects the cargo directly from your facility.\n• Requires: Pickup address, site contact name & phone, cargo type, and vehicle capacity (1-ton, 3-ton, or refrigerated van).\n\nTap below to create an inbound shipment and choose your transport method! 👇',
-        action: AgentAction(type: 'create_shipment', payload: {}),
+            ? '🚀 **إنشاء أمر شحن وتوزيع خارجي (Outbound Fulfillment):**\n\n1️⃣ فحص وتأكيد بيانات المستلم (الاسم، الهاتف، العنوان، الإمارة).\n2️⃣ اختيار الأصناف والكميات المطلوب سحبها من رصيد رفوفك بالمستودع.\n3️⃣ اختيار وسيلة التوصيل:\n   • توصيل قياسي (خلال 24 ساعة): 15 درهم\n   • توصيل سريع (نفس اليوم): 25 درهم\n   • المناطق البعيدة / الغربية: 35 درهم\n   • استلام العميل من المستودع: مجاني\n\nاضغط أدناه لإنشاء أمر التجهيز والشحن فوراً!'
+            : '🚀 **Create Outbound Fulfillment & Courier Dispatch:**\n\n1️⃣ Enter and verify consignee details (Name, UAE mobile, delivery address).\n2️⃣ Pick items and quantities from your stored shelf inventory.\n3️⃣ Select delivery service level:\n   • Standard Next-Day: AED 15\n   • Express Same-Day: AED 25\n   • Regional / Remote: AED 35\n   • Customer Self-Pickup: FREE\n\nTap below to launch the outbound order creation screen!',
+        action: AgentAction(type: 'create_outbound_order', payload: {}),
+      );
+    }
+
+    // 3.3. Inbound Intake Receiving, Count & Damage Photos
+    if (_hasAny(norm, [
+      'intake inspection', 'count verification', 'damaged items', 'damage photo', 'receiving goods',
+      'استلام بالعدد', 'فحص التلف', 'صور التلفيات', 'محضر استلام', 'توثيق الضرر', 'تصوير المنتجات للمتجر'
+    ])) {
+      return AgentResponse(
+        text: isAr
+            ? '📦 **بروتوكول فحص واستلام البضائع (Intake Inspection):**\n\n• **التسليم المباشر (Drop-off)**: التسليم برصيف المستودع هو الخيار الأسرع المعتمد حالياً.\n• **الاستلام بالعدد**: مطابقة العدد الفعلي مقابل بوليصة الشحن (ASN).\n• **توثيق التلفيات**: في حال وجود طرود متضررة، يتم التقاط صور إثبات فورية وعزلها بمنطقة الحجر.\n• **خدمة تصوير المنتجات (VAS)**: إمكانية طلب تصوير احترافي لعرض بضاعتك في المتجر (15 درهم/منتج).\n\nاضغط أدناه لفتح شاشة الفحص والاستلام!'
+            : '📦 **Inbound Cargo Intake & Receiving Protocol:**\n\n• **Drop-off Only (Active)**: Fast dock intake is our primary active operational flow.\n• **Receiving by Count**: Physical verification against expected shipment items.\n• **Damage Quarantine & Photos**: Any crushed or damaged units require instant camera capture.\n• **Product Photography (VAS)**: Request 4K white-background photos for your online store (AED 15/item).\n\nTap below to open the intake inspection console!',
+        action: AgentAction(type: 'open_intake_inspection', payload: {}),
+      );
+    }
+
+    // 3.4. Payment Gateway & Fintx
+    if (_hasAny(norm, [
+      'fintx', 'payment gateway', 'aani', 'tabby', 'tamara', 'apple pay',
+      'بوابة الدفع', 'فنتكس', 'دفع فنتكس', 'آني', 'تقسيط', 'طرق الدفع'
+    ])) {
+      return AgentResponse(
+        text: isAr
+            ? '💳 **بوابة الدفع المتكاملة عبر Fintx UAE:**\n\nمنصة NXN مرتبطة ببوابة Fintx المعتمدة من مصرف الإمارات المركزي لدعم كافة خيارات الدفع:\n• 🍏 **Apple Pay** بنقرة واحدة وتوثيق FaceID\n• 💳 **بطاقات فيزا وماستركارد وجيوان** المشفرة (256-bit)\n• ⚡ **نظام آني (Aani)** للدفع والتحويل البنكي الفوري عبر البنك المركزي\n• 🛍️ **تابي وتمارا**: تقسيط المشتريات على 3 أو 4 دفعات بدون فوائد (0%)\n• 🏦 **تحويل أرباح التجار**: سحب مباشر وفوري لحسابك البنكي (IBAN)'
+            : '💳 **Integrated Fintx UAE Payment Gateway:**\n\nNXN is integrated with Fintx (CBUAE compliant) for seamless settlements:\n• 🍏 **Apple Pay** with 1-tap biometric authentication\n• 💳 **Visa, Mastercard & Jaywan** with 256-bit encryption\n• ⚡ **Aani Instant Payments** directly via UAE Central Bank\n• 🛍️ **Tabby & Tamara**: Split purchases in 3 or 4 interest-free installments\n• 🏦 **Merchant Payouts**: Direct instant transfer to your UAE IBAN',
+      );
+    }
+
+    // 3.5. Direct Voice/Text Booking & Instant Checkout Intent
+    final bool hasBookingIntent = _hasAny(norm, [
+      'rent', 'book', 'shelf', 'shelves', 'warehouse', 'lease', 'reserve', 'storage', 'space',
+      'احجز', 'استاجر', 'ااجر', 'حجز', 'رف', 'ارفف', 'أرفف', 'رفوف', 'مستودع', 'مخزن', 'تخزين',
+      // Gulf / Saudi
+      'ابغي', 'ابي', 'ابغى', 'ودي', 'باجر', 'بستاجر', 'ابا', 'احجزلي', 'حط اغراضي', 'حط سامان', 'ودني للدفع', 'دخلني علطول',
+      // Egyptian
+      'عايز', 'عاوز', 'تاجير', 'نفسي ااجر', 'ادخلني على الدفع',
+      // Levantine
+      'بدي', 'بدي استاجر', 'بدي احجز', 'خدني للدفع', 'دغري',
+      // Arabizi
+      'baddi', '3ayez', '3awz', 'a2ajjer', 'este2jer', 'book'
+    ]);
+
+    if (hasBookingIntent) {
+      // Extract numbers for shelves, months, workers
+      int? extractedShelves;
+      int? extractedMonths;
+      int? extractedWorkers;
+
+      // 1. Shelves regex & dialect keywords
+      final RegExp shelfRegex = RegExp(r'(\d+)\s*(?:shelves|shelf|ارفف|أرفف|رفوف|رف|raf|rfouf)', caseSensitive: false);
+      final Match? shelfMatch = shelfRegex.firstMatch(norm);
+      if (shelfMatch != null) {
+        extractedShelves = int.tryParse(shelfMatch.group(1)!);
+      } else {
+        // Fallback: check "rent 39" or "احجز 39" or "ااجر 39" or "بدي 39"
+        final RegExp actionNumRegex = RegExp(r'(?:rent|book|احجز|استاجر|تاجير|ااجر|ابي|ابغي|ابغى|بدي|عايز|عاوز|اجر)\s*(\d+)', caseSensitive: false);
+        final Match? actMatch = actionNumRegex.firstMatch(norm);
+        if (actMatch != null) {
+          extractedShelves = int.tryParse(actMatch.group(1)!);
+        }
+      }
+
+      // 2. Months regex & word-number detection across dialects
+      final RegExp monthRegex = RegExp(r'(\d+)\s*(?:months?|month|شهور|أشهر|شهر|اشهر|chhour|shohor|ashhir|mos)', caseSensitive: false);
+      final Match? monthMatch = monthRegex.firstMatch(norm);
+      if (monthMatch != null) {
+        extractedMonths = int.tryParse(monthMatch.group(1)!);
+      } else if (norm.contains('سنه') || norm.contains('سنة') || norm.contains('عام') || norm.contains('1 year') || norm.contains('one year')) {
+        extractedMonths = 12;
+      } else if (norm.contains('نصف سنه') || norm.contains('نص سنه') || norm.contains('نصف سنة') || norm.contains('نص سنة') || norm.contains('half year')) {
+        extractedMonths = 6;
+      } else if (norm.contains('شهرين') || norm.contains('شهران') || norm.contains('2 months') || norm.contains('two months')) {
+        extractedMonths = 2;
+      } else {
+        // Fallback: check "for 5" or "لمدة 5" or "حق 5" or "ل 5"
+        final RegExp forNumRegex = RegExp(r'(?:for|لمدة|لمده|حق|ل|بتاع)\s*(\d+)', caseSensitive: false);
+        final Match? forMatch = forNumRegex.firstMatch(norm);
+        if (forMatch != null) {
+          extractedMonths = int.tryParse(forMatch.group(1)!);
+        }
+      }
+
+      // 3. Workers regex
+      final RegExp workerRegex = RegExp(r'(\d+)\s*(?:workers?|worker|عمال|عامل|عمالة|عماله)', caseSensitive: false);
+      final Match? workerMatch = workerRegex.firstMatch(norm);
+      if (workerMatch != null) {
+        extractedWorkers = int.tryParse(workerMatch.group(1)!);
+      }
+
+      // If user specified concrete parameters (e.g. 39 shelves or 5 months or warehouse destination)
+      final bool hasLocationMention = norm.contains('dubai') || norm.contains('دبي') || norm.contains('dxb') || norm.contains('قوز') || norm.contains('جافزا') ||
+          norm.contains('abu dhabi') || norm.contains('أبوظبي') || norm.contains('ابوظبي') || norm.contains('بوظبي') || norm.contains('auh') || norm.contains('مصفح') ||
+          norm.contains('sharjah') || norm.contains('الشارقة') || norm.contains('الشارقه') || norm.contains('الشارجة') || norm.contains('shj') ||
+          norm.contains('al ain') || norm.contains('العين') || norm.contains('aln');
+
+      if (extractedShelves != null || (extractedMonths != null && hasLocationMention)) {
+        final int shelves = extractedShelves ?? 1;
+        final int months = extractedMonths ?? 1;
+        final int workers = extractedWorkers ?? 0;
+
+        // Determine warehouse across dialectal names
+        String warehouseId = 'dxb';
+        String warehouseNameEn = 'Dubai Central Warehouse';
+        String warehouseNameAr = 'مستودع دبي المركزي';
+
+        if (norm.contains('abu dhabi') || norm.contains('أبوظبي') || norm.contains('ابوظبي') || norm.contains('بوظبي') || norm.contains('auh') || norm.contains('مصفح') || norm.contains('كيزاد')) {
+          warehouseId = 'auh';
+          warehouseNameEn = 'Abu Dhabi Central Warehouse';
+          warehouseNameAr = 'مستودع أبوظبي المركزي';
+        } else if (norm.contains('sharjah') || norm.contains('الشارقة') || norm.contains('الشارقه') || norm.contains('الشارجة') || norm.contains('shj')) {
+          warehouseId = 'shj';
+          warehouseNameEn = 'Sharjah Regional Hub';
+          warehouseNameAr = 'مستودع الشارقة الإقليمي';
+        } else if (norm.contains('al ain') || norm.contains('العين') || norm.contains('aln')) {
+          warehouseId = 'aln';
+          warehouseNameEn = 'Al Ain Central Warehouse';
+          warehouseNameAr = 'مستودع العين المركزي';
+        }
+
+        double discountRate = 0.0;
+        if (months >= 12) {
+          discountRate = 0.20;
+        } else if (months >= 6) {
+          discountRate = 0.10;
+        } else if (months >= 3) {
+          discountRate = 0.05;
+        }
+
+        final double rawStorage = shelves * 100.0 * months;
+        final double discountedStorage = rawStorage * (1.0 - discountRate);
+        final double discountSavings = rawStorage - discountedStorage;
+        final double workerFee = workers * 50.0 * months;
+        final double basePrice = discountedStorage + workerFee;
+        final double vat = basePrice * 0.05;
+        final double total = basePrice + vat;
+        final String invNum = 'INV-RENT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+        final payload = {
+          'warehouse_id': warehouseId,
+          'warehouse_name': warehouseNameEn,
+          'warehouse_name_ar': warehouseNameAr,
+          'shelves_count': shelves,
+          'duration_months': months,
+          'workers_count': workers,
+          'amount': basePrice,
+          'vat': vat,
+          'worker_fee': workerFee,
+          'discount_rate': discountRate,
+          'discount_savings': discountSavings,
+          'total': total,
+          'invoice_number': invNum,
+        };
+
+        return AgentResponse(
+          text: isAr
+              ? '⚡ **تم تجهيز حجزك الفوري بنجاح!** 📦\n\n🏢 **المستودع**: $warehouseNameAr\n📦 **عدد الأرفف**: $shelves رف قياسي (حمولة تصل إلى ${shelves * 500} كجم)\n⏱️ **مدة الإيجار**: $months ${months == 1 ? 'شهر' : months == 2 ? 'شهران' : months <= 10 ? 'أشهر' : 'شهراً'}${discountRate > 0 ? ' (خصم عقد ${(discountRate * 100).toInt()}%)\n' : '\n'}${workers > 0 ? '👷 **العمالة المساعدة**: $workers عامل\n' : ''}💰 **تفاصيل التكلفة والتسعير**:\n• الإيجار الأساسي (100 درهم/رف/شهر): **${rawStorage.toStringAsFixed(2)} درهم**\n${discountSavings > 0 ? '• خصم مدة العقد (${(discountRate * 100).toInt()}%): **- ${discountSavings.toStringAsFixed(2)} درهم**\n' : ''}• ضريبة القيمة المضافة (5% VAT): **${vat.toStringAsFixed(2)} درهم**\n• **الإجمالي المستحق للدفع عبر Fintx**: **${total.toStringAsFixed(2)} درهم إماراتي**\n\nاضغط على زر **انتقل للدفع الآن** أدناه لإتمام الدفع وتفعيل حجزك فوراً! 💳🚀'
+              : '⚡ **Direct Booking Quote Ready!** 📦\n\n🏢 **Facility**: $warehouseNameEn\n📦 **Shelves Allocated**: $shelves Standard Shelves (up to ${shelves * 500} kg capacity)\n⏱️ **Rental Period**: $months ${months == 1 ? 'Month' : 'Months'}${discountRate > 0 ? ' (${(discountRate * 100).toInt()}% Contract Discount applied)\n' : '\n'}${workers > 0 ? '👷 **Helper Workers**: $workers\n' : ''}💰 **Price Breakdown**:\n• Base Shelf Rental (AED 100/shelf/mo): **AED ${rawStorage.toStringAsFixed(2)}**\n${discountSavings > 0 ? '• Contract Discount Savings: **- AED ${discountSavings.toStringAsFixed(2)}**\n' : ''}• UAE VAT (5%): **AED ${vat.toStringAsFixed(2)}**\n• **Total Amount Due via Fintx**: **AED ${total.toStringAsFixed(2)}**\n\nTap **Proceed to Payment** below to complete the transaction and activate your storage space instantly! 💳🚀',
+          action: AgentAction(type: 'direct_checkout', payload: payload),
+        );
+      }
+    }
+
+    // 4. Inbound Transport: Direct Shipment vs General Inbound
+    final bool hasShipmentIntent = _hasAny(norm, [
+      'shipment', 'send goods', 'deliver goods', 'inbound', 'drop off', 'drop-off', 'pickup', 'pick-up',
+      'ارسال بضاعه', 'توريد', 'توصيل بضاعه', 'شحن', 'استلام بضاعه', 'تسليم بضاعه', 'شحنه'
+    ]);
+
+    if (hasShipmentIntent) {
+      // Check if user specified quantity or shipment method
+      final RegExp boxRegex = RegExp(r'(\d+)\s*(?:boxes|box|items|units|parcels|cartons|طرد|طرود|كرتون|كراتين|قطعه|قطع)', caseSensitive: false);
+      final Match? boxMatch = boxRegex.firstMatch(message);
+      final int? extractedItems = boxMatch != null ? int.tryParse(boxMatch.group(1)!) : null;
+
+      final bool isPickUp = _hasAny(norm, ['pickup', 'pick up', 'pick-up', 'collect', 'استلام', 'استلم', 'خذوها', 'من موقعي', 'من عندي']);
+      
+      String warehouseId = 'dxb';
+      String warehouseNameEn = 'Dubai Central Warehouse';
+      String warehouseNameAr = 'مستودع دبي المركزي';
+      if (norm.contains('abu dhabi') || norm.contains('أبوظبي') || norm.contains('ابوظبي')) {
+        warehouseId = 'auh';
+        warehouseNameEn = 'Abu Dhabi Central Warehouse';
+        warehouseNameAr = 'مستودع أبوظبي المركزي';
+      } else if (norm.contains('sharjah') || norm.contains('الشارقة') || norm.contains('الشارقه')) {
+        warehouseId = 'shj';
+        warehouseNameEn = 'Sharjah Regional Hub';
+        warehouseNameAr = 'مستودع الشارقة الإقليمي';
+      } else if (norm.contains('al ain') || norm.contains('العين')) {
+        warehouseId = 'aln';
+        warehouseNameEn = 'Al Ain Central Warehouse';
+        warehouseNameAr = 'مستودع العين المركزي';
+      }
+
+      String? pickupLoc;
+      if (norm.contains('quoz') || norm.contains('القوز')) {
+        pickupLoc = isAr ? 'منطقة القوز الصناعية' : 'Al Quoz Industrial Area';
+      } else if (norm.contains('jafza') || norm.contains('جافزا')) {
+        pickupLoc = isAr ? 'المنطقة الحرة بجبل علي' : 'Jebel Ali Free Zone (JAFZA)';
+      } else if (norm.contains('mussafah') || norm.contains('مصفح')) {
+        pickupLoc = isAr ? 'مصفح الصناعية، أبوظبي' : 'Mussafah Industrial Area, Abu Dhabi';
+      }
+
+      if (extractedItems != null || isPickUp || norm.contains('tomorrow') || norm.contains('غدا') || norm.contains('غداً')) {
+        final int items = extractedItems ?? 20;
+        final payload = {
+          'is_drop_off': !isPickUp,
+          'item_count': items,
+          'warehouse_id': warehouseId,
+          'warehouse_name': warehouseNameEn,
+          'warehouse_name_ar': warehouseNameAr,
+          'pickup_location': pickupLoc ?? (isAr ? 'مستودع التاجر' : 'Merchant Facility'),
+          'goods_type': 'General Merchandise',
+        };
+
+        return AgentResponse(
+          text: isAr
+              ? '🚚 **تم تجهيز بيانات طلب التوريد والشحن!** 📦\n\n'
+                '• **طريقة الشحن**: ${!isPickUp ? '🏭 Drop-off (تسليم مباشر بالمستودع مع تصريح بوابة فوري)' : '🚛 Pick-up (استلام مباشر من موقعك)'}\n'
+                '• **الوجهة**: $warehouseNameAr\n'
+                '• **عدد الطرود**: $items طرد\n'
+                '${isPickUp && pickupLoc != null ? '• **موقع الاستلام**: $pickupLoc\n' : ''}'
+                '\nاضغط على الزر أدناه لتأكيد الشحنة وإصدار تصريح الدخول الرقمي (Gate Pass QR) فوراً! 🎫'
+              : '🚚 **Inbound Shipment Request Prepared!** 📦\n\n'
+                '• **Transport Mode**: ${!isPickUp ? '🏭 Drop-off (Deliver yourself + Instant Gate Pass)' : '🚛 Pick-up (NXN Fleet Collection)'}\n'
+                '• **Destination**: $warehouseNameEn\n'
+                '• **Cargo Quantity**: $items Parcels / Boxes\n'
+                '${isPickUp && pickupLoc != null ? '• **Pickup Origin**: $pickupLoc\n' : ''}'
+                '\nTap below to confirm and issue your digital Gate Pass (STO QR) instantly! 🎫',
+          action: AgentAction(type: 'direct_shipment', payload: payload),
+        );
+      }
+    }
+
+    // 5. Product Creation & Pricing Control: Direct Add Product
+    final bool hasAddProductIntent = _hasAny(norm, [
+      'add product', 'list product', 'new product', 'upload product',
+      'اضافه منتج', 'أضف منتج', 'اضف منتج', 'ادراج منتج', 'منتج جديد'
+    ]);
+
+    if (hasAddProductIntent) {
+      // Extract price (e.g. 18 AED, 120 درهم, $50)
+      final RegExp priceRegex = RegExp(r'(\d+(?:\.\d+)?)\s*(?:aed|dirhams?|درهم|د\.إ)', caseSensitive: false);
+      final Match? priceMatch = priceRegex.firstMatch(message);
+      final double? extractedPrice = priceMatch != null ? double.tryParse(priceMatch.group(1)!) : null;
+
+      // Extract quantity (e.g. 50 units, 100 حبة)
+      final RegExp qtyRegex = RegExp(r'(\d+)\s*(?:units?|pieces?|qty|items?|حبة|حبه|قطعه|قطع)', caseSensitive: false);
+      final Match? qtyMatch = qtyRegex.firstMatch(message);
+      final int? extractedQty = qtyMatch != null ? int.tryParse(qtyMatch.group(1)!) : null;
+
+      // Extract clean product title candidate
+      String prodName = isAr ? 'منتج جديد' : 'New Marketplace Item';
+      if (norm.contains('coffee') || norm.contains('قهوة') || norm.contains('قهوه')) {
+        prodName = isAr ? 'قهوة كولد برو باردة 250 مل' : 'Cold Brew Coffee 250ml';
+      } else if (norm.contains('honey') || norm.contains('عسل')) {
+        prodName = isAr ? 'عسل سدر إماراتي أصلي 500 جرام' : 'Original Emirati Sidr Honey 500g';
+      } else if (norm.contains('box') || norm.contains('كرتون') || norm.contains('تغليف')) {
+        prodName = isAr ? 'صناديق كرافت صديقة للبيئة (حزمة 50)' : 'Eco-Friendly Kraft Boxes (Pack of 50)';
+      }
+
+      final payload = {
+        'name': prodName,
+        'price': extractedPrice ?? 25.0,
+        'quantity': extractedQty ?? 50,
+        'category': (prodName.contains('Coffee') || prodName.contains('Honey') || prodName.contains('عسل') || prodName.contains('قهو')) ? 'Food & Beverage' : 'General',
+      };
+
+      return AgentResponse(
+        text: isAr
+            ? '🛍️ **مسودة إدراج المنتج في السوق جاهزة!** ✨\n\n'
+              '• **اسم المنتج**: $prodName\n'
+              '• **سعر البيع (AED)**: ${(payload['price'] as num).toStringAsFixed(2)} درهم\n'
+              '• **الكمية المبدئية**: ${payload['quantity']} قطعة\n'
+              '• **التحكم بالتسعير**: 100% خاص بالتاجر (يمكنك التعديل في أي وقت)\n\n'
+              'اضغط أدناه لفتح الكاميرا أو اختيار صورة من المعرض ونشر المنتج فوراً! 📷'
+            : '🛍️ **Marketplace Product Draft Ready!** ✨\n\n'
+              '• **Product Name**: $prodName\n'
+              '• **Selling Price**: AED ${(payload['price'] as num).toStringAsFixed(2)}\n'
+              '• **Initial Inventory**: ${payload['quantity']} Units\n'
+              '• **Pricing Control**: 100% Merchant Autonomy (editable anytime)\n\n'
+              'Tap below to take a photo or select from gallery and publish instantly! 📷',
+        action: AgentAction(type: 'direct_add_product', payload: payload),
+      );
+    }
+
+    // 6. Direct Price Edit Action
+    final bool hasPriceEditIntent = _hasAny(norm, [
+      'change price', 'update price', 'edit price', 'modify price',
+      'تعديل السعر', 'تغيير السعر', 'غير السعر', 'عدل سعر'
+    ]);
+
+    if (hasPriceEditIntent) {
+      final RegExp priceRegex = RegExp(r'(\d+(?:\.\d+)?)\s*(?:aed|dirhams?|درهم|د\.إ)', caseSensitive: false);
+      final Match? priceMatch = priceRegex.firstMatch(message);
+      final double? newPrice = priceMatch != null ? double.tryParse(priceMatch.group(1)!) : null;
+
+      String prodName = isAr ? 'المنتج المحدد' : 'Selected Product';
+      if (norm.contains('honey') || norm.contains('عسل')) {
+        prodName = isAr ? 'عسل سدر إماراتي' : 'Emirati Sidr Honey';
+      } else if (norm.contains('coffee') || norm.contains('قهو')) {
+        prodName = isAr ? 'قهوة كولد برو' : 'Cold Brew Coffee';
+      }
+
+      final payload = {
+        'product_name': prodName,
+        'new_price': newPrice ?? 120.0,
+      };
+
+      return AgentResponse(
+        text: isAr
+            ? '🏷️ **تحديث سعر المنتج في السوق التجاري:**\n\n'
+              '• **المنتج**: $prodName\n'
+              '• **السعر الجديد**: ${(payload['new_price'] as num).toStringAsFixed(2)} درهم إماراتي\n\n'
+              'اضغط أدناه لتأكيد وتطبيق السعر الجديد مباشرة على شاشة إدارة الأسعار! ⚡'
+            : '🏷️ **Marketplace Product Price Update:**\n\n'
+              '• **Item**: $prodName\n'
+              '• **New Unit Price**: AED ${(payload['new_price'] as num).toStringAsFixed(2)}\n\n'
+              'Tap below to confirm and apply the price adjustment across live listings! ⚡',
+        action: AgentAction(type: 'direct_edit_price', payload: payload),
+      );
+    }
+
+    // 7. Direct Order Tracking
+    final bool hasTrackIntent = _hasAny(norm, [
+      'track order', 'track my order', 'where is order', 'order status', 'tracking',
+      'تتبع الطلب', 'وين طلبي', 'تتبع الشحنه', 'حاله الطلب', 'وين وصل الطلب', 'تتبع'
+    ]);
+
+    if (hasTrackIntent) {
+      final RegExp orderNumRegex = RegExp(r'(?:#|ord-|order\s*)?(\d{4,6})', caseSensitive: false);
+      final Match? orderMatch = orderNumRegex.firstMatch(message);
+      final String orderRef = orderMatch != null ? 'ORD-${orderMatch.group(1)}' : 'ORD-1002';
+
+      final payload = {
+        'order_id': orderRef,
+        'customer_name': isAr ? 'فاطمة المنصوري' : 'Fatima Al Mansoori',
+        'status': 'out_for_delivery',
+        'eta': 'Today, 4:30 PM',
+        'courier': 'NXN Express Logistics',
+      };
+
+      return AgentResponse(
+        text: isAr
+            ? '📍 **حالة التتبع المباشر للشحنة (#$orderRef):**\n\n'
+              '• **العميل**: ${payload['customer_name']}\n'
+              '• **الحالة الحالية**: 🚚 خارج للتوصيل (Out for Delivery)\n'
+              '• **موعد الوصول المتوقع (ETA)**: اليوم، 4:30 مساءً\n'
+              '• **شركة الشحن**: ${payload['courier']}\n\n'
+              'اضغط أدناه لفتح خريطة التتبع المباشرة وتفاصيل السائق! 🗺️'
+            : '📍 **Live Shipment Tracking Status (#$orderRef):**\n\n'
+              '• **Recipient**: ${payload['customer_name']}\n'
+              '• **Current Status**: 🚚 Out for Delivery\n'
+              '• **Estimated Arrival (ETA)**: Today, 4:30 PM\n'
+              '• **Carrier**: ${payload['courier']}\n\n'
+              'Tap below to open full live map tracking & driver details! 🗺️',
+        action: AgentAction(type: 'direct_track_order', payload: payload),
+      );
+    }
+
+    // 8. Direct Wallet IBAN Withdrawal Request
+    final bool hasWithdrawIntent = _hasAny(norm, [
+      'withdraw', 'payout', 'transfer to bank', 'iban transfer',
+      'سحب الارباح', 'سحب الفلوس', 'تحويل للبنك', 'اسحب', 'سحب'
+    ]);
+
+    if (hasWithdrawIntent) {
+      final RegExp withdrawRegex = RegExp(r'(\d+(?:\.\d+)?)\s*(?:aed|dirhams?|درهم)', caseSensitive: false);
+      final Match? withdrawMatch = withdrawRegex.firstMatch(message);
+      final double amount = withdrawMatch != null ? double.tryParse(withdrawMatch.group(1)!) ?? 3500.0 : 3500.0;
+
+      final payload = {
+        'amount': amount,
+        'iban': 'AE210330000001234567890',
+        'bank_name': 'Emirates NBD',
+      };
+
+      return AgentResponse(
+        text: isAr
+            ? '💳 **طلب سحب الأرباح إلى الحساب المصرفي (IBAN Payout):**\n\n'
+              '• **المبلغ المطلوب**: ${amount.toStringAsFixed(2)} درهم إماراتي\n'
+              '• **الحساب المصرفي**: ${payload['bank_name']} (•••• 7890)\n'
+              '• **مدة المعالجة**: 2-3 أيام عمل بنظام التحويل الإماراتي المباشر (IPP)\n\n'
+              'اضغط أدناه لفتح المحفظة وتأكيد عملية التحويل فوراً! 🏦'
+            : '💳 **Bank Account Withdrawal Request (IBAN Payout):**\n\n'
+              '• **Requested Amount**: AED ${amount.toStringAsFixed(2)}\n'
+              '• **Bank Account**: ${payload['bank_name']} (•••• 7890)\n'
+              '• **Processing Time**: 2–3 Business Days via UAE IPP Direct Transfer\n\n'
+              'Tap below to open your wallet and confirm the payout request! 🏦',
+        action: AgentAction(type: 'direct_wallet_payout', payload: payload),
+      );
+    }
+
+    // 9. Direct Gate Pass Generation
+    final bool hasGatePassIntent = _hasAny(norm, [
+      'gate pass', 'sto pass', 'security pass', 'entry pass',
+      'تصريح دخول', 'بوابه الدخول', 'باركود الدخول', 'اذن دخول'
+    ]);
+
+    if (hasGatePassIntent) {
+      final payload = {
+        'gate_pass_code': 'GP-DXB-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        'warehouse_name': isAr ? 'مستودع دبي المركزي (القوز)' : 'Dubai Central Warehouse (Al Quoz)',
+        'dock_bay': 'Dock Bay #4',
+        'valid_date': '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+      };
+
+      return AgentResponse(
+        text: isAr
+            ? '🎫 **تم إصدار تصريح الدخول الرقمي للمستودع (Gate Pass STO):**\n\n'
+              '• **رمز التصريح**: ${payload['gate_pass_code']}\n'
+              '• **المستودع**: ${payload['warehouse_name']}\n'
+              '• **رصيف التفريغ المحدد**: ${payload['dock_bay']}\n'
+              '• **الصلاحية**: ${payload['valid_date']} (صالحة لـ 24 ساعة)\n\n'
+              'يستطيع السائق إبراز رمز الباركود أدناه لحراس أمن البوابة للعبور الفوري! 🛡️'
+            : '🎫 **Digital Warehouse Gate Pass Issued (STO):**\n\n'
+              '• **Pass Reference**: ${payload['gate_pass_code']}\n'
+              '• **Facility**: ${payload['warehouse_name']}\n'
+              '• **Assigned Dock**: ${payload['dock_bay']}\n'
+              '• **Validity**: ${payload['valid_date']} (Active for 24 Hours)\n\n'
+              'Present the scannable QR below to security for instant bay access! 🛡️',
+        action: AgentAction(type: 'direct_gate_pass', payload: payload),
       );
     }
 

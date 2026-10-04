@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 import '../models/invoice.dart';
 import '../widgets/common.dart';
@@ -86,9 +86,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
 
   Future<void> _showInvoiceDialog(BuildContext context, Invoice inv) async {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final statusTag = Tag(inv.paid
         ? AppLocalizations.of(context)!.paidTag
         : AppLocalizations.of(context)!.pendingTag);
+    String formatCurrency(double val) => isAr ? '${val.toStringAsFixed(2)} درهم' : _aed.format(val);
+
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -99,16 +102,16 @@ class _PaymentsPageState extends State<PaymentsPage> {
           children: [
             statusTag,
             const SizedBox(height: 8),
-            Text('${AppLocalizations.of(context)!.warehouseProductLabel}: ${inv.warehouseName}'),
+            Text('${AppLocalizations.of(context)!.warehouseProductLabel}: ${inv.getWarehouseName(isAr)}'),
             Text('${AppLocalizations.of(context)!.dateLabel}: ${inv.formattedDate}'),
             const SizedBox(height: 8),
             Divider(color: Colors.grey.shade300),
-            _kv(AppLocalizations.of(context)!.subtotalLabel, _aed.format(inv.amount)),
-            _kv(AppLocalizations.of(context)!.vatLabel, _aed.format(inv.vat)),
+            _kv(AppLocalizations.of(context)!.subtotalLabel, formatCurrency(inv.amount)),
+            _kv(AppLocalizations.of(context)!.vatLabel, formatCurrency(inv.vat)),
             if (inv.workerFee > 0)
-              _kv(Localizations.localeOf(context).languageCode == 'ar' ? 'أجور العمال' : 'Worker Fees', _aed.format(inv.workerFee)),
+              _kv(isAr ? 'أجور العمال' : 'Worker Fees', formatCurrency(inv.workerFee)),
             const Divider(),
-            _kv(AppLocalizations.of(context)!.totalLabel, _aed.format(inv.total), bold: true),
+            _kv(AppLocalizations.of(context)!.totalLabel, formatCurrency(inv.total), bold: true),
           ],
         ),
         actions: [
@@ -343,6 +346,7 @@ class _InvoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -379,14 +383,16 @@ class _InvoiceCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      invoice.warehouseName,
+                      invoice.getWarehouseName(isAr),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       "${invoice.number} • ${invoice.formattedDate}",
+                      textDirection: TextDirection.ltr,
                       style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                     ),
                   ],
@@ -398,7 +404,8 @@ class _InvoiceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    aed.format(invoice.total),
+                    isAr ? '${invoice.total.toStringAsFixed(2)} درهم' : aed.format(invoice.total),
+                    textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -436,7 +443,7 @@ class _InvoiceCard extends StatelessWidget {
                               title: 'Invoice_${invoice.number}',
                               buildPdf: () => PdfExportService.generateInvoicePdf(
                                 invoiceNumber: invoice.number,
-                                warehouseName: invoice.warehouseName,
+                                warehouseName: invoice.getWarehouseName(isAr),
                                 dateStr: invoice.formattedDate,
                                 amount: invoice.amount,
                                 vatAmount: invoice.vat,

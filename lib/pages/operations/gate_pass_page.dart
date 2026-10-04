@@ -27,7 +27,19 @@ class GatePassPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final bookingRef = bookingId ?? 'STO-881868';
-    final hubName = warehouseName ?? (isAr ? 'مستودع دبي المركزي' : 'Dubai Central Warehouse');
+    final hubName = warehouseName != null
+        ? (isAr
+            ? (warehouseName!.contains('Dubai')
+                ? 'مستودع دبي المركزي'
+                : (warehouseName!.contains('Sharjah')
+                    ? 'مستودع الشارقة الإقليمي'
+                    : (warehouseName!.contains('Abu Dhabi')
+                        ? 'مستودع أبوظبي المركزي'
+                        : (warehouseName!.contains('Al Ain')
+                            ? 'مستودع العين المركزي'
+                            : warehouseName!))))
+            : warehouseName!)
+        : (isAr ? 'مستودع دبي المركزي' : 'Dubai Central Warehouse');
     final slotStr = timeSlot ?? '08:00 AM - 11:00 AM';
     final plateStr = truckPlate ?? 'UAE-DXB-92810';
     final itemsCountStr = '${itemCount ?? 50} ${isAr ? "قطع" : "Units"}';

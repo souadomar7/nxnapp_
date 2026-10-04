@@ -50,12 +50,13 @@ class UserSession {
         (appMeta['role'] ?? appMeta['user_role'] ?? '').toString().toLowerCase();
 
     final UserRole role = switch (rawRole) {
-      'super_admin' || 'superadmin'  => UserRole.superAdmin,
+      'super_admin' || 'superadmin'                    => UserRole.superAdmin,
       'wh_admin' || 'whadmin' || 'admin' || 'operator' => UserRole.whAdmin,
-      'vendor'                       => UserRole.vendor,
-      'customer' || 'merchant'       => UserRole.customer,
-      'guest'                        => UserRole.guest,
-      _                              => UserRole.customer, // safe default for new signups
+      'driver' || 'courier'                            => UserRole.driver,
+      'vendor' || 'merchant' || 'seller'               => UserRole.vendor,
+      'customer' || 'buyer'                            => UserRole.customer,
+      'guest'                                          => UserRole.guest,
+      _                                                => UserRole.vendor, // default to vendor for NXN warehouse SME merchants
     };
 
     // ── Vendor status ────────────────────────────────────────────────────────
@@ -98,6 +99,7 @@ class UserSession {
   bool get isGuest        => role == UserRole.guest;
   bool get isCustomer     => role == UserRole.customer;
   bool get isVendor       => role == UserRole.vendor;
+  bool get isDriver       => role == UserRole.driver;
   bool get isWhAdmin      => role == UserRole.whAdmin;
   bool get isSuperAdmin   => role == UserRole.superAdmin;
 

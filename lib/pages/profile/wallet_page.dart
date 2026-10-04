@@ -207,41 +207,152 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   void _showPayoutDialog() {
+    final ibanCtrl = TextEditingController(text: 'AE070331234567890123456');
+    final bankCtrl = TextEditingController(text: 'Emirates NBD');
+    final amountCtrl = TextEditingController(text: (_balance >= 150.0 ? _balance.clamp(150.0, 5000.0) : 150.0).toStringAsFixed(0));
+    String? errorText;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Request IBAN Payout'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(decoration: InputDecoration(labelText: 'UAE IBAN (AE...)')),
-            SizedBox(height: 12),
-            TextField(decoration: InputDecoration(labelText: 'Bank Name')),
-            SizedBox(height: 12),
-            TextField(decoration: InputDecoration(labelText: 'Amount (AED)')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'IBAN Payout requested! 14-day clearance countdown initiated.',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.bluePrimary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  backgroundColor: Colors.green,
+                  child: const Icon(Icons.account_balance_rounded, color: AppColors.bluePrimary, size: 22),
                 ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.bluePrimary,
-              foregroundColor: Colors.white,
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Request IBAN Payout',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ],
             ),
-            child: const Text('Submit Payout'),
-          ),
-        ],
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Available to Withdraw:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(
+                          'AED ${_balance.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.bluePrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ibanCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'UAE IBAN *',
+                      hintText: 'AE000000000000000000000',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: bankCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Bank Name *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Amount (AED) *',
+                      helperText: 'Min withdrawal: AED 150.00',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      errorText!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final entered = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                  final iban = ibanCtrl.text.trim();
+
+                  if (iban.isEmpty || !iban.toUpperCase().startsWith('AE')) {
+                    setDialogState(() => errorText = 'Please enter a valid UAE IBAN starting with AE');
+                    return;
+                  }
+                  if (entered < 150.0) {
+                    setDialogState(() => errorText = 'Minimum withdrawal amount is AED 150.00');
+                    return;
+                  }
+                  if (entered > _balance) {
+                    setDialogState(() => errorText = 'Amount exceeds your available balance (AED ${_balance.toStringAsFixed(2)})');
+                    return;
+                  }
+
+                  Navigator.pop(ctx);
+
+                  setState(() {
+                    _balance -= entered;
+                    _transactions.insert(0, {
+                      'id': 'payout-${DateTime.now().millisecondsSinceEpoch}',
+                      'direction': 'debit',
+                      'amount_aed': entered,
+                      'type': 'payout_hold',
+                      'notes': 'IBAN Payout (${bankCtrl.text.trim()})',
+                      'created_at': DateTime.now().toIso8601String(),
+                    });
+                  });
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Withdrawal request of AED ${entered.toStringAsFixed(2)} submitted successfully!'),
+                      backgroundColor: Colors.green.shade700,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.bluePrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Submit Payout'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -119,73 +119,33 @@ class MarketplaceService {
         } catch (_) {}
       }
 
-      // Seed default mock items if empty
-      if (_localProducts.isEmpty) {
-        _localProducts = [
-          SmeProduct(
-            id: 'mock-beans',
-            sellerId: 'GUEST',
-            name: 'Premium Espresso Beans',
-            nameAr: 'حبوب إسبريسو فاخرة',
-            description: 'Locally roasted in Dubai, UAE. Rich flavor profile with hints of dark chocolate.',
-            price: 45.0,
-            shopName: 'My Guest Shop',
-            isShopApproved: true,
-            createdAt: DateTime.now(),
-          ),
-          SmeProduct(
-            id: 'mock-earbuds',
-            sellerId: 'GUEST',
-            name: 'Wireless Earbuds Pro',
-            nameAr: 'سماعات لاسلكية برو',
-            description: 'Active noise cancellation with up to 30 hours of total playtime.',
-            price: 120.0,
-            shopName: 'My Guest Shop',
-            isShopApproved: true,
-            createdAt: DateTime.now(),
-          ),
-        ];
-        
-        _localInventory = [
-          SmeInventory(
-            id: 'mock-inv-1',
-            sellerId: 'GUEST',
-            productId: 'mock-beans',
-            productName: 'Premium Espresso Beans',
-            quantity: 45,
-            status: 'in_stock',
-            createdAt: DateTime.now(),
-          ),
-          SmeInventory(
-            id: 'mock-inv-2',
-            sellerId: 'GUEST',
-            productId: 'mock-earbuds',
-            productName: 'Wireless Earbuds Pro',
-            quantity: 8, // Low stock alert trigger!
-            status: 'in_stock',
-            createdAt: DateTime.now(),
-          ),
-        ];
-        
-        _localOrders = [
-          SmeOrder(
-            id: 'mock-order-1',
-            sellerId: 'GUEST',
-            customerName: 'Fatima Al Mansoori',
-            customerAddress: 'Al Barsha 2, Dubai',
-            deliveryMethod: 'standard',
-            status: 'pending',
-            totalAmount: 165.0,
-            createdAt: DateTime.now(),
-          )
-        ];
-      }
-
       _initialized = true;
       updateNotifier.value++; // Trigger UI update after load
     } catch (e) {
       debugPrint('Error loading local data: $e');
     }
+  }
+
+  Future<void> clearAllData() async {
+    _localInvoices = [];
+    _localActivity = [];
+    _localProducts = [];
+    _localInventory = [];
+    _localOrders = [];
+    _localShop = null;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('local_invoices');
+      await prefs.remove('local_activity');
+      await prefs.remove('local_shop');
+      await prefs.remove('local_products');
+      await prefs.remove('local_inventory');
+      await prefs.remove('local_orders');
+      await prefs.remove('nxn_merchant_dashboard_snapshot');
+    } catch (_) {}
+
+    updateNotifier.value++;
   }
 
   Future<void> _saveLocal() async {
@@ -426,7 +386,9 @@ class MarketplaceService {
         allActivities.add(DashboardActivity(
           id: inv.id,
           title: inv.paid ? 'Payment Success' : 'Invoice Generated',
+          titleAr: inv.paid ? 'تم سداد الفاتورة بنجاح' : 'تم إنشاء فاتورة جديدة',
           subtitle: '${inv.amount} AED • ${inv.paid ? 'PAID' : 'PENDING'}',
+          subtitleAr: '${inv.amount} درهم • ${inv.paid ? 'تم السداد' : 'قيد الانتظار'}',
           date: inv.date,
           type: ActivityType.invoice,
         ));
@@ -447,10 +409,14 @@ class MarketplaceService {
           .limit(limit);
       
       for (var item in (inboundData as List)) {
+        final status = (item['status'] as String? ?? 'pending').toLowerCase();
+        final statusAr = status == 'received' ? 'تم الاستلام' : (status == 'processing' ? 'قيد المعالجة' : 'قيد الانتظار');
         activities.add(DashboardActivity(
           id: item['id'],
           title: 'Inbound Shipment',
-          subtitle: '${item['item_count']} items • ${(item['status'] as String).toUpperCase()}',
+          titleAr: 'شحنة واردة للمستودع (STO)',
+          subtitle: '${item['item_count']} items • ${status.toUpperCase()}',
+          subtitleAr: '${item['item_count']} عناصر • $statusAr',
           date: DateTime.parse(item['created_at']),
           type: ActivityType.inbound,
         ));
@@ -465,10 +431,14 @@ class MarketplaceService {
           .limit(limit);
 
       for (var item in (ordersData as List)) {
+        final status = (item['status'] as String? ?? 'pending').toLowerCase();
+        final statusAr = status == 'delivered' ? 'تم التسليم' : (status == 'shipped' ? 'تم الشحن' : (status == 'confirmed' ? 'تم التأكيد' : 'قيد التجهيز'));
         activities.add(DashboardActivity(
           id: item['id'],
           title: 'Delivery Order',
-          subtitle: 'To ${item['customer_name']} • ${(item['status'] as String).toUpperCase()}',
+          titleAr: 'طلب توصيل مشتري',
+          subtitle: 'To ${item['customer_name']} • ${status.toUpperCase()}',
+          subtitleAr: 'إلى ${item['customer_name']} • $statusAr',
           date: DateTime.parse(item['created_at']),
           type: ActivityType.delivery,
         ));
@@ -477,16 +447,21 @@ class MarketplaceService {
       // 3. New Subscriptions
       final subsData = await _supabase
           .from('sme_subscriptions')
-          .select('*, warehouses(name)')
+          .select('*, warehouses(name, name_ar)')
           .eq('seller_id', sellerId)
           .order('start_date', ascending: false)
           .limit(limit);
 
       for (var item in (subsData as List)) {
+        final wh = item['warehouses'] as Map<String, dynamic>? ?? {};
+        final whName = wh['name'] ?? 'Dubai Central Warehouse';
+        final whNameAr = wh['name_ar'] ?? 'مستودع دبي المركزي';
         activities.add(DashboardActivity(
           id: item['id'],
           title: 'Space Rented',
-          subtitle: '${item['warehouses']['name'] ?? 'Warehouse'} • ${item['shelves_count']} Shelves',
+          titleAr: 'تم استئجار مساحة تخزينية',
+          subtitle: '$whName • ${item['shelves_count']} Shelves',
+          subtitleAr: '$whNameAr • ${item['shelves_count']} أرفف',
           date: DateTime.parse(item['start_date']),
           type: ActivityType.rental,
         ));
@@ -505,7 +480,9 @@ class MarketplaceService {
         activities.add(DashboardActivity(
           id: item['id'],
           title: isPaid ? 'Payment Success' : 'Invoice Generated',
+          titleAr: isPaid ? 'تم سداد الفاتورة بنجاح' : 'تم إنشاء فاتورة جديدة',
           subtitle: '${item['amount']} AED • ${isPaid ? 'PAID' : 'PENDING'}',
+          subtitleAr: '${item['amount']} درهم • ${isPaid ? 'تم السداد' : 'قيد الانتظار'}',
           date: DateTime.parse(item['created_at']),
           type: ActivityType.invoice,
         ));
@@ -522,7 +499,9 @@ class MarketplaceService {
         activities.add(DashboardActivity(
           id: inv.id,
           title: inv.paid ? 'Payment Success' : 'Invoice Generated',
+          titleAr: inv.paid ? 'تم سداد الفاتورة بنجاح' : 'تم إنشاء فاتورة جديدة',
           subtitle: '${inv.amount} AED • ${inv.paid ? 'PAID' : 'PENDING'}',
+          subtitleAr: '${inv.amount} درهم • ${inv.paid ? 'تم السداد' : 'قيد الانتظار'}',
           date: inv.date,
           type: ActivityType.invoice,
         ));
@@ -543,7 +522,9 @@ class MarketplaceService {
         allActivities.add(DashboardActivity(
           id: inv.id,
           title: inv.paid ? 'Payment Success' : 'Invoice Generated',
+          titleAr: inv.paid ? 'تم سداد الفاتورة بنجاح' : 'تم إنشاء فاتورة جديدة',
           subtitle: '${inv.amount} AED • ${inv.paid ? 'PAID' : 'PENDING'}',
+          subtitleAr: '${inv.amount} درهم • ${inv.paid ? 'تم السداد' : 'قيد الانتظار'}',
           date: inv.date,
           type: ActivityType.invoice,
         ));
@@ -554,6 +535,8 @@ class MarketplaceService {
   }
 
   // --- Products ---
+
+  Future<List<SmeProduct>> getSellerProducts() => getProducts();
 
   Future<List<SmeProduct>> getProducts() async {
     final user = _supabase.auth.currentUser;
@@ -655,7 +638,26 @@ class MarketplaceService {
 
     if (user != null) {
       try {
-        await _supabase.from('sme_products').insert(newProduct.toJson());
+        await _supabase.from('sme_products').insert({
+          'id': prodId,
+          'seller_id': user.id,
+          'name': name,
+          'description': description.isEmpty ? null : description,
+          'price': price,
+          if (photoUrl.isNotEmpty) 'photo_url': photoUrl,
+        });
+      } on PostgrestException catch (e) {
+        if (e.message.contains('product_limit_reached')) {
+          _localProducts.removeWhere((p) => p.id == prodId);
+          _localInventory.removeWhere((i) => i.id == invId);
+          rethrow;
+        }
+        debugPrint('Error inserting remote product: $e');
+      } catch (e) {
+        debugPrint('Error inserting remote product/inventory: $e');
+      }
+
+      try {
         await _supabase.from('sme_inventory').insert({
           'id': invId,
           'seller_id': user.id,
@@ -664,15 +666,8 @@ class MarketplaceService {
           'status': 'in_stock',
           'created_at': DateTime.now().toIso8601String(),
         });
-      } on PostgrestException catch (e) {
-        if (e.message.contains('product_limit_reached')) {
-          _localProducts.removeWhere((p) => p.id == prodId);
-          _localInventory.removeWhere((i) => i.id == invId);
-          rethrow;
-        }
-        debugPrint('Error inserting remote product/inventory: $e');
-      } catch (e) {
-        debugPrint('Error inserting remote product/inventory: $e');
+      } catch (invErr) {
+        debugPrint('Remote inventory insert error: $invErr');
       }
     }
 
@@ -739,6 +734,99 @@ class MarketplaceService {
         }).eq('id', productId);
       } catch (e) {
         debugPrint('Error updating remote product price: $e');
+      }
+    }
+
+    await _saveLocal();
+    updateNotifier.value++;
+  }
+
+  Future<void> updateProduct(
+    String productId,
+    String name,
+    String description,
+    double price,
+    String photoUrl, {
+    int quantity = 0,
+    String? category,
+    String? nameAr,
+  }) async {
+    // 1. Update local products list
+    final idx = _localProducts.indexWhere((p) => p.id == productId);
+    if (idx != -1) {
+      final old = _localProducts[idx];
+      _localProducts[idx] = SmeProduct(
+        id: old.id,
+        sellerId: old.sellerId,
+        inventoryId: old.inventoryId,
+        name: name,
+        nameAr: (nameAr != null && nameAr.isNotEmpty) ? nameAr : old.nameAr,
+        description: description,
+        price: price,
+        quantity: quantity > 0 ? quantity : old.quantity,
+        photoUrl: photoUrl.isNotEmpty ? photoUrl : old.photoUrl,
+        shopName: old.shopName,
+        isShopApproved: old.isShopApproved,
+        category: category ?? old.category,
+        createdAt: old.createdAt,
+      );
+    }
+
+    // 2. Update local inventory item
+    final invIdx = _localInventory.indexWhere((i) => i.productId == productId);
+    if (invIdx != -1) {
+      final inv = _localInventory[invIdx];
+      _localInventory[invIdx] = SmeInventory(
+        id: inv.id,
+        sellerId: inv.sellerId,
+        productId: inv.productId,
+        productName: name,
+        shelfId: inv.shelfId,
+        quantity: quantity > 0 ? quantity : inv.quantity,
+        status: inv.status,
+        createdAt: inv.createdAt,
+        sku: inv.sku,
+        warehouseName: inv.warehouseName,
+        shelfLocation: inv.shelfLocation,
+        totalValue: (quantity > 0 ? quantity : inv.quantity) * price,
+      );
+    }
+
+    // 3. Activity Log
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    _localActivity.insert(0, DashboardActivity(
+      id: 'ACT-PROD-UPDATE-$stamp',
+      title: 'Product Updated',
+      titleAr: 'تم تحديث بيانات المنتج',
+      subtitle: '$name • AED ${price.toStringAsFixed(2)}',
+      subtitleAr: '$name • ${price.toStringAsFixed(2)} درهم',
+      date: DateTime.now(),
+      type: ActivityType.inbound,
+    ));
+
+    // 4. Remote Supabase update
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        await _supabase.from('sme_products').update({
+          'name': name,
+          'description': description,
+          'price': price,
+          if (photoUrl.isNotEmpty) 'photo_url': photoUrl,
+        }).eq('id', productId);
+      } catch (e) {
+        debugPrint('Error updating remote product: $e');
+      }
+
+      if (quantity > 0) {
+        try {
+          await _supabase.from('sme_inventory').update({
+            'quantity': quantity,
+            'product_name': name,
+          }).eq('product_id', productId);
+        } catch (invErr) {
+          debugPrint('Remote inventory quantity update note: $invErr');
+        }
       }
     }
 
@@ -823,55 +911,95 @@ class MarketplaceService {
 
   Future<List<Map<String, dynamic>>> getOrdersForSeller() async {
     final user = _supabase.auth.currentUser;
-    if (user == null) {
-      return _localOrders.map((o) => {
-        'id': o.id,
-        'customer_name': o.customerName,
-        'customer_phone': o.recipientPhone ?? '',
-        'customer_address': o.customerAddress,
-        'total_amount': o.totalAmount,
-        'status': o.status,
-        'created_at': o.createdAt.toIso8601String(),
-      }).toList();
-    }
-    try {
-      final data = await _supabase
-          .from('sme_orders')
-          .select()
-          .eq('seller_id', user.id)
-          .order('created_at', ascending: false);
-      final list = List<Map<String, dynamic>>.from(data);
-      if (list.isEmpty && _localOrders.isNotEmpty) {
-        return _localOrders.map((o) => {
+    final List<Map<String, dynamic>> combined = [];
+    final Set<String> seenIds = {};
+
+    // 1. Add all local session orders first
+    for (var o in _localOrders) {
+      if (seenIds.add(o.id)) {
+        combined.add({
           'id': o.id,
           'customer_name': o.customerName,
-          'customer_phone': o.recipientPhone ?? '',
+          'customer_phone': o.recipientPhone,
           'customer_address': o.customerAddress,
           'total_amount': o.totalAmount,
           'status': o.status,
           'created_at': o.createdAt.toIso8601String(),
-        }).toList();
+        });
       }
-      return list;
-    } catch (e) {
-      debugPrint('getOrdersForSeller error (using local fallback): $e');
-      return _localOrders.map((o) => {
-        'id': o.id,
-        'customer_name': o.customerName,
-        'customer_phone': o.recipientPhone ?? '',
-        'customer_address': o.customerAddress,
-        'total_amount': o.totalAmount,
-        'status': o.status,
-        'created_at': o.createdAt.toIso8601String(),
-      }).toList();
     }
+
+    // 2. Fetch remote orders from Supabase if online
+    if (user != null) {
+      try {
+        final data = await _supabase
+            .from('sme_orders')
+            .select()
+            .order('created_at', ascending: false);
+        for (var row in (data as List)) {
+          final id = row['id']?.toString() ?? '';
+          if (seenIds.add(id)) {
+            combined.add({
+              'id': id,
+              'customer_name': row['customer_name'] ?? 'Buyer',
+              'customer_phone': row['customer_phone'] ?? '',
+              'customer_address': row['customer_address'] ?? '',
+              'total_amount': (row['total_amount'] as num?)?.toDouble() ?? 0.0,
+              'status': row['status'] ?? 'pending',
+              'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('getOrdersForSeller remote error: $e');
+      }
+    }
+
+    return combined;
+  }
+
+  Future<List<Map<String, dynamic>>> getOrdersForBuyer() async {
+    final user = _supabase.auth.currentUser;
+    final List<Map<String, dynamic>> combined = [];
+
+    if (user != null) {
+      try {
+        final data = await _supabase
+            .from('buyer_orders')
+            .select('*, sme_products(name, photo_url, price)')
+            .eq('buyer_id', user.id)
+            .order('created_at', ascending: false);
+        for (var row in data) {
+          combined.add(Map<String, dynamic>.from(row));
+        }
+      } catch (e) {
+        debugPrint('getOrdersForBuyer remote error: $e');
+      }
+    }
+
+    if (combined.isEmpty) {
+      for (var o in _localOrders) {
+        combined.add({
+          'id': o.id,
+          'customer_name': o.customerName,
+          'total_amount': o.totalAmount,
+          'order_status': o.status,
+          'status': o.status,
+          'created_at': o.createdAt.toIso8601String(),
+        });
+      }
+    }
+
+    return combined;
   }
 
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
     // Update local state first
     final localIdx = _localOrders.indexWhere((o) => o.id == orderId);
+    String? customerName = 'Customer';
     if (localIdx != -1) {
       final existing = _localOrders[localIdx];
+      customerName = existing.customerName;
       _localOrders[localIdx] = SmeOrder(
         id: existing.id,
         sellerId: existing.sellerId,
@@ -886,6 +1014,20 @@ class MarketplaceService {
       await _saveLocal();
     }
 
+    // Add activity log
+    _localActivity.insert(
+      0,
+      DashboardActivity(
+        id: 'ACT-STATUS-${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Order Status: $newStatus',
+        titleAr: 'تحديث حالة الطلب: $newStatus',
+        subtitle: 'Order #$orderId updated for $customerName',
+        subtitleAr: 'تم تحديث حالة الطلب #$orderId لـ $customerName',
+        date: DateTime.now(),
+        type: ActivityType.delivery,
+      ),
+    );
+
     final user = _supabase.auth.currentUser;
     if (user != null) {
       try {
@@ -894,8 +1036,15 @@ class MarketplaceService {
             .update({'status': newStatus})
             .eq('id', orderId);
       } catch (e) {
-        debugPrint('updateOrderStatus error: $e');
+        debugPrint('updateOrderStatus sme_orders error: $e');
       }
+
+      try {
+        await _supabase
+            .from('buyer_orders')
+            .update({'order_status': newStatus})
+            .eq('id', orderId);
+      } catch (_) {}
     }
     MarketplaceService.updateNotifier.value++;
   }
@@ -944,10 +1093,7 @@ class MarketplaceService {
             'seller_id': user.id,
             'warehouse_id': warehouseId,
             'shelves_count': 1,
-            'months': 1,
-            'storage_type': 'ambient',
             'is_active': true,
-            'auto_renew': true,
             'start_date': now.toIso8601String(),
             'end_date': now.add(const Duration(days: 365)).toIso8601String(),
             'created_at': now.toIso8601String(),
@@ -957,16 +1103,29 @@ class MarketplaceService {
         debugPrint('Auto-provisioning subscription check error: $subErr');
       }
 
-      await _supabase.from('sme_inbound_requests').insert({
+      final basePayload = <String, dynamic>{
         'seller_id': user.id,
         'warehouse_id': warehouseId,
         'expected_date': expectedDate.toIso8601String(),
         'item_count': itemCount,
         'notes': notes,
-        'shipment_type': shipmentType,
         'status': 'pending',
         'gate_pass_code': 'GP-${DateTime.now().millisecondsSinceEpoch}',
-      });
+      };
+
+      try {
+        await _supabase.from('sme_inbound_requests').insert({
+          ...basePayload,
+          'shipment_type': shipmentType,
+        });
+      } on PostgrestException catch (e) {
+        if (e.message.contains('shipment_type')) {
+          await _supabase.from('sme_inbound_requests').insert(basePayload);
+        } else {
+          debugPrint('createInboundRequest PostgrestException: $e');
+          rethrow;
+        }
+      }
     } on PostgrestException catch (e) {
       debugPrint('createInboundRequest PostgrestException: $e');
       rethrow;
@@ -1050,9 +1209,17 @@ class MarketplaceService {
     try {
       await _supabase.from('sme_invoices').insert(data);
     } catch (e) {
-        debugPrint('Error saving invoice (fallback): $e');
-        _localInvoices.add(invoice);
-        _saveLocal(); // Persist
+      if (e.toString().contains('warehouse_name_ar')) {
+        try {
+          final sanitized = Map<String, dynamic>.from(data)..remove('warehouse_name_ar');
+          await _supabase.from('sme_invoices').insert(sanitized);
+          updateNotifier.value++;
+          return;
+        } catch (_) {}
+      }
+      debugPrint('Error saving invoice (fallback): $e');
+      _localInvoices.add(invoice);
+      _saveLocal(); // Persist
     }
     updateNotifier.value++; // Notify UI
   }
@@ -1252,15 +1419,7 @@ class MarketplaceService {
 
   // --- Marketplace Shops ---
   
-  static MarketplaceShop? _localShop = MarketplaceShop(
-    id: 'SHOP-EMIRATES-001',
-    sellerId: 'GUEST',
-    shopName: 'Emirates Merchant Store',
-    licenseName: 'CN-2891048 (Dubai Economy & Tourism)',
-    isApproved: true,
-    isFeatured: true,
-    createdAt: DateTime.now(),
-  );
+  static MarketplaceShop? _localShop;
 
   Future<MarketplaceShop?> getMyShop() async {
     final user = _supabase.auth.currentUser;
@@ -2174,10 +2333,11 @@ class MarketplaceService {
 
   // ─── SUBSCRIPTION OFFBOARDING & CAPACITY LIFECYCLE ───────────────────────
 
-  /// Step 1 & 2: Requests subscription cancellation with 14-day grace period
+  /// Requests subscription cancellation under client policy:
+  /// Current month is non-refundable. Future cycle will not renew. If prepaid future months exist, partial refund is processed.
   Future<Map<String, dynamic>> requestSubscriptionCancellation({
     required String subscriptionId,
-    required String refundModel,
+    String cancellationReason = 'Merchant requested cancellation',
     required double refundAmount,
   }) async {
     final user = _supabase.auth.currentUser;
@@ -2207,7 +2367,7 @@ class MarketplaceService {
       try {
         final res = await _supabase.rpc('request_subscription_cancellation', params: {
           'p_subscription_id': subscriptionId,
-          'p_refund_model': refundModel,
+          'p_cancellation_reason': cancellationReason,
           'p_refund_amount': refundAmount,
         });
         if (res != null && res is Map<String, dynamic>) {
@@ -2223,7 +2383,7 @@ class MarketplaceService {
       0,
       DashboardActivity(
         id: 'ACT-CANCEL-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Subscription Cancellation Requested ($refundModel)',
+        title: 'Subscription Cancellation Requested',
         subtitle: 'Effective End: ${effectiveEndDate.day}/${effectiveEndDate.month}/${effectiveEndDate.year} | Refund: AED ${refundAmount.toStringAsFixed(2)}',
         date: DateTime.now(),
         type: ActivityType.rental,

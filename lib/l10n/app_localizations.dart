@@ -791,7 +791,7 @@ abstract class AppLocalizations {
   /// No description provided for @access247.
   ///
   /// In en, this message translates to:
-  /// **'24/7 Access'**
+  /// **'24/7 Digital Tracking'**
   String get access247;
 
   /// No description provided for @businessHours.

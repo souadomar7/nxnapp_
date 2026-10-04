@@ -393,7 +393,8 @@ class _SellerProductsPageState extends State<SellerProductsPage> {
                                             children: [
                                               Expanded(
                                                 child: Text(
-                                                  product.name,
+                                                  product.getLocalizedName(isAr),
+                                                  textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                                   style: const TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.bold,
@@ -431,7 +432,8 @@ class _SellerProductsPageState extends State<SellerProductsPage> {
                                           if (product.description != null && product.description!.isNotEmpty) ...[
                                             const SizedBox(height: 4),
                                             Text(
-                                              product.description!,
+                                              product.getLocalizedDescription(isAr),
+                                              textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
@@ -450,7 +452,10 @@ class _SellerProductsPageState extends State<SellerProductsPage> {
                                                     style: const TextStyle(fontSize: 10, color: Colors.grey),
                                                   ),
                                                   Text(
-                                                    'AED ${product.price.toStringAsFixed(2)}',
+                                                    isAr
+                                                        ? '${product.price.toStringAsFixed(2)} درهم'
+                                                        : 'AED ${product.price.toStringAsFixed(2)}',
+                                                    textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                                     style: const TextStyle(
                                                       fontSize: 16,
                                                       fontWeight: FontWeight.w800,

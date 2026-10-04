@@ -377,7 +377,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get access247 => '24/7 Access';
+  String get access247 => '24/7 Digital Tracking';
 
   @override
   String get businessHours => 'Business Hours';
