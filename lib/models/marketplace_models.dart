@@ -108,6 +108,42 @@ class SmeProduct {
       if (_category != null) 'category': _category,
     };
   }
+
+  SmeProduct copyWith({
+    String? id,
+    String? sellerId,
+    String? inventoryId,
+    String? name,
+    String? nameAr,
+    String? description,
+    double? price,
+    int? quantity,
+    String? photoUrl,
+    String? shopName,
+    bool? isShopApproved,
+    bool? isHidden,
+    String? hiddenReason,
+    String? category,
+    DateTime? createdAt,
+  }) {
+    return SmeProduct(
+      id: id ?? this.id,
+      sellerId: sellerId ?? this.sellerId,
+      inventoryId: inventoryId ?? this.inventoryId,
+      name: name ?? this.name,
+      nameAr: nameAr ?? this.nameAr,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      quantity: quantity ?? this.quantity,
+      photoUrl: photoUrl ?? this.photoUrl,
+      shopName: shopName ?? this.shopName,
+      isShopApproved: isShopApproved ?? this.isShopApproved,
+      isHidden: isHidden ?? this.isHidden,
+      hiddenReason: hiddenReason ?? this.hiddenReason,
+      category: category ?? _category,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }
 
 class SmeInventory {

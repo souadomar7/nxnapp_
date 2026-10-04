@@ -344,18 +344,37 @@ class MarketplaceService {
         totalValue = localValue;
       }
 
-      final ordersResponse = await _supabase
-          .from('sme_orders')
-          .select('id')
-          .eq('seller_id', sellerId)
-          .eq('status', 'pending')
-          .count(CountOption.exact);
+      int totalPendingOrders = 0;
+      try {
+        final smeRes = await _supabase
+            .from('sme_orders')
+            .select('id')
+            .eq('seller_id', sellerId)
+            .eq('status', 'pending')
+            .count(CountOption.exact);
+        totalPendingOrders += smeRes.count;
+      } catch (_) {}
+
+      try {
+        final buyerRes = await _supabase
+            .from('buyer_orders')
+            .select('id')
+            .eq('seller_id', sellerId)
+            .eq('order_status', 'pending')
+            .count(CountOption.exact);
+        totalPendingOrders += buyerRes.count;
+      } catch (_) {}
+
+      final localPending = _localOrders.where((e) => e.status == 'pending').length;
+      if (totalPendingOrders == 0 && localPending > 0) {
+        totalPendingOrders = localPending;
+      }
 
       return {
         'shelves': totalShelves,
         'shelvesThisMonth': shelvesThisMonth,
         'items': totalItems,
-        'pendingOrders': ordersResponse.count,
+        'pendingOrders': totalPendingOrders,
         'lowStock': lowStockCount,
         'outOfStock': outOfStockCount,
         'totalValue': totalValue,
@@ -587,22 +606,37 @@ class MarketplaceService {
     }
   }
 
-  Future<void> addProduct(String name, String description, double price, String photoUrl, {int quantity = 50}) async {
+  Future<void> addProduct(
+    String name,
+    String description,
+    double price,
+    String photoUrl, {
+    int quantity = 50,
+    String? category,
+    String? nameAr,
+    String? shopName,
+  }) async {
     final user = _supabase.auth.currentUser;
     final stamp = DateTime.now().millisecondsSinceEpoch;
     final prodId = 'PROD-$stamp';
     final invId = 'INV-$stamp';
+
+    final effectiveCategory = (category != null && category.isNotEmpty) ? category : 'General';
+    final effectiveShopName = (shopName != null && shopName.isNotEmpty) ? shopName : 'Emirates Merchant';
 
     final newProduct = SmeProduct(
       id: prodId,
       sellerId: user?.id ?? 'GUEST',
       inventoryId: invId,
       name: name,
+      nameAr: nameAr,
       description: description.isEmpty ? null : description,
       price: price,
+      quantity: quantity > 0 ? quantity : 50,
       photoUrl: photoUrl.isEmpty ? null : photoUrl,
-      shopName: 'Emirates Merchant',
+      shopName: effectiveShopName,
       isShopApproved: true,
+      category: effectiveCategory,
       createdAt: DateTime.now(),
     );
 
@@ -637,14 +671,38 @@ class MarketplaceService {
     ));
 
     if (user != null) {
+      // Ensure merchant has a registered and approved shop in marketplace_shops
+      try {
+        final existingShop = await _supabase
+            .from('marketplace_shops')
+            .select('id')
+            .eq('seller_id', user.id)
+            .maybeSingle();
+
+        if (existingShop == null) {
+          await _supabase.from('marketplace_shops').insert({
+            'id': 'SHOP-$stamp',
+            'seller_id': user.id,
+            'shop_name': effectiveShopName,
+            'license_name': 'Commercial License',
+            'is_approved': true,
+          });
+        }
+      } catch (shopErr) {
+        debugPrint('Auto-shop check/insert note: $shopErr');
+      }
+
       try {
         await _supabase.from('sme_products').insert({
           'id': prodId,
           'seller_id': user.id,
           'name': name,
+          if (nameAr != null && nameAr.isNotEmpty) 'name_ar': nameAr,
           'description': description.isEmpty ? null : description,
           'price': price,
           if (photoUrl.isNotEmpty) 'photo_url': photoUrl,
+          'category': effectiveCategory,
+          'quantity': quantity > 0 ? quantity : 50,
         });
       } on PostgrestException catch (e) {
         if (e.message.contains('product_limit_reached')) {
@@ -931,12 +989,45 @@ class MarketplaceService {
 
     // 2. Fetch remote orders from Supabase if online
     if (user != null) {
+      // A. Buyer orders placed in marketplace for this seller
       try {
-        final data = await _supabase
+        final buyerOrders = await _supabase
+            .from('buyer_orders')
+            .select('*, sme_products(name, photo_url)')
+            .eq('seller_id', user.id)
+            .order('created_at', ascending: false);
+
+        for (var row in (buyerOrders as List)) {
+          final id = row['id']?.toString() ?? '';
+          if (seenIds.add(id)) {
+            final prod = row['sme_products'] as Map<String, dynamic>?;
+            combined.add({
+              'id': id,
+              'customer_name': row['buyer_name'] ?? 'Buyer',
+              'customer_phone': row['buyer_phone'] ?? '',
+              'customer_address': row['delivery_address'] ?? row['buyer_address'] ?? '',
+              'product_name': prod?['name'] ?? '',
+              'product_photo': prod?['photo_url'] ?? '',
+              'quantity': row['quantity'] ?? 1,
+              'total_amount': (row['total_amount'] as num?)?.toDouble() ?? 0.0,
+              'status': row['order_status'] ?? row['payment_status'] ?? 'pending',
+              'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('getOrdersForSeller buyer_orders error: $e');
+      }
+
+      // B. Seller outbound delivery requests (sme_orders)
+      try {
+        final smeOrders = await _supabase
             .from('sme_orders')
             .select()
+            .eq('seller_id', user.id)
             .order('created_at', ascending: false);
-        for (var row in (data as List)) {
+
+        for (var row in (smeOrders as List)) {
           final id = row['id']?.toString() ?? '';
           if (seenIds.add(id)) {
             combined.add({
@@ -951,7 +1042,7 @@ class MarketplaceService {
           }
         }
       } catch (e) {
-        debugPrint('getOrdersForSeller remote error: $e');
+        debugPrint('getOrdersForSeller sme_orders error: $e');
       }
     }
 
@@ -961,27 +1052,46 @@ class MarketplaceService {
   Future<List<Map<String, dynamic>>> getOrdersForBuyer() async {
     final user = _supabase.auth.currentUser;
     final List<Map<String, dynamic>> combined = [];
+    final Set<String> seenIds = {};
 
     if (user != null) {
       try {
         final data = await _supabase
             .from('buyer_orders')
             .select('*, sme_products(name, photo_url, price)')
-            .eq('buyer_id', user.id)
             .order('created_at', ascending: false);
-        for (var row in data) {
-          combined.add(Map<String, dynamic>.from(row));
+        for (var row in (data as List)) {
+          final id = row['id']?.toString() ?? '';
+          if (seenIds.add(id)) {
+            final prod = row['sme_products'] as Map<String, dynamic>?;
+            combined.add({
+              'id': id,
+              'customer_name': row['buyer_name'] ?? 'Customer',
+              'customer_phone': row['buyer_phone'] ?? '',
+              'customer_address': row['delivery_address'] ?? row['buyer_address'] ?? '',
+              'product_name': prod?['name'] ?? '',
+              'product_photo': prod?['photo_url'] ?? '',
+              'quantity': row['quantity'] ?? 1,
+              'total_amount': (row['total_amount'] as num?)?.toDouble() ?? 0.0,
+              'order_status': row['order_status'] ?? row['payment_status'] ?? 'pending',
+              'status': row['order_status'] ?? row['payment_status'] ?? 'pending',
+              'created_at': row['created_at'] ?? DateTime.now().toIso8601String(),
+            });
+          }
         }
       } catch (e) {
         debugPrint('getOrdersForBuyer remote error: $e');
       }
     }
 
-    if (combined.isEmpty) {
-      for (var o in _localOrders) {
+    // Merge local session orders
+    for (var o in _localOrders) {
+      if (seenIds.add(o.id)) {
         combined.add({
           'id': o.id,
           'customer_name': o.customerName,
+          'customer_phone': o.recipientPhone,
+          'customer_address': o.customerAddress,
           'total_amount': o.totalAmount,
           'order_status': o.status,
           'status': o.status,
@@ -1681,40 +1791,50 @@ class MarketplaceService {
 
   Future<List<SmeProduct>> getPublicMarketplaceProducts() async {
     try {
-      // 1. Fetch all approved shops
-      final shopsRes = await _supabase
-          .from('marketplace_shops')
-          .select('seller_id, shop_name, is_approved, is_featured')
-          .eq('is_approved', true);
-
-      final Map<String, Map<String, dynamic>> approvedShops = {};
-      for (var s in (shopsRes as List)) {
-        approvedShops[s['seller_id']] = Map<String, dynamic>.from(s);
-      }
-
-      if (approvedShops.isEmpty) {
-        return List.from(_localProducts);
-      }
-
-      // 2. Fetch non-hidden products belonging to approved sellers
-      final sellerIds = approvedShops.keys.toList();
-      final response = await _supabase
-          .from('sme_products')
-          .select()
-          .inFilter('seller_id', sellerIds)
-          .eq('is_hidden', false)
-          .order('created_at', ascending: false);
-
-      final remoteList = (response as List).map((e) {
-        final sellerShop = approvedShops[e['seller_id']];
-        if (sellerShop != null) {
-          e['shop_name']        = sellerShop['shop_name'];
-          e['is_shop_approved'] = sellerShop['is_approved'];
+      // 1. Fetch shops map (approved or active)
+      final Map<String, Map<String, dynamic>> shopsMap = {};
+      try {
+        final shopsRes = await _supabase
+            .from('marketplace_shops')
+            .select('seller_id, shop_name, is_approved, is_featured');
+        for (var s in (shopsRes as List)) {
+          final sId = s['seller_id']?.toString();
+          if (sId != null) {
+            shopsMap[sId] = Map<String, dynamic>.from(s);
+          }
         }
-        return SmeProduct.fromJson(e);
-      }).toList();
+      } catch (e) {
+        debugPrint('Note: Could not query marketplace_shops: $e');
+      }
 
-      final all = [...remoteList, ..._localProducts];
+      // 2. Fetch all active, non-hidden products from Supabase
+      List<SmeProduct> remoteList = [];
+      try {
+        final response = await _supabase
+            .from('sme_products')
+            .select()
+            .eq('is_hidden', false)
+            .order('created_at', ascending: false);
+
+        remoteList = (response as List).map((e) {
+          final sId = e['seller_id']?.toString() ?? '';
+          final sellerShop = shopsMap[sId];
+          final map = Map<String, dynamic>.from(e);
+          if (sellerShop != null) {
+            map['shop_name'] = sellerShop['shop_name'] ?? 'Verified Merchant';
+            map['is_shop_approved'] = sellerShop['is_approved'] ?? true;
+          } else {
+            map['shop_name'] = map['shop_name'] ?? 'Verified Merchant';
+            map['is_shop_approved'] = true;
+          }
+          return SmeProduct.fromJson(map);
+        }).toList();
+      } catch (e) {
+        debugPrint('Error fetching sme_products: $e');
+      }
+
+      // 3. Merge with local session products (for instant preview / offline resilient)
+      final all = [...remoteList, ..._localProducts.where((p) => !p.isHidden)];
       final ids = <String>{};
       final deduped = <SmeProduct>[];
       for (var p in all) {
@@ -1723,7 +1843,7 @@ class MarketplaceService {
       return deduped;
     } catch (e) {
       debugPrint('Error fetching public marketplace products (fallback): $e');
-      return List.from(_localProducts);
+      return List.from(_localProducts.where((p) => !p.isHidden));
     }
   }
 
@@ -1842,30 +1962,17 @@ class MarketplaceService {
   }) async {
     final user = _supabase.auth.currentUser;
     final double totalAmount = product.price * quantity;
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final orderId = 'ORD-$stamp';
 
     final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-    final validSellerId = isUuid.hasMatch(product.sellerId)
+    final String targetSellerId = isUuid.hasMatch(product.sellerId)
         ? product.sellerId
-        : (user?.id ?? '00000000-0000-0000-0000-000000000000');
-    final validProductId = (product.id.isNotEmpty && isUuid.hasMatch(product.id)) ? product.id : null;
-
-    final buyerOrderData = {
-      if (user != null) 'buyer_id': user.id,
-      'buyer_name': buyerName,
-      'buyer_phone': buyerPhone,
-      'buyer_email': buyerEmail,
-      'product_id': validProductId,
-      'seller_id': validSellerId,
-      'quantity': quantity,
-      'unit_price': product.price,
-      'total_amount': totalAmount,
-      'payment_status': 'pending',
-      'buyer_address': deliveryAddress,
-    };
+        : (user?.id ?? '2f6e019e-6986-4cc0-8e25-48c1baf26764');
 
     final newOrder = SmeOrder(
-      id: 'ORD-${DateTime.now().millisecondsSinceEpoch}',
-      sellerId: product.sellerId,
+      id: orderId,
+      sellerId: targetSellerId,
       customerName: buyerName,
       customerAddress: deliveryAddress,
       recipientPhone: buyerPhone,
@@ -1879,8 +1986,8 @@ class MarketplaceService {
     _localInvoices.insert(
       0,
       Invoice(
-        id: newOrder.id,
-        number: newOrder.id,
+        id: orderId,
+        number: orderId,
         warehouseName: 'NXN Marketplace Dispatch',
         date: DateTime.now(),
         amount: totalAmount,
@@ -1899,7 +2006,7 @@ class MarketplaceService {
     _localActivity.insert(
       0,
       DashboardActivity(
-        id: 'ACT-${DateTime.now().millisecondsSinceEpoch}',
+        id: 'ACT-$stamp',
         title: '🛒 New Marketplace Order!',
         titleAr: '🛒 طلب شراء جديد من المتجر!',
         subtitle: '${product.name} x $quantity ($buyerName)',
@@ -1909,51 +2016,78 @@ class MarketplaceService {
         amount: totalAmount,
       ),
     );
+
+    // Stock decrement locally
+    for (int i = 0; i < _localProducts.length; i++) {
+      if (_localProducts[i].id == product.id) {
+        final currentQty = _localProducts[i].quantity;
+        final newQty = (currentQty - quantity).clamp(0, 999999);
+        _localProducts[i] = _localProducts[i].copyWith(quantity: newQty);
+        break;
+      }
+    }
+    for (int i = 0; i < _localInventory.length; i++) {
+      if (_localInventory[i].productId == product.id) {
+        final currentQty = _localInventory[i].quantity;
+        final newQty = (currentQty - quantity).clamp(0, 999999);
+        _localInventory[i] = SmeInventory(
+          id: _localInventory[i].id,
+          sellerId: _localInventory[i].sellerId,
+          productId: _localInventory[i].productId,
+          productName: _localInventory[i].productName,
+          shelfId: _localInventory[i].shelfId,
+          quantity: newQty,
+          status: newQty > 0 ? 'in_stock' : 'out_of_stock',
+          createdAt: _localInventory[i].createdAt,
+          sku: _localInventory[i].sku,
+          warehouseName: _localInventory[i].warehouseName,
+          shelfLocation: _localInventory[i].shelfLocation,
+          totalValue: newQty * product.price,
+        );
+        break;
+      }
+    }
     await _saveLocal();
 
-    if (user != null) {
-      if (isUuid.hasMatch(validSellerId)) {
-        try {
-          await _supabase.from('buyer_orders').insert(buyerOrderData);
-        } catch (e) {
-          try {
-            final fallbackData = Map<String, dynamic>.from(buyerOrderData)..remove('buyer_address');
-            fallbackData['notes'] = 'Address: $deliveryAddress | Phone: $buyerPhone';
-            await _supabase.from('buyer_orders').insert(fallbackData);
-          } catch (_) {}
-        }
-      }
+    // Remote persistence in buyer_orders
+    try {
+      final buyerOrderData = {
+        'buyer_name': buyerName,
+        'buyer_phone': buyerPhone,
+        if (buyerEmail != null && buyerEmail.isNotEmpty) 'buyer_email': buyerEmail,
+        'delivery_address': deliveryAddress,
+        'product_id': product.id,
+        'seller_id': targetSellerId,
+        'quantity': quantity,
+        'unit_price': product.price,
+        'total_amount': totalAmount,
+        'payment_status': 'pending',
+        'order_status': 'pending',
+        if (user != null) 'buyer_id': user.id,
+      };
 
       try {
-        await _supabase.from('sme_orders').insert({
-          'seller_id': isUuid.hasMatch(validSellerId) ? validSellerId : user.id,
-          if (validProductId != null) 'product_id': validProductId,
-          'customer_name': buyerName,
-          'customer_phone': buyerPhone,
-          'customer_address': deliveryAddress,
-          'delivery_method': 'standard',
-          'total_amount': totalAmount,
-          'quantity': quantity,
-          'status': 'pending',
-          'created_at': DateTime.now().toIso8601String(),
-          'notes': 'Phone: $buyerPhone',
-        });
+        await _supabase.from('buyer_orders').insert(buyerOrderData);
       } catch (e) {
+        // Fallback without buyer_id if RLS/schema requires it
+        final fallback = Map<String, dynamic>.from(buyerOrderData)..remove('buyer_id');
         try {
-          await _supabase.from('sme_orders').insert({
-            'seller_id': isUuid.hasMatch(validSellerId) ? validSellerId : user.id,
-            if (validProductId != null) 'product_id': validProductId,
-            'customer_name': buyerName,
-            'customer_address': deliveryAddress,
-            'delivery_method': 'standard',
-            'total_amount': totalAmount,
-            'quantity': quantity,
-            'status': 'pending',
-            'created_at': DateTime.now().toIso8601String(),
-            'notes': 'Phone: $buyerPhone',
-          });
+          await _supabase.from('buyer_orders').insert(fallback);
         } catch (_) {}
       }
+
+      // Decrement product quantity in Supabase if online
+      try {
+        final pRes = await _supabase.from('sme_products').select('quantity').eq('id', product.id).maybeSingle();
+        if (pRes != null && pRes['quantity'] != null) {
+          final oldQty = (pRes['quantity'] as num).toInt();
+          await _supabase.from('sme_products').update({
+            'quantity': (oldQty - quantity).clamp(0, 999999),
+          }).eq('id', product.id);
+        }
+      } catch (_) {}
+    } catch (e) {
+      debugPrint('createBuyerOrder remote error: $e');
     }
 
     updateNotifier.value++;

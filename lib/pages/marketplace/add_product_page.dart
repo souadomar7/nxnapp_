@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/locale_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
@@ -246,25 +245,9 @@ class _AddProductPageState extends State<AddProductPage> {
           price,
           photoUrl,
           quantity: qty,
+          category: _selectedCategory,
+          nameAr: _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
         );
-
-        // Update optional category & name_ar on newly created product
-        try {
-          final user = Supabase.instance.client.auth.currentUser;
-          if (user != null) {
-            try {
-              await Supabase.instance.client.from('sme_products').update({
-                'category': _selectedCategory,
-                'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
-              }).eq('seller_id', user.id).order('created_at', ascending: false).limit(1);
-            } catch (inner) {
-              // If category column is not in schema cache, try name_ar only
-              await Supabase.instance.client.from('sme_products').update({
-                'name_ar': _nameArController.text.trim().isNotEmpty ? _nameArController.text.trim() : null,
-              }).eq('seller_id', user.id).order('created_at', ascending: false).limit(1);
-            }
-          }
-        } catch (_) {}
 
         if (mounted) {
           context.read<MerchantDataProvider>().refreshProducts();

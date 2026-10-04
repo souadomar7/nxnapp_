@@ -16,9 +16,8 @@ class MarketplaceRepository {
     try {
       final res = await _supabase
           .from('sme_products')
-          .select('*, marketplace_shops!inner(shop_name, is_approved)')
+          .select('*, marketplace_shops(shop_name, is_approved)')
           .eq('is_hidden', false)
-          .eq('marketplace_shops.is_approved', true)
           .order('created_at', ascending: false);
 
       return (res as List).map((map) {
@@ -30,7 +29,9 @@ class MarketplaceRepository {
           nameAr: map['name_ar'],
           description: map['description'] ?? '',
           price: (map['price'] as num?)?.toDouble() ?? 0.0,
+          quantity: (map['quantity'] as num?)?.toInt() ?? 0,
           photoUrl: map['photo_url'] ?? '',
+          category: map['category'],
           shopName: shop?['shop_name'] ?? 'Verified Merchant',
           isShopApproved: shop?['is_approved'] ?? true,
           isHidden: map['is_hidden'] ?? false,

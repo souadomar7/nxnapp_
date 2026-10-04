@@ -546,6 +546,25 @@ class MerchantDataProvider extends ChangeNotifier {
           }
         }
 
+        try {
+          final buyerRes = await _supabase
+              .from('buyer_orders')
+              .select('id, order_status, total_amount')
+              .eq('seller_id', sellerId);
+
+          for (var o in (buyerRes as List)) {
+            final status = (o['order_status'] ?? '').toString().toLowerCase();
+            final amount = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+
+            if (['pending', 'confirmed', 'preparing', 'ready_for_shipment'].contains(status)) {
+              pendingCount++;
+            }
+            if (status == 'delivered') {
+              grossDelivered += amount;
+            }
+          }
+        } catch (_) {}
+
         // Query Supabase wallets table if migrated
         try {
           final merchantRes = await _supabase

@@ -27,11 +27,13 @@ class _PublicMarketplacePageState extends State<PublicMarketplacePage>
 
   final List<Map<String, dynamic>> _categories = [
     {'label': 'All', 'labelAr': 'الكل', 'icon': Icons.grid_view_rounded},
-    {'label': 'Electronics', 'labelAr': 'إلكترونيات', 'icon': Icons.devices_rounded},
     {'label': 'Food & Beverage', 'labelAr': 'أغذية ومشروبات', 'icon': Icons.restaurant_rounded},
+    {'label': 'Electronics', 'labelAr': 'إلكترونيات', 'icon': Icons.devices_rounded},
+    {'label': 'Flowers & Gifts', 'labelAr': 'زهور وهدايا', 'icon': Icons.card_giftcard_rounded},
+    {'label': 'Health & Beauty', 'labelAr': 'صحة وجمال', 'icon': Icons.spa_rounded},
     {'label': 'Fashion', 'labelAr': 'أزياء', 'icon': Icons.checkroom_rounded},
     {'label': 'Home', 'labelAr': 'المنزل', 'icon': Icons.home_rounded},
-    {'label': 'Beauty', 'labelAr': 'جمال', 'icon': Icons.spa_rounded},
+    {'label': 'General', 'labelAr': 'عام', 'icon': Icons.inventory_2_rounded},
   ];
 
   @override
@@ -77,9 +79,36 @@ class _PublicMarketplacePageState extends State<PublicMarketplacePage>
           _normalizeArabic(product.description ?? '').contains(query) ||
           _normalizeArabic(product.shopName ?? '').contains(query);
       
-      final categoryMatch = _selectedCategory == 'All' ||
-          _selectedCategory == 'الكل' ||
-          (product.category ?? '').toLowerCase() == _selectedCategory.toLowerCase();
+      bool categoryMatch = false;
+      final sel = _selectedCategory.toLowerCase().trim();
+      final pCat = (product.category ?? 'General').toLowerCase().trim();
+
+      if (sel == 'all' || sel == 'الكل') {
+        categoryMatch = true;
+      } else if (pCat == sel) {
+        categoryMatch = true;
+      } else if ((sel.contains('flower') || sel.contains('gift') || sel.contains('زهور')) &&
+                 (pCat.contains('flower') || pCat.contains('gift') || pCat.contains('زهور'))) {
+        categoryMatch = true;
+      } else if ((sel.contains('food') || sel.contains('beverage') || sel.contains('أغذية')) &&
+                 (pCat.contains('food') || pCat.contains('beverage') || pCat.contains('أغذية'))) {
+        categoryMatch = true;
+      } else if ((sel.contains('electro') || sel.contains('إلكترون')) &&
+                 (pCat.contains('electro') || pCat.contains('إلكترون'))) {
+        categoryMatch = true;
+      } else if ((sel.contains('beauty') || sel.contains('جمال') || sel.contains('صحة')) &&
+                 (pCat.contains('beauty') || pCat.contains('جمال') || pCat.contains('صحة'))) {
+        categoryMatch = true;
+      } else if ((sel.contains('fashion') || sel.contains('أزياء')) &&
+                 (pCat.contains('fashion') || pCat.contains('أزياء'))) {
+        categoryMatch = true;
+      } else if ((sel.contains('home') || sel.contains('منزل')) &&
+                 (pCat.contains('home') || pCat.contains('منزل'))) {
+        categoryMatch = true;
+      } else if ((sel.contains('general') || sel.contains('عام')) &&
+                 (pCat.contains('general') || pCat.contains('عام'))) {
+        categoryMatch = true;
+      }
       
       return (query.isEmpty || nameMatch) && categoryMatch;
     }).toList();
