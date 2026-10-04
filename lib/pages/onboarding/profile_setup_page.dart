@@ -150,22 +150,51 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         }
 
         if (_isBusinessAccount) {
-          // Upsert SME seller registration
-          await Supabase.instance.client.from('sme_sellers').upsert({
-            'id': user.id,
-            'business_name': _businessNameController.text.trim(),
-            'contact_number': _contactController.text.trim(),
-            'email': _emailController.text.trim(),
-            'license_owner_name': _licenseOwnerController.text.trim(),
-            'license_number': _licenseController.text.trim(),
-            'is_verified': isFromUaePass,
-          });
+          // Upsert SME seller registration with columns matching database schema
+          try {
+            await Supabase.instance.client.from('sme_sellers').upsert({
+              'id': user.id,
+              'business_name': _businessNameController.text.trim(),
+              'contact_number': _contactController.text.trim(),
+              'license_number': _licenseController.text.trim(),
+              'is_verified': isFromUaePass,
+            });
+          } catch (e) {
+            debugPrint('sme_sellers upsert note: $e');
+          }
+
+          // Register in marketplace_shops so the shop exists for admin approval & marketplace
+          try {
+            final shopId = 'SHOP-${DateTime.now().millisecondsSinceEpoch}';
+            await Supabase.instance.client.from('marketplace_shops').upsert({
+              'id': shopId,
+              'seller_id': user.id,
+              'shop_name': _businessNameController.text.trim(),
+              'license_name': _licenseController.text.trim().isNotEmpty
+                  ? _licenseController.text.trim()
+                  : 'Commercial License',
+              'is_approved': isFromUaePass,
+            }, onConflict: 'seller_id');
+          } catch (e) {
+            debugPrint('marketplace_shops upsert note: $e');
+          }
         }
       }
 
       // Explicitly clear guest state upon completed profile registration
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_guest', false);
+
+      if (_isBusinessAccount) {
+        final userId = user?.id ?? 'pending_merchant';
+        await prefs.setString('pending_seller_id', userId);
+        await prefs.setString('pending_seller_name', _businessNameController.text.trim());
+        await prefs.setString('pending_seller_license', _licenseController.text.trim());
+        await prefs.setString('pending_seller_contact', _contactController.text.trim());
+        await prefs.setBool('is_verified_$userId', isFromUaePass);
+        await prefs.setBool('merchant_verified', isFromUaePass);
+        await prefs.setBool('is_merchant_pending', !isFromUaePass);
+      }
 
       if (mounted) {
         userProvider.setUser(
@@ -174,6 +203,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           licenseNumber: _isBusinessAccount ? _licenseController.text.trim() : '',
         );
         if (_isBusinessAccount) {
+          userProvider.setVerified(isFromUaePass);
           userProvider.setDocumentUploaded(_documentFile?.name ?? userProvider.documentFileName ?? 'Trade_License_CN2891048.pdf');
         }
       }

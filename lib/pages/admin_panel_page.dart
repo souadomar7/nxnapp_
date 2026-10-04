@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/locale_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/user_provider.dart';
 import '../services/marketplace_service.dart';
 import '../models/history_models.dart';
 import 'qr_scanner_page.dart';
@@ -55,9 +58,114 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
 
   Future<void> _loadAdminData() async {
     final list = await _marketplaceService.getRecentActivity(limit: 20);
+    final List<Map<String, String>> loadedPending = [];
+
+    // 1. Fetch unverified sellers from Supabase sme_sellers
+    try {
+      final List<dynamic> unverifiedSellers = await Supabase.instance.client
+          .from('sme_sellers')
+          .select()
+          .eq('is_verified', false)
+          .order('created_at', ascending: false);
+
+      for (var s in unverifiedSellers) {
+        final id = s['id']?.toString() ?? '';
+        final shop = s['business_name']?.toString() ?? 'New Merchant';
+        final phone = s['contact_number']?.toString() ?? '';
+        final license = s['license_number']?.toString() ?? 'Pending Upload';
+        loadedPending.add({
+          'id': id,
+          'seller_id': id,
+          'shop': shop,
+          'owner': phone.isNotEmpty ? phone : 'Merchant Owner',
+          'emirate': 'UAE',
+          'license': license,
+          'trn': '100-${id.length > 8 ? id.substring(0, 8).toUpperCase() : id.toUpperCase()}',
+          'source': 'sme_sellers',
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading unverified sme_sellers: $e');
+    }
+
+    // 2. Fetch unapproved shops from Supabase marketplace_shops
+    try {
+      final List<dynamic> unapprovedShops = await Supabase.instance.client
+          .from('marketplace_shops')
+          .select()
+          .eq('is_approved', false)
+          .order('created_at', ascending: false);
+
+      for (var s in unapprovedShops) {
+        final id = s['id']?.toString() ?? '';
+        final sellerId = s['seller_id']?.toString() ?? id;
+        if (loadedPending.any((p) => p['id'] == id || p['seller_id'] == sellerId)) continue;
+        loadedPending.add({
+          'id': id,
+          'seller_id': sellerId,
+          'shop': s['shop_name']?.toString() ?? 'Merchant Shop',
+          'owner': s['license_name']?.toString() ?? 'Commercial License',
+          'emirate': 'Dubai',
+          'license': s['license_name']?.toString() ?? 'CN-2891048',
+          'trn': '100-${id.length > 8 ? id.substring(0, 8).toUpperCase() : id.toUpperCase()}',
+          'source': 'marketplace_shops',
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading unapproved shops: $e');
+    }
+
+    // 3. Check SharedPreferences for locally pending registrations
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pendingId = prefs.getString('pending_seller_id');
+      final isVerified = prefs.getBool('is_verified_${pendingId ?? ""}') ?? false;
+      final isMerchantPending = prefs.getBool('is_merchant_pending') ?? false;
+
+      if (pendingId != null && !isVerified && isMerchantPending) {
+        if (!loadedPending.any((p) => p['id'] == pendingId || p['seller_id'] == pendingId)) {
+          loadedPending.add({
+            'id': pendingId,
+            'seller_id': pendingId,
+            'shop': prefs.getString('pending_seller_name') ?? 'Pending Store',
+            'owner': prefs.getString('pending_seller_contact') ?? 'Store Manager',
+            'emirate': 'Dubai',
+            'license': prefs.getString('pending_seller_license') ?? 'CN-2891048',
+            'trn': '100-2938-4821',
+            'source': 'local',
+          });
+        }
+      }
+
+      // 4. Also check UserProvider if user has pending account state
+      if (mounted) {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+        final isUserVerified = prefs.getBool('merchant_verified') ?? false;
+        if (!isUserVerified && isMerchantPending && currentUserId != null) {
+          if (!loadedPending.any((p) => p['seller_id'] == currentUserId)) {
+            loadedPending.add({
+              'id': currentUserId,
+              'seller_id': currentUserId,
+              'shop': userProvider.displayName,
+              'owner': userProvider.contactNumber,
+              'emirate': 'Dubai',
+              'license': userProvider.licenseNumber,
+              'trn': '100-8849-2091',
+              'source': 'user_provider',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking local pending approvals: $e');
+    }
+
     if (mounted) {
       setState(() {
         _activities = list;
+        _pendingSellers.clear();
+        _pendingSellers.addAll(loadedPending);
       });
     }
   }
@@ -66,9 +174,47 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
     final seller = _pendingSellers[index];
     final shopName = seller['shop']!;
     final shopId = seller['id']!;
+    final sellerId = seller['seller_id'] ?? shopId;
 
     // 1. Authorize & approve shop in MarketplaceService
     await _marketplaceService.verifyShop(shopId);
+
+    // 2. Authorize in Supabase sme_sellers
+    try {
+      await Supabase.instance.client
+          .from('sme_sellers')
+          .update({'is_verified': true})
+          .eq('id', sellerId);
+    } catch (e) {
+      debugPrint('Error updating sme_sellers is_verified: $e');
+    }
+
+    // 3. Authorize in Supabase marketplace_shops
+    try {
+      await Supabase.instance.client
+          .from('marketplace_shops')
+          .update({'is_approved': true})
+          .eq('seller_id', sellerId);
+    } catch (e) {
+      debugPrint('Error updating marketplace_shops is_approved: $e');
+    }
+
+    // 4. Update SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_verified_$sellerId', true);
+      await prefs.setBool('merchant_verified', true);
+      await prefs.setBool('is_merchant_pending', false);
+    } catch (e) {
+      debugPrint('Error setting local prefs on approve: $e');
+    }
+
+    // 5. Update UserProvider if mounted
+    if (mounted) {
+      try {
+        Provider.of<UserProvider>(context, listen: false).setVerified(true);
+      } catch (_) {}
+    }
 
     setState(() {
       _pendingSellers.removeAt(index);
@@ -552,16 +698,26 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
               isAr ? 'طلبات توثيق تراخيص التجار (KYC)' : 'Merchant Trade License Applications',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AdminPanelColors.textDark),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${_pendingSellers.length} ${isAr ? "معلقة" : "Pending"}',
-                style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.bold),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, size: 20, color: AdminPanelColors.textSub),
+                  onPressed: _loadAdminData,
+                  tooltip: isAr ? 'تحديث' : 'Refresh',
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_pendingSellers.length} ${isAr ? "معلقة" : "Pending"}',
+                    style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

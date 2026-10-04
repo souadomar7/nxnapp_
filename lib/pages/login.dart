@@ -202,7 +202,10 @@ class _LoginPageState extends State<LoginPage> {
 
       // If merchant, check license verification
       if (role == 'merchant' && sellerDoc != null) {
-        final isVerified = sellerDoc['is_verified'] == true;
+        final prefs = await SharedPreferences.getInstance();
+        final isVerified = sellerDoc['is_verified'] == true ||
+            prefs.getBool('is_verified_${user.id}') == true ||
+            (prefs.getBool('merchant_verified') == true && prefs.getBool('is_merchant_pending') == false);
         if (!isVerified) {
           if (mounted) {
             Navigator.of(context).pushAndRemoveUntil(

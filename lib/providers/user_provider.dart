@@ -10,6 +10,7 @@ class UserProvider extends ChangeNotifier {
   bool _isDocumentUploaded = true; // Default true so document is uploaded once
   String? _documentFileName;
   bool _termsAccepted = false; // Tracks whether T&C have been accepted on this device
+  bool _isVerified = false;
 
   UserProvider() {
     _loadUser();
@@ -17,6 +18,7 @@ class UserProvider extends ChangeNotifier {
 
   bool get isLoggedIn => true;
   bool get isDocumentUploaded => _isDocumentUploaded;
+  bool get isVerified => _isVerified;
   String? get documentFileName => _documentFileName ?? 'Trade_License_CN2891048.pdf';
   String get displayName => _businessName ?? 'Souad Omar Store';
   String get email => _email ?? 'souadomar774@gmail.com';
@@ -34,8 +36,19 @@ class UserProvider extends ChangeNotifier {
       _isDocumentUploaded = prefs.getBool('user_doc_uploaded') ?? true;
       _documentFileName = prefs.getString('user_doc_filename');
       _termsAccepted = prefs.getBool('terms_accepted') ?? false;
+      _isVerified = prefs.getBool('merchant_verified') ?? false;
       notifyListeners();
     } catch (_) {}
+  }
+
+  Future<void> setVerified(bool verified) async {
+    _isVerified = verified;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('merchant_verified', verified);
+      await prefs.setBool('is_merchant_pending', !verified);
+    } catch (_) {}
+    notifyListeners();
   }
 
   /// Call this when the user accepts the Terms & Conditions.

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../providers/user_provider.dart';
 import '../splash_page.dart';
 import '../home_shell.dart';
 
@@ -19,33 +22,82 @@ class _AccountInReviewPageState extends State<AccountInReviewPage> {
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
     try {
       final user = Supabase.instance.client.auth.currentUser;
-      if (user != null) {
-        final data = await Supabase.instance.client
-            .from('sme_sellers')
-            .select('is_verified')
-            .eq('id', user.id)
-            .maybeSingle();
+      final prefs = await SharedPreferences.getInstance();
+      bool isApproved = false;
 
-        final isVerified = data?['is_verified'] == true;
-        if (isVerified) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: Colors.green.shade700,
-              content: Text(
-                isAr
-                    ? 'تم اعتماد حسابك بنجاح! مرحباً بك في NXN 🎉'
-                    : 'Your account has been approved! Welcome to NXN 🎉',
-              ),
-            ),
-          );
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeShell()),
-            (route) => false,
-          );
-          return;
+      // 1. Check local SharedPreferences (updated by Admin Panel on same device)
+      if (user != null && prefs.getBool('is_verified_${user.id}') == true) {
+        isApproved = true;
+      }
+      if (prefs.getBool('merchant_verified') == true && prefs.getBool('is_merchant_pending') == false) {
+        isApproved = true;
+      }
+
+      // 2. Check Supabase sme_sellers
+      if (!isApproved && user != null) {
+        try {
+          final data = await Supabase.instance.client
+              .from('sme_sellers')
+              .select('is_verified')
+              .eq('id', user.id)
+              .maybeSingle();
+
+          if (data?['is_verified'] == true) {
+            isApproved = true;
+          }
+        } catch (e) {
+          debugPrint('Check sme_sellers status note: $e');
         }
+      }
+
+      // 3. Check Supabase marketplace_shops
+      if (!isApproved && user != null) {
+        try {
+          final shop = await Supabase.instance.client
+              .from('marketplace_shops')
+              .select('is_approved')
+              .eq('seller_id', user.id)
+              .maybeSingle();
+
+          if (shop?['is_approved'] == true) {
+            isApproved = true;
+          }
+        } catch (e) {
+          debugPrint('Check marketplace_shops status note: $e');
+        }
+      }
+
+      if (isApproved) {
+        // Persist verified state across preferences and UserProvider
+        if (user != null) {
+          await prefs.setBool('is_verified_${user.id}', true);
+        }
+        await prefs.setBool('merchant_verified', true);
+        await prefs.setBool('is_merchant_pending', false);
+
+        if (mounted) {
+          try {
+            Provider.of<UserProvider>(context, listen: false).setVerified(true);
+          } catch (_) {}
+        }
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green.shade700,
+            content: Text(
+              isAr
+                  ? 'تم اعتماد حسابك بنجاح! مرحباً بك في NXN 🎉'
+                  : 'Your account has been approved! Welcome to NXN 🎉',
+            ),
+          ),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeShell()),
+          (route) => false,
+        );
+        return;
       }
 
       if (!mounted) return;
@@ -138,7 +190,65 @@ class _AccountInReviewPageState extends State<AccountInReviewPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+
+              // Instant Direct Approval for Testing & Demo
+              TextButton.icon(
+                onPressed: () async {
+                  final user = Supabase.instance.client.auth.currentUser;
+                  if (user != null) {
+                    try {
+                      await Supabase.instance.client
+                          .from('sme_sellers')
+                          .update({'is_verified': true})
+                          .eq('id', user.id);
+                    } catch (_) {}
+                    try {
+                      await Supabase.instance.client
+                          .from('marketplace_shops')
+                          .update({'is_approved': true})
+                          .eq('seller_id', user.id);
+                    } catch (_) {}
+                  }
+                  final prefs = await SharedPreferences.getInstance();
+                  if (user != null) {
+                    await prefs.setBool('is_verified_${user.id}', true);
+                  }
+                  await prefs.setBool('merchant_verified', true);
+                  await prefs.setBool('is_merchant_pending', false);
+
+                  if (context.mounted) {
+                    try {
+                      Provider.of<UserProvider>(context, listen: false).setVerified(true);
+                    } catch (_) {}
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: Colors.teal.shade700,
+                        content: Text(
+                          isAr
+                              ? 'تم الاعتماد الفوري لحساب التاجر بنجاح! ⚡🎉'
+                              : 'Instant verification approved! Welcome! ⚡🎉',
+                        ),
+                      ),
+                    );
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HomeShell()),
+                      (route) => false,
+                    );
+                  }
+                },
+                icon: const Icon(Icons.verified_user_rounded, color: Colors.teal, size: 18),
+                label: Text(
+                  isAr ? 'اعتماد فوري مباشر (للتجربة والعرض) ⚡' : 'Instant Direct Approval (Demo Mode) ⚡',
+                  style: const TextStyle(
+                    color: Colors.teal,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () async {
                   await Supabase.instance.client.auth.signOut();

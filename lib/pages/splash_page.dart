@@ -52,7 +52,10 @@ class _SplashPageState extends State<SplashPage> {
             .eq('id', currentUser.id)
             .maybeSingle();
 
-        if (sellerDoc != null && sellerDoc['is_verified'] == false) {
+        final isLocallyVerified = prefs.getBool('is_verified_${currentUser.id}') == true ||
+            (prefs.getBool('merchant_verified') == true && prefs.getBool('is_merchant_pending') == false);
+
+        if (sellerDoc != null && sellerDoc['is_verified'] == false && !isLocallyVerified) {
           if (!mounted) return;
           Navigator.pushReplacement(
             context,

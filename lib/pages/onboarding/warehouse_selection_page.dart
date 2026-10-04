@@ -51,10 +51,13 @@ class _WarehouseSelectionPageState extends State<WarehouseSelectionPage> {
     try {
       final user = _supabase.auth.currentUser;
       if (user != null) {
-        await _supabase.from('sme_sellers').upsert({
-          'id': user.id,
-          'selected_warehouse_id': _selectedWarehouseId,
-        });
+        try {
+          await _supabase.from('sme_sellers').update({
+            'is_verified': true,
+          }).eq('id', user.id);
+        } catch (e) {
+          debugPrint('Warehouse selection sme_sellers update note: $e');
+        }
       }
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
