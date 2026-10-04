@@ -831,12 +831,16 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(
-                                          isAr ? 'إدراج منتج جديد في المتجر' : 'List New Product to Hub',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
+                                        Flexible(
+                                          child: Text(
+                                            isAr ? 'إدراج منتج جديد' : 'List New Product',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 6),
