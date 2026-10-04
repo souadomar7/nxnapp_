@@ -31,8 +31,9 @@ class _SplashPageState extends State<SplashPage> {
     // Read the persisted terms-accepted and guest flags directly from SharedPreferences
     bool termsAccepted = false;
     bool isGuest = false;
+    SharedPreferences? prefs;
     try {
-      final prefs = await SharedPreferences.getInstance();
+      prefs = await SharedPreferences.getInstance();
       termsAccepted = prefs.getBool('terms_accepted') ?? false;
       isGuest = prefs.getBool('is_guest') ?? false;
     } catch (_) {}
@@ -52,8 +53,8 @@ class _SplashPageState extends State<SplashPage> {
             .eq('id', currentUser.id)
             .maybeSingle();
 
-        final isLocallyVerified = prefs.getBool('is_verified_${currentUser.id}') == true ||
-            (prefs.getBool('merchant_verified') == true && prefs.getBool('is_merchant_pending') == false);
+        final isLocallyVerified = prefs?.getBool('is_verified_${currentUser.id}') == true ||
+            (prefs?.getBool('merchant_verified') == true && prefs?.getBool('is_merchant_pending') == false);
 
         if (sellerDoc != null && sellerDoc['is_verified'] == false && !isLocallyVerified) {
           if (!mounted) return;
