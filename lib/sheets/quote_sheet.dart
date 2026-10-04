@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/warehouse.dart';
 import '../models/invoice.dart';
-import '../pages/payment_page.dart';
+import '../pages/checkout_page.dart';
 
 import '../l10n/app_localizations.dart';
 
@@ -118,7 +118,7 @@ void showQuoteSheet(BuildContext context, [Warehouse? warehouse]) {
                           );
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => PaymentsPage(initialInvoice: invoice)),
+                            MaterialPageRoute(builder: (_) => CheckoutPage(invoice: invoice)),
                           );
                         },
                         child: Text(AppLocalizations.of(context)!.continueButton),

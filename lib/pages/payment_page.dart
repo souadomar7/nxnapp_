@@ -147,6 +147,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   @override
   Widget build(BuildContext context) {
     final invoices = _filtered;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FB),
@@ -189,7 +190,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  AppLocalizations.of(context)!.paymentsTitle,
+                                  isAr ? 'الفواتير وسجل المدفوعات' : 'Invoices & Billing',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 20,
@@ -201,17 +202,19 @@ class _PaymentsPageState extends State<PaymentsPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            AppLocalizations.of(context)!.invoicesFoundCount(invoices.length),
+                            isAr
+                                ? 'إدارة الفواتير والتحصيلات الضريبية (${invoices.length})'
+                                : 'Manage invoices, VAT receipts, and settlements (${invoices.length})',
                             style: const TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  ),
                 ),
               ),
             ),
+          ),
 
 
           // 2. Main Content

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme.dart';
 import '../../models/commercial_model.dart';
 import '../../models/invoice.dart';
+import '../../services/payment_service.dart';
 import '../checkout_page.dart';
 import '../operations/outbound_order_creation_page.dart';
 import '../operations/inbound_intake_inspection_page.dart';
@@ -425,7 +426,12 @@ class _HomeSellerMarketplaceHubPageState extends State<HomeSellerMarketplaceHubP
                       );
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => CheckoutPage(invoice: invoice)),
+                        MaterialPageRoute(
+                          builder: (_) => CheckoutPage(
+                            invoice: invoice,
+                            initialMethod: PaymentMethod.fintx,
+                          ),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.lock_clock_outlined, color: Colors.white, size: 18),

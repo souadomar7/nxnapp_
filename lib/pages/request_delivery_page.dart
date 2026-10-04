@@ -5,7 +5,7 @@ import '../providers/locale_provider.dart';
 import '../services/marketplace_service.dart';
 import '../models/invoice.dart';
 import '../theme.dart';
-import 'payment_page.dart';
+import 'checkout_page.dart';
 import '../services/pdf_export_service.dart';
 import 'document_preview_page.dart';
 import '../core/utils/validators.dart';
@@ -1033,7 +1033,7 @@ class _RequestDeliveryPageState extends State<RequestDeliveryPage> {
               );
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => PaymentsPage(initialInvoice: invoice)),
+                MaterialPageRoute(builder: (_) => CheckoutPage(invoice: invoice)),
               );
             },
             style: ElevatedButton.styleFrom(

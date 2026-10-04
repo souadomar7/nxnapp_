@@ -44,12 +44,13 @@ class PaymentService {
   static Future<void> pay({
     required PaymentMethod method,
     required Invoice invoice,
+    FintxPaymentMethod fintxSubMethod = FintxPaymentMethod.uaeInstantPaymentAani,
   }) async {
     switch (method) {
       case PaymentMethod.fintx:
         final result = await FintxPaymentService().initiateCheckout(
           invoice: invoice,
-          method: FintxPaymentMethod.card,
+          method: fintxSubMethod,
         );
         if (!result.success) {
           throw PaymentException(result.errorMessage ?? 'Fintx gateway transaction declined.');

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../theme.dart';
 import '../../services/marketplace_service.dart';
-import '../payment_page.dart';
+import '../checkout_page.dart';
 import '../../models/invoice.dart';
 import '../../providers/user_provider.dart';
 
@@ -57,8 +57,8 @@ class _CreateShopPageState extends State<CreateShopPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => PaymentsPage(
-              initialInvoice: setupInvoice,
+            builder: (_) => CheckoutPage(
+              invoice: setupInvoice,
             ),
           ),
         );

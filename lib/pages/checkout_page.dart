@@ -11,12 +11,14 @@ import '../theme.dart';
 import 'package:provider/provider.dart';
 import '../providers/merchant_data_provider.dart';
 import '../services/bilingual_pdf_invoice_service.dart';
+import '../services/fintx_payment_service.dart';
 import 'receipt_page.dart';
 
 class CheckoutPage extends StatefulWidget {
   final Invoice invoice;
+  final PaymentMethod? initialMethod;
 
-  const CheckoutPage({super.key, required this.invoice});
+  const CheckoutPage({super.key, required this.invoice, this.initialMethod});
 
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
@@ -30,6 +32,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
   final _nameController = TextEditingController();
 
   PaymentMethod _selectedMethod = PaymentMethod.card;
+  FintxPaymentMethod _selectedFintxSubMethod = FintxPaymentMethod.uaeInstantPaymentAani;
   bool _isProcessing = false;
   String _processingMessage = '';
   bool _paymentSuccess = false;
@@ -41,6 +44,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    _selectedMethod = widget.initialMethod ?? PaymentMethod.card;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -72,11 +76,23 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
       return;
     }
 
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
     setState(() {
       _isProcessing = true;
-      _processingMessage = _selectedMethod == PaymentMethod.cash
-          ? 'Generating invoice slip...'
-          : 'Contacting secure gateway...';
+      if (_selectedMethod == PaymentMethod.cash) {
+        _processingMessage = isAr ? 'جاري إنشاء إيصال الدفع...' : 'Generating invoice slip...';
+      } else if (_selectedMethod == PaymentMethod.fintx) {
+        _processingMessage = _selectedFintxSubMethod == FintxPaymentMethod.uaeInstantPaymentAani
+            ? (isAr ? 'الاتصال بشبكة آني (المصرف المركزي)...' : 'Connecting to CBUAE Aani Network...')
+            : _selectedFintxSubMethod == FintxPaymentMethod.tabbyInstallments
+                ? (isAr ? 'جاري تفعيل خطة تقسيط تابي 0%...' : 'Initiating Tabby 0% Installment Plan...')
+                : (isAr ? 'جاري تفعيل خطة تقسيط تمارا...' : 'Initiating Tamara Installment Plan...');
+      } else if (_selectedMethod == PaymentMethod.wallet) {
+        _processingMessage = isAr ? 'خصم المبلغ من محفظة NXN...' : 'Deducting from NXN Wallet...';
+      } else {
+        _processingMessage = isAr ? 'الاتصال ببوابة الدفع الآمنة...' : 'Contacting secure gateway...';
+      }
     });
 
     try {
@@ -85,7 +101,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
         await Future.delayed(const Duration(milliseconds: 1200));
 
         if (!mounted) return;
-        setState(() => _processingMessage = 'Registering pending order...');
+        setState(() => _processingMessage = isAr ? 'تسجيل الطلب قيد الانتظار...' : 'Registering pending order...');
         await Future.delayed(const Duration(milliseconds: 1000));
 
         // Invoice was already saved as paid=false — nothing else to do here.
@@ -96,17 +112,15 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
         });
         _animationController.forward();
       } else {
-        // Card or Apple Pay — call real Stripe via our backend.
-        setState(() => _processingMessage = 'Opening secure payment...');
-
         await PaymentService.pay(
           method: _selectedMethod,
           invoice: widget.invoice,
+          fintxSubMethod: _selectedFintxSubMethod,
         );
 
         // Payment sheet completed successfully — update invoice + subscriptions.
         if (!mounted) return;
-        setState(() => _processingMessage = 'Activating your space...');
+        setState(() => _processingMessage = isAr ? 'تأكيد الحجز وتفعيل المساحة...' : 'Activating your space...');
 
         final service = MarketplaceService();
         try {
@@ -300,12 +314,6 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                   child: Row(
                     children: [
                       _buildMethodTab(
-                        method: PaymentMethod.fintx,
-                        icon: Icons.account_balance_wallet_rounded,
-                        label: isAr ? 'بوابة Fintx' : 'Fintx Gateway',
-                      ),
-                      const SizedBox(width: 8),
-                      _buildMethodTab(
                         method: PaymentMethod.card,
                         icon: Icons.credit_card_rounded,
                         label: isAr ? 'بطاقة بنكية' : 'Card (Visa/MC)',
@@ -318,6 +326,12 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                       ),
                       const SizedBox(width: 8),
                       _buildMethodTab(
+                        method: PaymentMethod.fintx,
+                        icon: Icons.bolt_rounded,
+                        label: isAr ? 'آني والتقسيط' : 'Aani & BNPL',
+                      ),
+                      const SizedBox(width: 8),
+                      _buildMethodTab(
                         method: PaymentMethod.wallet,
                         icon: Icons.wallet_rounded,
                         label: isAr ? 'محفظة NXN' : 'NXN Wallet',
@@ -326,7 +340,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                       _buildMethodTab(
                         method: PaymentMethod.cash,
                         icon: Icons.storefront_rounded,
-                        label: isAr ? 'مكتب NXN (نقداً)' : 'Cash at NXN Office',
+                        label: isAr ? 'مكتب NXN (نقداً)' : 'Cash at Office',
                       ),
                     ],
                   ),
@@ -336,8 +350,9 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
 
                 // 3. Payment details block
                 if (_selectedMethod == PaymentMethod.fintx) ...[
+                  // Fintx Gateway Header
                   Container(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
@@ -359,29 +374,23 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF10AC84).withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(Icons.verified_user_rounded, color: Color(0xFF10AC84), size: 20),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10AC84).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      isAr ? 'بوابة Fintx للمدفوعات' : 'Fintx UAE Gateway',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                  child: const Icon(Icons.bolt_rounded, color: Color(0xFF10AC84), size: 20),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  isAr ? 'الدفع الفوري والتقسيط (Fintx)' : 'Aani Instant Pay & BNPL',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
@@ -395,37 +404,57 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 10),
                         Text(
                           isAr
-                              ? 'أوركسترا دفع إماراتية متكاملة تدعم:\n• Apple Pay & Google Pay\n• مدفوعات آني الفورية (Aani UAE Instant Pay)\n• فيزا، ماستركارد، وبطاقة جيوان الوطنية\n• تقسيط تابي وتمارا 0% فوائد'
-                              : 'Direct UAE payment orchestration supporting:\n• Apple Pay & Google Pay\n• Aani Instant Payments (UAE Central Bank)\n• Visa, Mastercard & Jaywan\n• Tabby & Tamara 0% Interest Installments',
-                          style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
-                        ),
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.lock_rounded, color: Color(0xFF10AC84), size: 16),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  isAr
-                                      ? 'تسوية مشفرة 256-bit وإصدار فاتورة ضريبية فورية.'
-                                      : 'Instant 256-bit encrypted settlement & instant invoice certification.',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                                ),
-                              ),
-                            ],
-                          ),
+                              ? 'اختر وسيلة الدفع المناسبة عبر شبكة المدفوعات الوطنية أو التقسيط بدون فوائد:'
+                              : 'Select your preferred local payment rail or 0% interest installment plan:',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                       ],
                     ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Option 1: Aani Instant Payment
+                  _buildFintxSubMethodTile(
+                    method: FintxPaymentMethod.uaeInstantPaymentAani,
+                    icon: Icons.flash_on_rounded,
+                    iconColor: const Color(0xFF10AC84),
+                    title: isAr ? 'آني - الدفع الفوري (المصرف المركزي)' : 'Aani Instant Payment (CBUAE)',
+                    subtitle: isAr
+                        ? 'تحويل فوري مباشر برقم الهاتف الإماراتي أو الآيبان - تسوية لحظية 24/7'
+                        : 'Instant 24/7 bank transfer via UAE Mobile Number or IBAN',
+                    badge: isAr ? 'تسوية فورية' : 'Instant 24/7',
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Option 2: Tabby Installments
+                  _buildFintxSubMethodTile(
+                    method: FintxPaymentMethod.tabbyInstallments,
+                    icon: Icons.calendar_month_rounded,
+                    iconColor: const Color(0xFF3B82F6),
+                    title: isAr ? 'تابي - قسّمها على 4 دفعات بدون فوائد' : 'Tabby - Split into 4 Payments',
+                    subtitle: isAr
+                        ? '4 دفعات شهرية بقيمة ${aedFormat.format(widget.invoice.total / 4)} وبدون أي فوائد أو رسوم'
+                        : '4 interest-free monthly payments of ${aedFormat.format(widget.invoice.total / 4)}',
+                    badge: '0% Interest',
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Option 3: Tamara Installments
+                  _buildFintxSubMethodTile(
+                    method: FintxPaymentMethod.tamaraInstallments,
+                    icon: Icons.credit_score_rounded,
+                    iconColor: const Color(0xFFF59E0B),
+                    title: isAr ? 'تمارا - قسّم دفعاتك على 3 أشهر' : 'Tamara - Split in 3 Installments',
+                    subtitle: isAr
+                        ? '3 دفعات بقيمة ${aedFormat.format(widget.invoice.total / 3)} ومتوافق مع الشريعة الإسلامية'
+                        : '3 monthly payments of ${aedFormat.format(widget.invoice.total / 3)} - Sharia compliant',
+                    badge: isAr ? 'بدون رسوم تأخير' : 'No Late Fees',
                   ),
                 ] else if (_selectedMethod == PaymentMethod.wallet) ...[
                   // Merchant In-App Wallet Details
@@ -815,9 +844,23 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                                     ? (isAr
                                         ? 'خصم ${aedFormat.format(widget.invoice.total)} من المحفظة'
                                         : 'Pay ${aedFormat.format(widget.invoice.total)} with Wallet')
-                                    : (isAr
-                                        ? 'دفع ${aedFormat.format(widget.invoice.total)}'
-                                        : 'Pay ${aedFormat.format(widget.invoice.total)}'),
+                                    : _selectedMethod == PaymentMethod.fintx
+                                        ? (_selectedFintxSubMethod == FintxPaymentMethod.uaeInstantPaymentAani
+                                            ? (isAr
+                                                ? 'الدفع الفوري ${aedFormat.format(widget.invoice.total)} عبر آني'
+                                                : 'Pay ${aedFormat.format(widget.invoice.total)} via Aani')
+                                            : _selectedFintxSubMethod == FintxPaymentMethod.tabbyInstallments
+                                                ? (isAr
+                                                    ? 'متابعة الدفع عبر تابي (دفعة أولى: ${aedFormat.format(widget.invoice.total / 4)})'
+                                                    : 'Pay via Tabby (1st: ${aedFormat.format(widget.invoice.total / 4)})')
+                                                : (isAr
+                                                    ? 'متابعة الدفع عبر تمارا (دفعة أولى: ${aedFormat.format(widget.invoice.total / 3)})'
+                                                    : 'Pay via Tamara (1st: ${aedFormat.format(widget.invoice.total / 3)})'))
+                                        : _selectedMethod == PaymentMethod.applePay
+                                            ? (isAr ? 'الدفع عبر Apple Pay' : 'Pay with Apple Pay')
+                                            : (isAr
+                                                ? 'دفع ${aedFormat.format(widget.invoice.total)} بالبطاقة'
+                                                : 'Pay ${aedFormat.format(widget.invoice.total)} with Card'),
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     );
@@ -1084,7 +1127,7 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
       onTap: () => setState(() => _selectedMethod = method),
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.bluePrimary : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -1104,6 +1147,92 @@ class _CheckoutPageState extends State<CheckoutPage> with SingleTickerProviderSt
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFintxSubMethodTile({
+    required FintxPaymentMethod method,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required String badge,
+  }) {
+    final isSelected = _selectedFintxSubMethod == method;
+    return InkWell(
+      onTap: () => setState(() => _selectedFintxSubMethod = method),
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? iconColor.withValues(alpha: 0.06) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? iconColor : Colors.grey.shade200,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isSelected ? iconColor : AppColors.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: iconColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: iconColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: isSelected ? iconColor : Colors.grey.shade400,
+              size: 20,
             ),
           ],
         ),

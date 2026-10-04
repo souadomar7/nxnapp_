@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../theme.dart';
 import '../providers/locale_provider.dart';
-import 'payment_page.dart';
 import 'checkout_page.dart';
+import '../services/payment_service.dart';
 import '../models/invoice.dart';
 import '../services/ai_agent_service.dart';
 import 'create_shipment_page.dart';
@@ -1076,9 +1076,34 @@ class _CopilotPageState extends State<CopilotPage> with TickerProviderStateMixin
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
+                final double priceVal = (data['price'] is num)
+                    ? (data['price'] as num).toDouble()
+                    : double.tryParse(data['price'].toString().replaceAll(',', '')) ?? 100.0;
+                final double subtotal = priceVal / 1.05;
+                final double vat = priceVal - subtotal;
+                final invoice = Invoice(
+                  id: 'INV-COPILOT-${DateTime.now().millisecondsSinceEpoch}',
+                  number: 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+                  warehouseName: data['location']?.toString() ?? 'Dubai Warehouse',
+                  date: DateTime.now(),
+                  amount: subtotal,
+                  vat: vat,
+                  paid: false,
+                  type: InvoiceType.rental,
+                  metaData: {
+                    'shelves': data['shelves'],
+                    'duration': data['duration'],
+                    'source': 'copilot_quote_card',
+                  },
+                );
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const PaymentsPage()),
+                  MaterialPageRoute(
+                    builder: (_) => CheckoutPage(
+                      invoice: invoice,
+                      initialMethod: PaymentMethod.fintx,
+                    ),
+                  ),
                 );
               },
               child: const Text("Pay with Fintx / Apple Pay", style: TextStyle(fontSize: 12)),

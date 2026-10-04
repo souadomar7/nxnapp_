@@ -521,8 +521,10 @@ class _CartPageState extends State<CartPage> {
                                         amount: grandTotal,
                                         vat: vat,
                                       );
-                                      await PaymentService.pay(method: PaymentMethod.card, invoice: invoice)
-                                          .timeout(const Duration(seconds: 3));
+                                      await PaymentService.pay(
+                                        method: selectedPaymentMethod == 'apple_pay' ? PaymentMethod.applePay : PaymentMethod.card,
+                                        invoice: invoice,
+                                      ).timeout(const Duration(seconds: 3));
                                     } catch (_) {
                                       // In development/test mode or if server is offline, simulate authorization smoothly
                                       await Future.delayed(const Duration(milliseconds: 600));

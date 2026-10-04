@@ -14,6 +14,8 @@ import '../../pages/onboarding/profile_setup_page.dart';
 import '../../pages/booking_page.dart';
 import '../../pages/request_delivery_page.dart';
 import '../../pages/payment_page.dart';
+import '../../pages/checkout_page.dart';
+import '../../models/invoice.dart';
 import '../../pages/smart_inventory_stage.dart';
 
 import '../../pages/settings/kyc_page.dart';
@@ -134,6 +136,16 @@ class AppRouter {
       GoRoute(
         path: '/payments',
         builder: (_, __) => const PaymentsPage(),
+      ),
+      GoRoute(
+        path: '/checkout',
+        builder: (_, state) {
+          final invoice = state.extra as Invoice?;
+          if (invoice != null) {
+            return CheckoutPage(invoice: invoice);
+          }
+          return const PaymentsPage();
+        },
       ),
       GoRoute(
         path: '/inventory',

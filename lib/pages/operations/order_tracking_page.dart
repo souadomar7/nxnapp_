@@ -4,10 +4,17 @@ import '../../services/marketplace_service.dart';
 
 class OrderTrackingPage extends StatefulWidget {
   final String? orderId;
+  final String? trackingId;
   final String? productName;
   final String? currentStatus; // pending, confirmed, preparing, ready_for_shipment, shipped, delivered
 
-  const OrderTrackingPage({super.key, this.orderId, this.productName, this.currentStatus});
+  const OrderTrackingPage({
+    super.key,
+    this.orderId,
+    this.trackingId,
+    this.productName,
+    this.currentStatus,
+  });
 
   @override
   State<OrderTrackingPage> createState() => _OrderTrackingPageState();
@@ -15,12 +22,19 @@ class OrderTrackingPage extends StatefulWidget {
 
 class _OrderTrackingPageState extends State<OrderTrackingPage> {
   late String _status;
+  String? _resolvedOrderId;
+  String? _resolvedProductName;
   bool _isLoading = false;
+
+  String? get targetOrderId => widget.orderId ?? widget.trackingId ?? _resolvedOrderId;
+  String? get targetProductName => widget.productName ?? _resolvedProductName;
 
   @override
   void initState() {
     super.initState();
     _status = widget.currentStatus ?? 'pending';
+    _resolvedOrderId = widget.orderId ?? widget.trackingId;
+    _resolvedProductName = widget.productName;
     MarketplaceService.updateNotifier.addListener(_onMarketplaceUpdate);
     _refreshStatus();
   }
@@ -36,18 +50,68 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
   }
 
   Future<void> _refreshStatus() async {
-    if (widget.orderId == null) return;
+    final tId = targetOrderId;
     try {
-      final orders = await MarketplaceService().getOrdersForSeller();
-      final match = orders.firstWhere(
-        (o) => o['id'] == widget.orderId,
-        orElse: () => {},
-      );
-      if (match.isNotEmpty && match['status'] != null) {
-        if (mounted) {
-          setState(() {
-            _status = match['status'] as String;
-          });
+      if (tId != null) {
+        final sellerOrders = await MarketplaceService().getOrdersForSeller();
+        final matchSeller = sellerOrders.firstWhere(
+          (o) => o['id'] == tId,
+          orElse: () => {},
+        );
+        if (matchSeller.isNotEmpty && matchSeller['status'] != null) {
+          if (mounted) {
+            setState(() {
+              _status = matchSeller['status'] as String;
+              if (matchSeller['product_name'] != null) {
+                _resolvedProductName = matchSeller['product_name'].toString();
+              }
+            });
+          }
+          return;
+        }
+
+        final buyerOrders = await MarketplaceService().getOrdersForBuyer();
+        final matchBuyer = buyerOrders.firstWhere(
+          (o) => o['id'] == tId,
+          orElse: () => {},
+        );
+        if (matchBuyer.isNotEmpty && matchBuyer['status'] != null) {
+          if (mounted) {
+            setState(() {
+              _status = matchBuyer['status'] as String;
+              if (matchBuyer['product_name'] != null) {
+                _resolvedProductName = matchBuyer['product_name'].toString();
+              }
+            });
+          }
+          return;
+        }
+      } else {
+        // No specific ID passed: look up the user's latest active order
+        final buyerOrders = await MarketplaceService().getOrdersForBuyer();
+        if (buyerOrders.isNotEmpty) {
+          final latest = buyerOrders.first;
+          if (mounted) {
+            setState(() {
+              _resolvedOrderId = latest['id']?.toString();
+              _resolvedProductName = latest['product_name']?.toString() ?? latest['products']?['name']?.toString();
+              _status = latest['status']?.toString() ?? 'pending';
+            });
+          }
+          return;
+        }
+
+        final sellerOrders = await MarketplaceService().getOrdersForSeller();
+        if (sellerOrders.isNotEmpty) {
+          final latest = sellerOrders.first;
+          if (mounted) {
+            setState(() {
+              _resolvedOrderId = latest['id']?.toString();
+              _resolvedProductName = latest['product_name']?.toString() ?? latest['products']?['name']?.toString();
+              _status = latest['status']?.toString() ?? 'pending';
+            });
+          }
+          return;
         }
       }
     } catch (_) {}
@@ -132,7 +196,130 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.orderId != null)
+                  // 1. Live GPS Route Card
+                  Container(
+                    height: 165,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: 0.12,
+                            child: CustomPaint(
+                              painter: _RouteGridPainter(),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10AC84).withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(Icons.navigation_rounded, color: Color(0xFF10AC84), size: 18),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isAr ? 'تتبع الشحنة المباشر عبر GPS' : 'Live GPS Delivery Tracking',
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                          Text(
+                                            isAr ? 'أسطول NXN اللوجستي المعتمد' : 'NXN Certified Dispatch Fleet',
+                                            style: const TextStyle(color: Colors.white60, fontSize: 10),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: _status == 'delivered'
+                                          ? const Color(0xFF10AC84)
+                                          : _status == 'shipped'
+                                              ? Colors.blueAccent
+                                              : const Color(0xFFFF9F43),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      _status == 'delivered'
+                                          ? (isAr ? 'تم التسليم' : 'Delivered')
+                                          : _status == 'shipped'
+                                              ? (isAr ? 'في الطريق 🚚' : 'In Transit 🚚')
+                                              : (isAr ? 'قيد التجهيز 📦' : 'Preparing 📦'),
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isAr ? 'الموعد المتوقع لوصول الشحنة' : 'Estimated Delivery Window',
+                                            style: const TextStyle(color: Colors.white60, fontSize: 10),
+                                          ),
+                                          Text(
+                                            _status == 'delivered'
+                                                ? (isAr ? 'تم التسليم بنجاح إلى العميل' : 'Delivered Successfully')
+                                                : (isAr ? 'اليوم، خلال 2-4 ساعات ⚡' : 'Today, within 2-4 hours ⚡'),
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 2. Order Reference Info
+                  if (targetOrderId != null)
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -149,15 +336,15 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                             children: [
                               Text(isAr ? 'رقم الطلب' : 'Order Reference',
                                   style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                              Text('#${widget.orderId}',
+                              Text('#$targetOrderId',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.bluePrimary)),
                             ],
                           ),
-                          if (widget.productName != null) ...[
+                          if (targetProductName != null) ...[
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                widget.productName!,
+                                targetProductName!,
                                 textAlign: isAr ? TextAlign.left : TextAlign.end,
                                 textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
                                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -170,7 +357,7 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                     ),
                   const SizedBox(height: 24),
                   Text(
-                    isAr ? 'حالة الطلب' : 'Order Status',
+                    isAr ? 'حالة الشحنة والمسار' : 'Shipment Journey',
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 16),
@@ -244,9 +431,40 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
                   }),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                        builder: (_) => Container(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+                              const SizedBox(height: 20),
+                              Text(isAr ? 'مركز مساعدة التوصيل' : 'Delivery Support Center', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Text(isAr ? 'فريق الدعم اللوجستي متاح 24/7 لخدمتكم' : 'Our logistics dispatch team is available 24/7 to assist you.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                              const SizedBox(height: 20),
+                              ListTile(
+                                leading: const CircleAvatar(backgroundColor: Color(0xFF10AC84), child: Icon(Icons.support_agent, color: Colors.white)),
+                                title: Text(isAr ? 'المحادثة الفورية' : 'Live Chat with Dispatch'),
+                                subtitle: Text(isAr ? 'متوسط الرد: أقل من دقيقة' : 'Avg response: < 1 min'),
+                                onTap: () => Navigator.pop(context),
+                              ),
+                              ListTile(
+                                leading: const CircleAvatar(backgroundColor: AppColors.bluePrimary, child: Icon(Icons.call, color: Colors.white)),
+                                title: Text(isAr ? 'اتصال مباشر بالسائق / المشرف' : 'Call Logistics Hotline'),
+                                subtitle: const Text('800-NXN-DELIVERY'),
+                                onTap: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.support_agent_outlined),
-                    label: Text(isAr ? 'تواصل مع الدعم' : 'Contact Support'),
+                    label: Text(isAr ? 'تواصل مع الدعم اللوجستي' : 'Contact Delivery Support'),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -257,6 +475,37 @@ class _OrderTrackingPageState extends State<OrderTrackingPage> {
             ),
     );
   }
+}
+
+class _RouteGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    const step = 20.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+
+    final routePaint = Paint()
+      ..color = const Color(0xFF10AC84)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(20, size.height * 0.8)
+      ..quadraticBezierTo(size.width * 0.4, size.height * 0.2, size.width * 0.8, size.height * 0.5);
+    canvas.drawPath(path, routePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _OrderStep {
