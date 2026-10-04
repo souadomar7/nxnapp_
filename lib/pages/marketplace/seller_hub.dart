@@ -14,7 +14,6 @@ import '../../models/marketplace_models.dart';
 import 'seller_orders_page.dart';
 import 'seller_products_page.dart';
 import 'add_product_page.dart';
-import 'home_seller_marketplace_hub.dart';
 import '../../widgets/marketplace_image.dart';
 import '../booking_page.dart';
 import '../copilot_page.dart';
@@ -1049,17 +1048,6 @@ class _MerchantDashboardViewState extends State<_MerchantDashboardView> {
                                 MaterialPageRoute(
                                   builder: (_) => const RequestDeliveryPage(),
                                 ),
-                              ),
-                            ),
-                            _ActionCard(
-                              title: isAr ? 'منصة الأسر والشركات الصغيرة' : 'Home Seller Sales Hub',
-                              subtitle: isAr ? 'أرفف قياسية بـ 100 درهم وبوابة دفع Fintx المعتمدة' : '100 AED standard shelves, Fintx gateway & transparent pricing',
-                              badge: isAr ? 'قناة جديدة' : 'New Channel',
-                              icon: Icons.storefront_rounded,
-                              color: const Color(0xFF1E3A8A),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const HomeSellerMarketplaceHubPage()),
                               ),
                             ),
                           ],
