@@ -789,13 +789,29 @@ class _AddProductPageState extends State<AddProductPage> {
             ),
           ],
         ),
-        child: SizedBox(
+        child: Container(
           height: 54,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F766E), Color(0xFF10B981)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
           child: ElevatedButton(
             onPressed: _isLoading ? null : _submit,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.bluePrimary,
+              backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
+              shadowColor: Colors.transparent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               elevation: 0,
             ),
@@ -810,7 +826,7 @@ class _AddProductPageState extends State<AddProductPage> {
                         _isEditMode
                             ? (isAr ? 'حفظ التعديلات' : 'Save Changes')
                             : (isAr ? 'نشر المنتج في المتجر' : 'Publish to Marketplace'),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.2),
                       ),
                     ],
                   ),
