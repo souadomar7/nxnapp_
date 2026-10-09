@@ -20,7 +20,6 @@ import '../services/marketplace_service.dart';
 import '../providers/merchant_data_provider.dart';
 import 'login.dart';
 import 'registration_page.dart';
-import 'demo_menu_page.dart';
 import 'admin_panel_page.dart';
 import 'marketplace/seller_orders_page.dart';
 
@@ -538,17 +537,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       builder: (_) => const AdminPanelPage())),
             ),
           if (kDebugMode) ...[
-            _Divider(),
-            _ProfileTile(
-              icon: Icons.developer_mode_rounded,
-              title: 'All Features Demo Menu',
-              subtitle: 'Quick access to all app pages (Debug Only)',
-              iconColor: AppColors.bluePrimary,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const DemoMenuPage())),
-            ),
             _Divider(),
             _ProfileTile(
               icon: Icons.cleaning_services_rounded,
